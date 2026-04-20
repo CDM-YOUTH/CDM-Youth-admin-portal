@@ -12,7 +12,16 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as AdminYouthsRouteImport } from './routes/admin.youths'
 import { Route as AdminWelfareRouteImport } from './routes/admin.welfare'
+import { Route as AdminUniformsRouteImport } from './routes/admin.uniforms'
+import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
+import { Route as AdminReportsRouteImport } from './routes/admin.reports'
+import { Route as AdminMissionRouteImport } from './routes/admin.mission'
+import { Route as AdminFormationRouteImport } from './routes/admin.formation'
+import { Route as AdminEventsRouteImport } from './routes/admin.events'
+import { Route as AdminEnrollmentRouteImport } from './routes/admin.enrollment'
+import { Route as AdminCusaRouteImport } from './routes/admin.cusa'
 
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
@@ -29,36 +38,147 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminYouthsRoute = AdminYouthsRouteImport.update({
+  id: '/youths',
+  path: '/youths',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminWelfareRoute = AdminWelfareRouteImport.update({
   id: '/welfare',
   path: '/welfare',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminUniformsRoute = AdminUniformsRouteImport.update({
+  id: '/uniforms',
+  path: '/uniforms',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSettingsRoute = AdminSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminReportsRoute = AdminReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminMissionRoute = AdminMissionRouteImport.update({
+  id: '/mission',
+  path: '/mission',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminFormationRoute = AdminFormationRouteImport.update({
+  id: '/formation',
+  path: '/formation',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminEventsRoute = AdminEventsRouteImport.update({
+  id: '/events',
+  path: '/events',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminEnrollmentRoute = AdminEnrollmentRouteImport.update({
+  id: '/enrollment',
+  path: '/enrollment',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminCusaRoute = AdminCusaRouteImport.update({
+  id: '/cusa',
+  path: '/cusa',
   getParentRoute: () => AdminRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
+  '/admin/cusa': typeof AdminCusaRoute
+  '/admin/enrollment': typeof AdminEnrollmentRoute
+  '/admin/events': typeof AdminEventsRoute
+  '/admin/formation': typeof AdminFormationRoute
+  '/admin/mission': typeof AdminMissionRoute
+  '/admin/reports': typeof AdminReportsRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/uniforms': typeof AdminUniformsRoute
   '/admin/welfare': typeof AdminWelfareRoute
+  '/admin/youths': typeof AdminYouthsRoute
   '/admin/': typeof AdminIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin/cusa': typeof AdminCusaRoute
+  '/admin/enrollment': typeof AdminEnrollmentRoute
+  '/admin/events': typeof AdminEventsRoute
+  '/admin/formation': typeof AdminFormationRoute
+  '/admin/mission': typeof AdminMissionRoute
+  '/admin/reports': typeof AdminReportsRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/uniforms': typeof AdminUniformsRoute
   '/admin/welfare': typeof AdminWelfareRoute
+  '/admin/youths': typeof AdminYouthsRoute
   '/admin': typeof AdminIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
+  '/admin/cusa': typeof AdminCusaRoute
+  '/admin/enrollment': typeof AdminEnrollmentRoute
+  '/admin/events': typeof AdminEventsRoute
+  '/admin/formation': typeof AdminFormationRoute
+  '/admin/mission': typeof AdminMissionRoute
+  '/admin/reports': typeof AdminReportsRoute
+  '/admin/settings': typeof AdminSettingsRoute
+  '/admin/uniforms': typeof AdminUniformsRoute
   '/admin/welfare': typeof AdminWelfareRoute
+  '/admin/youths': typeof AdminYouthsRoute
   '/admin/': typeof AdminIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/admin' | '/admin/welfare' | '/admin/'
+  fullPaths:
+    | '/'
+    | '/admin'
+    | '/admin/cusa'
+    | '/admin/enrollment'
+    | '/admin/events'
+    | '/admin/formation'
+    | '/admin/mission'
+    | '/admin/reports'
+    | '/admin/settings'
+    | '/admin/uniforms'
+    | '/admin/welfare'
+    | '/admin/youths'
+    | '/admin/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/admin/welfare' | '/admin'
-  id: '__root__' | '/' | '/admin' | '/admin/welfare' | '/admin/'
+  to:
+    | '/'
+    | '/admin/cusa'
+    | '/admin/enrollment'
+    | '/admin/events'
+    | '/admin/formation'
+    | '/admin/mission'
+    | '/admin/reports'
+    | '/admin/settings'
+    | '/admin/uniforms'
+    | '/admin/welfare'
+    | '/admin/youths'
+    | '/admin'
+  id:
+    | '__root__'
+    | '/'
+    | '/admin'
+    | '/admin/cusa'
+    | '/admin/enrollment'
+    | '/admin/events'
+    | '/admin/formation'
+    | '/admin/mission'
+    | '/admin/reports'
+    | '/admin/settings'
+    | '/admin/uniforms'
+    | '/admin/welfare'
+    | '/admin/youths'
+    | '/admin/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -89,6 +209,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/youths': {
+      id: '/admin/youths'
+      path: '/youths'
+      fullPath: '/admin/youths'
+      preLoaderRoute: typeof AdminYouthsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/welfare': {
       id: '/admin/welfare'
       path: '/welfare'
@@ -96,16 +223,90 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminWelfareRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/uniforms': {
+      id: '/admin/uniforms'
+      path: '/uniforms'
+      fullPath: '/admin/uniforms'
+      preLoaderRoute: typeof AdminUniformsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/settings': {
+      id: '/admin/settings'
+      path: '/settings'
+      fullPath: '/admin/settings'
+      preLoaderRoute: typeof AdminSettingsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/reports': {
+      id: '/admin/reports'
+      path: '/reports'
+      fullPath: '/admin/reports'
+      preLoaderRoute: typeof AdminReportsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/mission': {
+      id: '/admin/mission'
+      path: '/mission'
+      fullPath: '/admin/mission'
+      preLoaderRoute: typeof AdminMissionRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/formation': {
+      id: '/admin/formation'
+      path: '/formation'
+      fullPath: '/admin/formation'
+      preLoaderRoute: typeof AdminFormationRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/events': {
+      id: '/admin/events'
+      path: '/events'
+      fullPath: '/admin/events'
+      preLoaderRoute: typeof AdminEventsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/enrollment': {
+      id: '/admin/enrollment'
+      path: '/enrollment'
+      fullPath: '/admin/enrollment'
+      preLoaderRoute: typeof AdminEnrollmentRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/cusa': {
+      id: '/admin/cusa'
+      path: '/cusa'
+      fullPath: '/admin/cusa'
+      preLoaderRoute: typeof AdminCusaRouteImport
+      parentRoute: typeof AdminRoute
+    }
   }
 }
 
 interface AdminRouteChildren {
+  AdminCusaRoute: typeof AdminCusaRoute
+  AdminEnrollmentRoute: typeof AdminEnrollmentRoute
+  AdminEventsRoute: typeof AdminEventsRoute
+  AdminFormationRoute: typeof AdminFormationRoute
+  AdminMissionRoute: typeof AdminMissionRoute
+  AdminReportsRoute: typeof AdminReportsRoute
+  AdminSettingsRoute: typeof AdminSettingsRoute
+  AdminUniformsRoute: typeof AdminUniformsRoute
   AdminWelfareRoute: typeof AdminWelfareRoute
+  AdminYouthsRoute: typeof AdminYouthsRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminCusaRoute: AdminCusaRoute,
+  AdminEnrollmentRoute: AdminEnrollmentRoute,
+  AdminEventsRoute: AdminEventsRoute,
+  AdminFormationRoute: AdminFormationRoute,
+  AdminMissionRoute: AdminMissionRoute,
+  AdminReportsRoute: AdminReportsRoute,
+  AdminSettingsRoute: AdminSettingsRoute,
+  AdminUniformsRoute: AdminUniformsRoute,
   AdminWelfareRoute: AdminWelfareRoute,
+  AdminYouthsRoute: AdminYouthsRoute,
   AdminIndexRoute: AdminIndexRoute,
 }
 
