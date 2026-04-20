@@ -1,5 +1,6 @@
 import { Outlet, createFileRoute } from "@tanstack/react-router";
 import { AdminSidebar } from "@/components/admin/admin-sidebar";
+import { SidebarProvider } from "@/components/admin/sidebar-context";
 
 export const Route = createFileRoute("/admin")({
   component: AdminLayout,
@@ -7,11 +8,13 @@ export const Route = createFileRoute("/admin")({
 
 function AdminLayout() {
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
-      <AdminSidebar />
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <Outlet />
+    <SidebarProvider>
+      <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
+        <AdminSidebar />
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <Outlet />
+        </div>
       </div>
-    </div>
+    </SidebarProvider>
   );
 }

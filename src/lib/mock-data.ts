@@ -34,9 +34,14 @@ export const KPIS_CUSA = [
   { label: "Upcoming Retreats", value: "3", trend: "next 60d", tone: "info" as const, sub: "registration open" },
 ];
 
+// Deterministic ratios per deanery to avoid SSR/CSR hydration mismatch.
+const ENROLLMENT_RATIOS: Record<string, number> = {
+  mc: 0.77, mw: 0.71, ka: 0.83, ki: 0.69, kg: 0.74, kh: 0.88, ga: 0.66, kd: 0.79,
+};
+
 export const ENROLLMENT_BY_DEANERY = DEANERIES.map((d) => ({
   name: d.name,
-  enrolled: Math.round(d.youths * (0.65 + Math.random() * 0.25)),
+  enrolled: Math.round(d.youths * (ENROLLMENT_RATIOS[d.code] ?? 0.75)),
   target: d.youths,
 }));
 
