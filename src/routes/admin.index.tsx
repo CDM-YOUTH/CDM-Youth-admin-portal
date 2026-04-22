@@ -21,11 +21,13 @@ import { Donut } from "@/components/admin/donut";
 import {
   ACTIVITY_FEED,
   CATEGORY_SPLIT,
+  CUSA_BY_DEANERY,
   DEANERIES,
   ENROLLMENT_BY_DEANERY,
   KPIS_CUSA,
   KPIS_ENROLLMENT,
   KPIS_GENERAL,
+  MISSION_BY_DEANERY,
   MISSION_PHASES,
   TOP_PARISHES,
   UPCOMING_EVENTS,
@@ -88,34 +90,7 @@ function DashboardPage() {
 function GeneralTab() {
   return (
     <>
-      <FilterBar>
-        <FilterLabel>Filter by</FilterLabel>
-        <FilterDivider />
-        <select className="min-w-[148px] rounded-md border border-gold-3 bg-bg-3 px-2.5 py-1.5 text-[11px] font-semibold text-gold outline-none">
-          <option>All Deaneries</option>
-          {DEANERIES.map((d) => (
-            <option key={d.code}>{d.name}</option>
-          ))}
-        </select>
-        <span className="text-text-4">›</span>
-        <select
-          disabled
-          className="min-w-[148px] rounded-md border border-border bg-bg-3 px-2.5 py-1.5 text-[11px] font-semibold text-text-2 opacity-40 outline-none"
-        >
-          <option>All Parishes</option>
-        </select>
-        <span className="text-text-4">›</span>
-        <select
-          disabled
-          className="min-w-[148px] rounded-md border border-border bg-bg-3 px-2.5 py-1.5 text-[11px] font-semibold text-text-2 opacity-40 outline-none"
-        >
-          <option>All Local Churches</option>
-        </select>
-        <button className="rounded-md border border-border bg-transparent px-2.5 py-1 text-[9px] text-text-3 hover:border-danger hover:text-danger">
-          ✕ Clear
-        </button>
-        <FilterScope>Diocese-wide</FilterScope>
-      </FilterBar>
+      <OrgFilterBar scope="Diocese-wide" />
 
       <div className="mb-3.5 grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-5">
         {KPIS_GENERAL.map((k) => (
@@ -211,6 +186,39 @@ function GeneralTab() {
   );
 }
 
+function OrgFilterBar({ scope }: { scope: string }) {
+  return (
+    <FilterBar>
+      <FilterLabel>Filter by</FilterLabel>
+      <FilterDivider />
+      <select className="min-w-[148px] rounded-md border border-gold-3 bg-bg-3 px-2.5 py-1.5 text-[11px] font-semibold text-gold outline-none">
+        <option>All Deaneries</option>
+        {DEANERIES.map((d) => (
+          <option key={d.code}>{d.name}</option>
+        ))}
+      </select>
+      <span className="text-text-4">›</span>
+      <select
+        disabled
+        className="min-w-[148px] rounded-md border border-border bg-bg-3 px-2.5 py-1.5 text-[11px] font-semibold text-text-2 opacity-40 outline-none"
+      >
+        <option>All Parishes</option>
+      </select>
+      <span className="text-text-4">›</span>
+      <select
+        disabled
+        className="min-w-[148px] rounded-md border border-border bg-bg-3 px-2.5 py-1.5 text-[11px] font-semibold text-text-2 opacity-40 outline-none"
+      >
+        <option>All Outstations</option>
+      </select>
+      <button className="rounded-md border border-border bg-transparent px-2.5 py-1 text-[9px] text-text-3 hover:border-danger hover:text-danger">
+        ✕ Clear
+      </button>
+      <FilterScope>{scope}</FilterScope>
+    </FilterBar>
+  );
+}
+
 const feedColor: Record<string, string> = {
   enroll: "var(--color-success-soft)",
   event: "var(--color-info-soft)",
@@ -257,6 +265,8 @@ function FeedItem({
 function EnrollmentTab() {
   return (
     <>
+      <OrgFilterBar scope="Enrollment analytics" />
+
       <div className="mb-3.5 flex items-start gap-3.5 rounded-xl border border-success/20 bg-gradient-to-br from-bg-2 to-bg-1 p-4">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-success-soft text-[20px]">
           🌱
@@ -282,49 +292,22 @@ function EnrollmentTab() {
         ))}
       </div>
 
-      <Card>
-        <CardHead title="Pending Approvals" subtitle="23 youths awaiting parish review" action="Open queue →" />
-        <CardBody className="p-0">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-border">
-                {["Name", "Parish", "Category", "Submitted", "Payment", "Status"].map((h) => (
-                  <th
-                    key={h}
-                    className="label-eyebrow px-3.5 py-2.5 text-left"
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                ["Grace Wanjiku", "St. Joseph Murang'a", "Secondary", "2h ago", "Paid", "review"],
-                ["Peter Kamau", "Holy Family Maragua", "Tertiary", "5h ago", "Pending", "review"],
-                ["Mary Njeri", "St. Peter Kandara", "Secondary", "1d ago", "Paid", "review"],
-                ["John Mwangi", "Christ the King Kigumo", "Working", "1d ago", "Paid", "review"],
-                ["Faith Wairimu", "St. Mary Kangema", "Primary", "2d ago", "Pending", "review"],
-              ].map((row, i) => (
-                <tr key={i} className="border-b border-border/30 last:border-0 hover:bg-bg-3">
-                  <td className="px-3.5 py-2.5 text-[11px] font-semibold text-foreground">{row[0]}</td>
-                  <td className="px-3.5 py-2.5 text-[11px] text-text-1">{row[1]}</td>
-                  <td className="px-3.5 py-2.5 text-[11px] text-text-1">{row[2]}</td>
-                  <td className="px-3.5 py-2.5 text-[11px] text-text-3">{row[3]}</td>
-                  <td className="px-3.5 py-2.5">
-                    <Pill tone={row[4] === "Paid" ? "success" : "gold"}>{row[4]}</Pill>
-                  </td>
-                  <td className="px-3.5 py-2.5">
-                    <button className="rounded-md bg-gold px-3 py-1 text-[10px] font-bold text-gold-foreground">
-                      Review
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </CardBody>
-      </Card>
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.25fr_1fr]">
+        <Card>
+          <CardHead title="Enrollment by Deanery" subtitle="Enrolled against annual target" />
+          <CardBody>
+            {ENROLLMENT_BY_DEANERY.map((d) => (
+              <ProgressRow key={d.name} label={d.name} value={d.enrolled} max={d.target} />
+            ))}
+          </CardBody>
+        </Card>
+        <Card>
+          <CardHead title="Enrollment Category Mix" subtitle="Registered youths only" />
+          <CardBody>
+            <Donut data={CATEGORY_SPLIT} />
+          </CardBody>
+        </Card>
+      </div>
     </>
   );
 }
@@ -347,38 +330,31 @@ function Stat({ value, label, tone = "up" }: { value: string; label: string; ton
 function CusaTab() {
   return (
     <>
+      <OrgFilterBar scope="CUSA analytics" />
+
       <div className="mb-3.5 grid grid-cols-2 gap-2.5 lg:grid-cols-4">
         {KPIS_CUSA.map((k) => (
           <Kpi key={k.label} {...k} accent="var(--color-violet)" />
         ))}
       </div>
-      <Card>
-        <CardHead
-          title="University Chapters"
-          subtitle="Catholic University Students Association"
-          action="Manage chapters →"
-        />
-        <CardBody>
-          {[
-            { name: "University of Nairobi", members: 68, lead: "Faith Wairimu" },
-            { name: "Kenyatta University", members: 54, lead: "Brian Otieno" },
-            { name: "JKUAT", members: 42, lead: "Mercy Akinyi" },
-            { name: "Murang'a University", members: 38, lead: "Samuel Mwangi" },
-            { name: "Strathmore", members: 31, lead: "Joy Wanjiru" },
-          ].map((c) => (
-            <div
-              key={c.name}
-              className="flex items-center justify-between border-b border-border/30 py-2.5 last:border-0"
-            >
-              <div>
-                <div className="text-[11px] font-semibold text-text-1">{c.name}</div>
-                <div className="text-[9px] text-text-3">Lead: {c.lead}</div>
-              </div>
-              <Pill tone="violet">{c.members} members</Pill>
-            </div>
-          ))}
-        </CardBody>
-      </Card>
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.25fr_1fr]">
+        <Card>
+          <CardHead title="CUSA Members by Deanery" subtitle="Tertiary youth membership distribution" />
+          <CardBody>
+            {CUSA_BY_DEANERY.map((d) => (
+              <ProgressRow key={d.name} label={d.name} value={d.members} max={74} color="var(--color-violet)" />
+            ))}
+          </CardBody>
+        </Card>
+        <Card>
+          <CardHead title="Chapter Reporting" subtitle="Active members against registered members" />
+          <CardBody>
+            {CUSA_BY_DEANERY.slice(0, 6).map((d) => (
+              <ProgressRow key={d.name} label={d.name} value={d.active} max={d.members} color="var(--color-success)" />
+            ))}
+          </CardBody>
+        </Card>
+      </div>
     </>
   );
 }
@@ -388,6 +364,8 @@ function CusaTab() {
 function MissionTab() {
   return (
     <>
+      <OrgFilterBar scope="Mission Week analytics" />
+
       <Card className="mb-3.5">
         <CardHead title="Mission Week 2026 — Phase Tracker" subtitle="Cross-parish reshuffle in progress" />
         <CardBody className="space-y-1.5">
@@ -429,6 +407,25 @@ function MissionTab() {
         <Kpi label="Nominees" value="247" trend="+47 today" tone="up" />
         <Kpi label="Parishes Participating" value="56 / 56" trend="100%" tone="up" />
         <Kpi label="Reshuffle Pairs" value="124" trend="auto-generated" tone="info" />
+      </div>
+
+      <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+        <Card>
+          <CardHead title="Nominees by Deanery" subtitle="Mission candidates submitted" />
+          <CardBody>
+            {MISSION_BY_DEANERY.map((d) => (
+              <ProgressRow key={d.name} label={d.name} value={d.nominees} max={42} color="var(--color-gold)" />
+            ))}
+          </CardBody>
+        </Card>
+        <Card>
+          <CardHead title="Reports Returned" subtitle="Post-mission reporting completion" />
+          <CardBody>
+            {MISSION_BY_DEANERY.map((d) => (
+              <ProgressRow key={d.name} label={d.name} value={d.reports} max={d.pairs} color="var(--color-info)" />
+            ))}
+          </CardBody>
+        </Card>
       </div>
     </>
   );
