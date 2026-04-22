@@ -372,6 +372,8 @@ function EnrollmentTab() {
   const analytics = useFilteredAnalytics();
   const totals = totalsFor(analytics.units);
   const rows = rollupRows(analytics.units, analytics.filters, "enrolled", "youths");
+  const trendRows = enrollmentTrendRows(analytics.units);
+  const maxTrend = Math.max(...trendRows.map((row) => row.value), 1);
 
   return (
     <>
@@ -409,6 +411,21 @@ function EnrollmentTab() {
           <CardHead title="Enrollment Category Mix" subtitle="Registered youths only" />
           <CardBody>
             <Donut data={categorySplit(analytics.units)} />
+          </CardBody>
+        </Card>
+      </div>
+
+      <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+        <Card>
+          <CardHead title="Enrollment Trend" subtitle="Monthly enrollments within selected filters" />
+          <CardBody>
+            {trendRows.map((row) => <ProgressRow key={row.label} label={row.label} value={row.value} max={maxTrend} color="var(--color-success)" />)}
+          </CardBody>
+        </Card>
+        <Card>
+          <CardHead title="Gender Split" subtitle="Enrolled youths within selected filters" />
+          <CardBody>
+            {genderRows(analytics.units, "enrolled").map((row) => <ProgressRow key={row.label} label={row.label} value={row.value} max={totals.enrolled || 1} color={row.color} />)}
           </CardBody>
         </Card>
       </div>
