@@ -18,6 +18,8 @@ import {
   ProgressRow,
 } from "@/components/admin/ui-bits";
 import { Donut } from "@/components/admin/donut";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { CUSA_INSTITUTIONS, buildCusaMembers, cusaGenderRows, cusaInstitutionRows, cusaMembersFor } from "@/lib/cusa-data";
 import {
   ACTIVITY_FEED,
   ANALYTICS_UNITS,
@@ -139,7 +141,7 @@ function rollupRows(
   units: AnalyticsUnit[],
   filters: FilterState,
   valueKey: "enrolled" | "cusaMembers" | "cusaActive" | "missionNominees" | "missionReports",
-  maxKey: "youths" | "cusaMembers" | "missionPairs",
+  maxKey: "youths" | "cusaMembers" | "missionPairs" | "missionNominees",
 ) {
   const groups = new Map<string, { label: string; value: number; max: number }>();
   units.forEach((unit) => {
@@ -151,6 +153,20 @@ function rollupRows(
     groups.set(key, row);
   });
   return [...groups.values()].sort((a, b) => b.value - a.value);
+}
+
+function cusaRollupRows(units: AnalyticsUnit[], filters: FilterState, institution = "") {
+  const groups = new Map<string, { label: string; value: number; max: number }>();
+  units.forEach((unit) => {
+    const key = filters.parishId ? unit.id : filters.deaneryCode ? unit.parishId : unit.deaneryCode;
+    const label = filters.parishId ? unit.name : filters.deaneryCode ? unit.parishName : unit.deaneryName;
+    const row = groups.get(key) ?? { label, value: 0, max: 0 };
+    const members = cusaMembersFor(unit, institution);
+    row.value += members;
+    row.max += members;
+    groups.set(key, row);
+  });
+  return [...groups.values()].filter((row) => row.value > 0).sort((a, b) => b.value - a.value);
 }
 
 function categorySplit(units: AnalyticsUnit[]) {
@@ -165,6 +181,24 @@ function categorySplit(units: AnalyticsUnit[]) {
 
 function pct(value: number, max: number) {
   return max > 0 ? Math.round((value / max) * 100) : 0;
+}
+
+function genderRows(units: AnalyticsUnit[], metric: "enrolled" | "missionNominees") {
+  const total = units.reduce((sum, unit) => sum + unit[metric], 0);
+  const female = units.reduce((sum, unit) => sum + Math.round(unit[metric] * (0.46 + (unit.youths % 13) / 100)), 0);
+  return [
+    { label: "Female", value: Math.min(female, total), color: "var(--color-pink)" },
+    { label: "Male", value: Math.max(0, total - female), color: "var(--color-info)" },
+  ];
+}
+
+function enrollmentTrendRows(units: AnalyticsUnit[]) {
+  const total = totalsFor(units).enrolled;
+  const weights = [0.16, 0.22, 0.27, 0.35];
+  return ["Jan", "Feb", "Mar", "Apr"].map((label, index) => ({
+    label,
+    value: Math.round(total * weights[index]),
+  }));
 }
 
 /* ---------- TAB: General ---------- */
