@@ -470,33 +470,46 @@ function Stat({ value, label, tone = "up" }: { value: string; label: string; ton
 
 function CusaTab() {
   const analytics = useFilteredAnalytics();
+  const [institution, setInstitution] = useState("");
   const totals = totalsFor(analytics.units);
-  const memberRows = rollupRows(analytics.units, analytics.filters, "cusaMembers", "cusaMembers");
-  const activeRows = rollupRows(analytics.units, analytics.filters, "cusaActive", "cusaMembers");
+  const filteredMembers = analytics.units.reduce((sum, unit) => sum + cusaMembersFor(unit, institution), 0);
+  const memberRows = cusaRollupRows(analytics.units, analytics.filters, institution);
+  const institutionRows = cusaInstitutionRows(analytics.units);
+  const maxInstitution = Math.max(...institutionRows.map((row) => row.value), 1);
+  const gender = cusaGenderRows(analytics.units, institution);
 
   return (
     <>
-      <OrgFilterBar {...analytics} />
+      <OrgFilterBar {...analytics} institution={institution} onInstitutionChange={setInstitution} />
 
       <div className="mb-3.5 grid grid-cols-2 gap-2.5 lg:grid-cols-4">
-        <Kpi label="CUSA Members" value={totals.cusaMembers.toLocaleString()} trend={`${totals.cusaActive} active`} tone="up" accent="var(--color-violet)" sub={analytics.scope} />
-        <Kpi label="Universities" value={String(Math.max(1, Math.round(totals.cusaMembers / 22)))} trend="represented" tone="info" accent="var(--color-violet)" />
+        <Kpi label="CUSA Members" value={filteredMembers.toLocaleString()} trend={`${totals.cusaActive} active`} tone="up" accent="var(--color-violet)" sub={institution || analytics.scope} />
+        <Kpi label="Universities" value={String(institution ? 1 : institutionRows.length)} trend="represented" tone="info" accent="var(--color-violet)" />
         <Kpi label="Active Chapters" value={String(Math.max(1, memberRows.length))} trend="reporting" tone="up" accent="var(--color-violet)" />
         <Kpi label="Activity Rate" value={`${pct(totals.cusaActive, totals.cusaMembers)}%`} trend="active members" tone="up" accent="var(--color-violet)" />
       </div>
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.25fr_1fr]">
         <Card>
-          <CardHead title="CUSA Members Analytics" subtitle="Tertiary youth membership distribution" />
+          <CardHead title="CUSA Members Analytics" subtitle="Members by parish or outstation" />
           <CardBody>
             {memberRows.map((d) => <ProgressRow key={d.label} label={d.label} value={d.value} max={memberRows[0]?.value || 1} color="var(--color-violet)" />)}
           </CardBody>
         </Card>
         <Card>
-          <CardHead title="Chapter Reporting" subtitle="Active members against registered members" />
+          <CardHead title="Chapter Reporting" subtitle="Members by institution" />
           <CardBody>
-            {activeRows.map((d) => <ProgressRow key={d.label} label={d.label} value={d.value} max={d.max} color="var(--color-success)" />)}
+            {(institution ? institutionRows.filter((row) => row.label === institution) : institutionRows).map((d) => <ProgressRow key={d.label} label={d.label} value={d.value} max={maxInstitution} color="var(--color-success)" />)}
           </CardBody>
         </Card>
+      </div>
+      <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+        <Card>
+          <CardHead title="Gender Split" subtitle="CUSA members within selected filters" />
+          <CardBody>
+            {gender.map((row) => <ProgressRow key={row.label} label={row.label} value={row.value} max={filteredMembers || 1} color={row.color} />)}
+          </CardBody>
+        </Card>
+        <CusaMemberTable units={analytics.units} institution={institution} />
       </div>
     </>
   );
