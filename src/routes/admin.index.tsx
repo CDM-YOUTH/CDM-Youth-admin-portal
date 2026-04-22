@@ -515,6 +515,40 @@ function CusaTab() {
   );
 }
 
+function CusaMemberTable({ units, institution }: { units: AnalyticsUnit[]; institution: string }) {
+  const members = buildCusaMembers(units, institution).slice(0, 10);
+
+  return (
+    <Card>
+      <CardHead title="CUSA Members Table" subtitle="Filtered by organization and institution" />
+      <CardBody className="p-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {["Name", "Institution", "Parish", "Outstation", "Gender", "Course", "Status"].map((heading) => (
+                <TableHead key={heading} className="label-eyebrow px-3 py-2">{heading}</TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {members.map((member) => (
+              <TableRow key={member.id} className="border-border/30 hover:bg-bg-3">
+                <TableCell className="px-3 py-2 text-[10px] font-semibold text-foreground">{member.name}</TableCell>
+                <TableCell className="px-3 py-2 text-[10px] text-text-1">{member.institution}</TableCell>
+                <TableCell className="px-3 py-2 text-[10px] text-text-2">{member.parishName}</TableCell>
+                <TableCell className="px-3 py-2 text-[10px] text-text-2">{member.churchName}</TableCell>
+                <TableCell className="px-3 py-2 text-[10px] text-text-2">{member.gender}</TableCell>
+                <TableCell className="px-3 py-2 text-[10px] text-text-2">{member.course} · {member.year}</TableCell>
+                <TableCell className="px-3 py-2"><Pill tone={member.status === "active" ? "success" : "violet"}>{member.status}</Pill></TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardBody>
+    </Card>
+  );
+}
+
 /* ---------- TAB: Mission Week ---------- */
 
 function MissionTab() {
