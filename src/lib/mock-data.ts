@@ -45,6 +45,28 @@ export const ENROLLMENT_BY_DEANERY = DEANERIES.map((d) => ({
   target: d.youths,
 }));
 
+export const CUSA_BY_DEANERY = [
+  { name: "Muranga Central", members: 74, chapters: 3, active: 68 },
+  { name: "Mwea Deanery", members: 38, chapters: 2, active: 31 },
+  { name: "Kangema Deanery", members: 29, chapters: 1, active: 25 },
+  { name: "Kirinyaga West", members: 56, chapters: 3, active: 49 },
+  { name: "Kigumo Deanery", members: 42, chapters: 2, active: 36 },
+  { name: "Kahuro Deanery", members: 21, chapters: 1, active: 18 },
+  { name: "Gatanga Deanery", members: 31, chapters: 1, active: 27 },
+  { name: "Kandara Deanery", members: 21, chapters: 1, active: 19 },
+];
+
+export const MISSION_BY_DEANERY = [
+  { name: "Muranga Central", nominees: 42, pairs: 21, reports: 18 },
+  { name: "Mwea Deanery", nominees: 31, pairs: 16, reports: 13 },
+  { name: "Kangema Deanery", nominees: 24, pairs: 12, reports: 11 },
+  { name: "Kirinyaga West", nominees: 36, pairs: 18, reports: 15 },
+  { name: "Kigumo Deanery", nominees: 29, pairs: 15, reports: 12 },
+  { name: "Kahuro Deanery", nominees: 19, pairs: 10, reports: 8 },
+  { name: "Gatanga Deanery", nominees: 34, pairs: 17, reports: 14 },
+  { name: "Kandara Deanery", nominees: 32, pairs: 16, reports: 13 },
+];
+
 export const CATEGORY_SPLIT = [
   { label: "Primary", value: 2840, color: "var(--color-info)" },
   { label: "Secondary", value: 4210, color: "var(--color-success)" },
