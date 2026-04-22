@@ -580,6 +580,12 @@ function MissionTab() {
             {reportRows.map((d) => <ProgressRow key={d.label} label={d.label} value={d.value} max={d.max} color="var(--color-info)" />)}
           </CardBody>
         </Card>
+        <Card>
+          <CardHead title="Gender Split" subtitle="Mission nominees within selected filters" />
+          <CardBody>
+            {genderRows(analytics.units, "missionNominees").map((row) => <ProgressRow key={row.label} label={row.label} value={row.value} max={totals.missionNominees || 1} color={row.color} />)}
+          </CardBody>
+        </Card>
       </div>
     </>
   );
