@@ -21,11 +21,13 @@ import { Donut } from "@/components/admin/donut";
 import {
   ACTIVITY_FEED,
   CATEGORY_SPLIT,
+  CUSA_BY_DEANERY,
   DEANERIES,
   ENROLLMENT_BY_DEANERY,
   KPIS_CUSA,
   KPIS_ENROLLMENT,
   KPIS_GENERAL,
+  MISSION_BY_DEANERY,
   MISSION_PHASES,
   TOP_PARISHES,
   UPCOMING_EVENTS,
@@ -88,34 +90,7 @@ function DashboardPage() {
 function GeneralTab() {
   return (
     <>
-      <FilterBar>
-        <FilterLabel>Filter by</FilterLabel>
-        <FilterDivider />
-        <select className="min-w-[148px] rounded-md border border-gold-3 bg-bg-3 px-2.5 py-1.5 text-[11px] font-semibold text-gold outline-none">
-          <option>All Deaneries</option>
-          {DEANERIES.map((d) => (
-            <option key={d.code}>{d.name}</option>
-          ))}
-        </select>
-        <span className="text-text-4">›</span>
-        <select
-          disabled
-          className="min-w-[148px] rounded-md border border-border bg-bg-3 px-2.5 py-1.5 text-[11px] font-semibold text-text-2 opacity-40 outline-none"
-        >
-          <option>All Parishes</option>
-        </select>
-        <span className="text-text-4">›</span>
-        <select
-          disabled
-          className="min-w-[148px] rounded-md border border-border bg-bg-3 px-2.5 py-1.5 text-[11px] font-semibold text-text-2 opacity-40 outline-none"
-        >
-          <option>All Local Churches</option>
-        </select>
-        <button className="rounded-md border border-border bg-transparent px-2.5 py-1 text-[9px] text-text-3 hover:border-danger hover:text-danger">
-          ✕ Clear
-        </button>
-        <FilterScope>Diocese-wide</FilterScope>
-      </FilterBar>
+      <OrgFilterBar scope="Diocese-wide" />
 
       <div className="mb-3.5 grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-5">
         {KPIS_GENERAL.map((k) => (
@@ -208,6 +183,39 @@ function GeneralTab() {
         </div>
       </div>
     </>
+  );
+}
+
+function OrgFilterBar({ scope }: { scope: string }) {
+  return (
+    <FilterBar>
+      <FilterLabel>Filter by</FilterLabel>
+      <FilterDivider />
+      <select className="min-w-[148px] rounded-md border border-gold-3 bg-bg-3 px-2.5 py-1.5 text-[11px] font-semibold text-gold outline-none">
+        <option>All Deaneries</option>
+        {DEANERIES.map((d) => (
+          <option key={d.code}>{d.name}</option>
+        ))}
+      </select>
+      <span className="text-text-4">›</span>
+      <select
+        disabled
+        className="min-w-[148px] rounded-md border border-border bg-bg-3 px-2.5 py-1.5 text-[11px] font-semibold text-text-2 opacity-40 outline-none"
+      >
+        <option>All Parishes</option>
+      </select>
+      <span className="text-text-4">›</span>
+      <select
+        disabled
+        className="min-w-[148px] rounded-md border border-border bg-bg-3 px-2.5 py-1.5 text-[11px] font-semibold text-text-2 opacity-40 outline-none"
+      >
+        <option>All Outstations</option>
+      </select>
+      <button className="rounded-md border border-border bg-transparent px-2.5 py-1 text-[9px] text-text-3 hover:border-danger hover:text-danger">
+        ✕ Clear
+      </button>
+      <FilterScope>{scope}</FilterScope>
+    </FilterBar>
   );
 }
 
