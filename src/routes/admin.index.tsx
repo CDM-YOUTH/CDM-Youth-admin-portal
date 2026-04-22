@@ -28,7 +28,6 @@ import {
   KPIS_ENROLLMENT,
   KPIS_GENERAL,
   MISSION_BY_DEANERY,
-  MISSION_PHASES,
   TOP_PARISHES,
   UPCOMING_EVENTS,
 } from "@/lib/mock-data";
@@ -366,50 +365,13 @@ function MissionTab() {
     <>
       <OrgFilterBar scope="Mission Week analytics" />
 
-      <Card className="mb-3.5">
-        <CardHead title="Mission Week 2026 — Phase Tracker" subtitle="Cross-parish reshuffle in progress" />
-        <CardBody className="space-y-1.5">
-          {MISSION_PHASES.map((p) => (
-            <div
-              key={p.phase}
-              className="flex items-center gap-3 rounded-lg border border-border bg-bg-2 px-3 py-2.5"
-            >
-              <span
-                className="h-2.5 w-2.5 shrink-0 rounded-full"
-                style={{
-                  background:
-                    p.status === "done"
-                      ? "var(--color-success)"
-                      : p.status === "active"
-                        ? "var(--color-gold)"
-                        : "var(--color-bg-4)",
-                }}
-              />
-              <div className="flex-1">
-                <div className="text-[11px] font-semibold text-text-1">
-                  Phase {p.phase} — {p.name}
-                </div>
-                <div className="text-[9px] text-text-3">{p.date}</div>
-              </div>
-              <Pill
-                tone={
-                  p.status === "done" ? "success" : p.status === "active" ? "gold" : "neutral"
-                }
-              >
-                {p.status}
-              </Pill>
-            </div>
-          ))}
-        </CardBody>
-      </Card>
-
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+      <div className="mb-3.5 grid grid-cols-1 gap-3 md:grid-cols-3">
         <Kpi label="Nominees" value="247" trend="+47 today" tone="up" />
         <Kpi label="Parishes Participating" value="56 / 56" trend="100%" tone="up" />
         <Kpi label="Reshuffle Pairs" value="124" trend="auto-generated" tone="info" />
       </div>
 
-      <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         <Card>
           <CardHead title="Nominees by Deanery" subtitle="Mission candidates submitted" />
           <CardBody>
