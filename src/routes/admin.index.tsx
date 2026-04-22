@@ -265,6 +265,8 @@ function FeedItem({
 function EnrollmentTab() {
   return (
     <>
+      <OrgFilterBar scope="Enrollment analytics" />
+
       <div className="mb-3.5 flex items-start gap-3.5 rounded-xl border border-success/20 bg-gradient-to-br from-bg-2 to-bg-1 p-4">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-success-soft text-[20px]">
           🌱
@@ -290,49 +292,22 @@ function EnrollmentTab() {
         ))}
       </div>
 
-      <Card>
-        <CardHead title="Pending Approvals" subtitle="23 youths awaiting parish review" action="Open queue →" />
-        <CardBody className="p-0">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-border">
-                {["Name", "Parish", "Category", "Submitted", "Payment", "Status"].map((h) => (
-                  <th
-                    key={h}
-                    className="label-eyebrow px-3.5 py-2.5 text-left"
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                ["Grace Wanjiku", "St. Joseph Murang'a", "Secondary", "2h ago", "Paid", "review"],
-                ["Peter Kamau", "Holy Family Maragua", "Tertiary", "5h ago", "Pending", "review"],
-                ["Mary Njeri", "St. Peter Kandara", "Secondary", "1d ago", "Paid", "review"],
-                ["John Mwangi", "Christ the King Kigumo", "Working", "1d ago", "Paid", "review"],
-                ["Faith Wairimu", "St. Mary Kangema", "Primary", "2d ago", "Pending", "review"],
-              ].map((row, i) => (
-                <tr key={i} className="border-b border-border/30 last:border-0 hover:bg-bg-3">
-                  <td className="px-3.5 py-2.5 text-[11px] font-semibold text-foreground">{row[0]}</td>
-                  <td className="px-3.5 py-2.5 text-[11px] text-text-1">{row[1]}</td>
-                  <td className="px-3.5 py-2.5 text-[11px] text-text-1">{row[2]}</td>
-                  <td className="px-3.5 py-2.5 text-[11px] text-text-3">{row[3]}</td>
-                  <td className="px-3.5 py-2.5">
-                    <Pill tone={row[4] === "Paid" ? "success" : "gold"}>{row[4]}</Pill>
-                  </td>
-                  <td className="px-3.5 py-2.5">
-                    <button className="rounded-md bg-gold px-3 py-1 text-[10px] font-bold text-gold-foreground">
-                      Review
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </CardBody>
-      </Card>
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.25fr_1fr]">
+        <Card>
+          <CardHead title="Enrollment by Deanery" subtitle="Enrolled against annual target" />
+          <CardBody>
+            {ENROLLMENT_BY_DEANERY.map((d) => (
+              <ProgressRow key={d.name} label={d.name} value={d.enrolled} max={d.target} />
+            ))}
+          </CardBody>
+        </Card>
+        <Card>
+          <CardHead title="Enrollment Category Mix" subtitle="Registered youths only" />
+          <CardBody>
+            <Donut data={CATEGORY_SPLIT} />
+          </CardBody>
+        </Card>
+      </div>
     </>
   );
 }
