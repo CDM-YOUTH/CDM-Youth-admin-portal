@@ -1,91 +1,235 @@
-// Mock data for CDM Youth Management System — Phase 1 (no backend yet).
+export type LocalChurch = {
+  id: string;
+  name: string;
+  youths: number;
+  enrolled: number;
+  cusaMembers: number;
+  cusaActive: number;
+  missionNominees: number;
+  missionPairs: number;
+  missionReports: number;
+  categories: {
+    primary: number;
+    secondary: number;
+    tertiary: number;
+    working: number;
+  };
+};
 
-export const DEANERIES = [
-  { code: "mc", name: "Muranga Central", parishes: 9, youths: 1820 },
-  { code: "mw", name: "Mwea Deanery", parishes: 7, youths: 1340 },
-  { code: "ka", name: "Kangema Deanery", parishes: 6, youths: 1105 },
-  { code: "ki", name: "Kirinyaga West", parishes: 8, youths: 1620 },
-  { code: "kg", name: "Kigumo Deanery", parishes: 7, youths: 1280 },
-  { code: "kh", name: "Kahuro Deanery", parishes: 5, youths: 980 },
-  { code: "ga", name: "Gatanga Deanery", parishes: 7, youths: 1410 },
-  { code: "kd", name: "Kandara Deanery", parishes: 7, youths: 1395 },
+export type Parish = {
+  id: string;
+  name: string;
+  churches: LocalChurch[];
+};
+
+export type Deanery = {
+  code: string;
+  name: string;
+  parishes: Parish[];
+};
+
+const parishLists: Array<{ code: string; name: string; parishes: string[] }> = [
+  {
+    code: "tuthu",
+    name: "Tuthu Deanery",
+    parishes: ["Tuthu", "Kanyenya-Ini", "Muthangari", "Kahatia", "Kiria-Ini", "Kiangunyi"],
+  },
+  {
+    code: "muranga",
+    name: "Murang’a Deanery",
+    parishes: ["Gitui", "Gaturi", "Mugoiri", "Cathedral", "Mumbi"],
+  },
+  {
+    code: "mwea",
+    name: "Mwea Deanery",
+    parishes: ["Karaba", "Kimbimbi", "Mwea", "Sagana", "Wang’uru"],
+  },
+  {
+    code: "kianyaga",
+    name: "Kianyaga Deanery",
+    parishes: ["Kiamutugu", "Karumandi", "Kianyaga", "Difathas", "Piai", "Kutus"],
+  },
+  {
+    code: "maragua",
+    name: "Maragua Deanery",
+    parishes: ["Sabasaba", "Ichagaki", "Ithanga", "Kitito", "Muthithi", "Maragwa", "Makuyu", "Kenol"],
+  },
+  {
+    code: "gaichanjiru",
+    name: "Gaichanjiru Deanery",
+    parishes: ["Nguthuru", "Ndonga", "Makomboki", "Mununga", "Kariua", "Kangari", "Mariira", "Gaichanjiru"],
+  },
+  {
+    code: "gatanga",
+    name: "Gatanga Deanery",
+    parishes: ["Mukurwe", "Ruchu", "Kaburugi", "Gacharage", "Mahuti", "Mukarara", "Gatanga", "Gatura"],
+  },
+  {
+    code: "baricho",
+    name: "Baricho Deanery",
+    parishes: ["Kibingoti", "Kiang’ombe", "Kiangai", "Kangaita", "Baricho", "Gathambi", "Kagio", "Kerugoya", "Kagumo"],
+  },
 ];
 
+const churchPrefixes = ["St. Mary", "St. Joseph", "Holy Family", "Christ the King", "St. Peter"];
+const churchSuffixes = ["Youth Centre", "Outstation", "Chapel", "Community", "Mission"];
+
+function slug(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[’']/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+function churchMetrics(deaneryIndex: number, parishIndex: number, churchIndex: number, parishName: string): LocalChurch {
+  const seed = (deaneryIndex + 2) * 37 + (parishIndex + 3) * 19 + (churchIndex + 1) * 11;
+  const youths = 56 + (seed % 96) + churchIndex * 13;
+  const enrolled = Math.round(youths * (0.62 + (seed % 27) / 100));
+  const cusaMembers = 4 + (seed % 18);
+  const cusaActive = Math.max(1, Math.round(cusaMembers * (0.68 + (seed % 19) / 100)));
+  const missionNominees = 2 + (seed % 9);
+  const missionPairs = Math.max(1, Math.round(missionNominees / 2));
+  const missionReports = Math.max(1, Math.min(missionPairs, missionPairs - (seed % 3 === 0 ? 1 : 0)));
+  const primary = Math.round(enrolled * (0.2 + (seed % 7) / 100));
+  const secondary = Math.round(enrolled * (0.36 + (seed % 9) / 100));
+  const tertiary = Math.round(enrolled * (0.18 + (seed % 6) / 100));
+  const working = Math.max(0, enrolled - primary - secondary - tertiary);
+
+  return {
+    id: `${slug(parishName)}-${churchIndex + 1}`,
+    name: `${churchPrefixes[(seed + churchIndex) % churchPrefixes.length]} ${parishName} ${churchSuffixes[(seed + parishIndex) % churchSuffixes.length]}`,
+    youths,
+    enrolled,
+    cusaMembers,
+    cusaActive,
+    missionNominees,
+    missionPairs,
+    missionReports,
+    categories: { primary, secondary, tertiary, working },
+  };
+}
+
+export const ORGANIZATION: Deanery[] = parishLists.map((deanery, deaneryIndex) => ({
+  ...deanery,
+  parishes: deanery.parishes.map((parishName, parishIndex) => ({
+    id: `${deanery.code}-${slug(parishName)}`,
+    name: parishName,
+    churches: Array.from({ length: 3 }, (_, churchIndex) =>
+      churchMetrics(deaneryIndex, parishIndex, churchIndex, parishName),
+    ),
+  })),
+}));
+
+export type AnalyticsUnit = LocalChurch & {
+  deaneryCode: string;
+  deaneryName: string;
+  parishId: string;
+  parishName: string;
+};
+
+export const ANALYTICS_UNITS: AnalyticsUnit[] = ORGANIZATION.flatMap((deanery) =>
+  deanery.parishes.flatMap((parish) =>
+    parish.churches.map((church) => ({
+      ...church,
+      deaneryCode: deanery.code,
+      deaneryName: deanery.name,
+      parishId: parish.id,
+      parishName: parish.name,
+    })),
+  ),
+);
+
+function sumUnits(units: AnalyticsUnit[]) {
+  return units.reduce(
+    (acc, unit) => ({
+      youths: acc.youths + unit.youths,
+      enrolled: acc.enrolled + unit.enrolled,
+      cusaMembers: acc.cusaMembers + unit.cusaMembers,
+      cusaActive: acc.cusaActive + unit.cusaActive,
+      missionNominees: acc.missionNominees + unit.missionNominees,
+      missionPairs: acc.missionPairs + unit.missionPairs,
+      missionReports: acc.missionReports + unit.missionReports,
+    }),
+    { youths: 0, enrolled: 0, cusaMembers: 0, cusaActive: 0, missionNominees: 0, missionPairs: 0, missionReports: 0 },
+  );
+}
+
+export const DEANERIES = ORGANIZATION.map((deanery) => {
+  const totals = sumUnits(ANALYTICS_UNITS.filter((unit) => unit.deaneryCode === deanery.code));
+  return { code: deanery.code, name: deanery.name, parishes: deanery.parishes.length, youths: totals.youths };
+});
+
+const totals = sumUnits(ANALYTICS_UNITS);
+
 export const KPIS_GENERAL = [
-  { label: "Total Youths", value: "10,950", trend: "+8.2%", tone: "up" as const, sub: "vs. last year" },
-  { label: "Active Parishes", value: "56", trend: "+3 new", tone: "up" as const, sub: "this year" },
+  { label: "Total Youths", value: totals.youths.toLocaleString(), trend: "+8.2%", tone: "up" as const, sub: "mock baseline" },
+  { label: "Active Parishes", value: String(ORGANIZATION.reduce((sum, d) => sum + d.parishes.length, 0)), trend: "+3 new", tone: "up" as const, sub: "from deanery list" },
   { label: "Open Welfare Cases", value: "5", trend: "2 urgent", tone: "warn" as const, sub: "needs attention" },
   { label: "Upcoming Events", value: "12", trend: "next 30d", tone: "info" as const, sub: "diocese-wide" },
   { label: "Formation Items", value: "84", trend: "+6", tone: "up" as const, sub: "this month" },
 ];
 
 export const KPIS_ENROLLMENT = [
-  { label: "Enrolled 2026", value: "8,240", trend: "75% of target", tone: "up" as const, sub: "of 11,000" },
+  { label: "Enrolled 2026", value: totals.enrolled.toLocaleString(), trend: `${Math.round((totals.enrolled / totals.youths) * 100)}% of target`, tone: "up" as const, sub: `of ${totals.youths.toLocaleString()}` },
   { label: "Pending Payment", value: "412", trend: "KES 206,000", tone: "warn" as const, sub: "outstanding" },
-  { label: "Self-Registered", value: "3,180", trend: "39% of total", tone: "info" as const, sub: "via Youth Portal" },
+  { label: "Self-Registered", value: Math.round(totals.enrolled * 0.39).toLocaleString(), trend: "39% of total", tone: "info" as const, sub: "via Youth Portal" },
   { label: "Awaiting Approval", value: "23", trend: "parish review", tone: "warn" as const, sub: "queue" },
-  { label: "Completion Rate", value: "94%", trend: "+2.1%", tone: "up" as const, sub: "vs. 2025" },
+  { label: "Completion Rate", value: `${Math.round((totals.enrolled / totals.youths) * 100)}%`, trend: "+2.1%", tone: "up" as const, sub: "vs. 2025" },
 ];
 
 export const KPIS_CUSA = [
-  { label: "CUSA Members", value: "312", trend: "+18", tone: "up" as const, sub: "this semester" },
+  { label: "CUSA Members", value: totals.cusaMembers.toLocaleString(), trend: "+18", tone: "up" as const, sub: "this semester" },
   { label: "Universities", value: "14", trend: "+2 new", tone: "up" as const, sub: "represented" },
-  { label: "Active Chapters", value: "9", trend: "all reporting", tone: "up" as const, sub: "monthly" },
+  { label: "Active Chapters", value: String(DEANERIES.length + 1), trend: "all reporting", tone: "up" as const, sub: "monthly" },
   { label: "Upcoming Retreats", value: "3", trend: "next 60d", tone: "info" as const, sub: "registration open" },
 ];
 
-// Deterministic ratios per deanery to avoid SSR/CSR hydration mismatch.
-const ENROLLMENT_RATIOS: Record<string, number> = {
-  mc: 0.77, mw: 0.71, ka: 0.83, ki: 0.69, kg: 0.74, kh: 0.88, ga: 0.66, kd: 0.79,
-};
+export const ENROLLMENT_BY_DEANERY = DEANERIES.map((deanery) => {
+  const row = sumUnits(ANALYTICS_UNITS.filter((unit) => unit.deaneryCode === deanery.code));
+  return { name: deanery.name, enrolled: row.enrolled, target: row.youths };
+});
 
-export const ENROLLMENT_BY_DEANERY = DEANERIES.map((d) => ({
-  name: d.name,
-  enrolled: Math.round(d.youths * (ENROLLMENT_RATIOS[d.code] ?? 0.75)),
-  target: d.youths,
-}));
+export const CUSA_BY_DEANERY = DEANERIES.map((deanery) => {
+  const row = sumUnits(ANALYTICS_UNITS.filter((unit) => unit.deaneryCode === deanery.code));
+  return { name: deanery.name, members: row.cusaMembers, chapters: deanery.parishes, active: row.cusaActive };
+});
 
-export const CUSA_BY_DEANERY = [
-  { name: "Muranga Central", members: 74, chapters: 3, active: 68 },
-  { name: "Mwea Deanery", members: 38, chapters: 2, active: 31 },
-  { name: "Kangema Deanery", members: 29, chapters: 1, active: 25 },
-  { name: "Kirinyaga West", members: 56, chapters: 3, active: 49 },
-  { name: "Kigumo Deanery", members: 42, chapters: 2, active: 36 },
-  { name: "Kahuro Deanery", members: 21, chapters: 1, active: 18 },
-  { name: "Gatanga Deanery", members: 31, chapters: 1, active: 27 },
-  { name: "Kandara Deanery", members: 21, chapters: 1, active: 19 },
-];
+export const MISSION_BY_DEANERY = DEANERIES.map((deanery) => {
+  const row = sumUnits(ANALYTICS_UNITS.filter((unit) => unit.deaneryCode === deanery.code));
+  return { name: deanery.name, nominees: row.missionNominees, pairs: row.missionPairs, reports: row.missionReports };
+});
 
-export const MISSION_BY_DEANERY = [
-  { name: "Muranga Central", nominees: 42, pairs: 21, reports: 18 },
-  { name: "Mwea Deanery", nominees: 31, pairs: 16, reports: 13 },
-  { name: "Kangema Deanery", nominees: 24, pairs: 12, reports: 11 },
-  { name: "Kirinyaga West", nominees: 36, pairs: 18, reports: 15 },
-  { name: "Kigumo Deanery", nominees: 29, pairs: 15, reports: 12 },
-  { name: "Kahuro Deanery", nominees: 19, pairs: 10, reports: 8 },
-  { name: "Gatanga Deanery", nominees: 34, pairs: 17, reports: 14 },
-  { name: "Kandara Deanery", nominees: 32, pairs: 16, reports: 13 },
-];
+const categoryTotals = ANALYTICS_UNITS.reduce(
+  (acc, unit) => ({
+    primary: acc.primary + unit.categories.primary,
+    secondary: acc.secondary + unit.categories.secondary,
+    tertiary: acc.tertiary + unit.categories.tertiary,
+    working: acc.working + unit.categories.working,
+  }),
+  { primary: 0, secondary: 0, tertiary: 0, working: 0 },
+);
 
 export const CATEGORY_SPLIT = [
-  { label: "Primary", value: 2840, color: "var(--color-info)" },
-  { label: "Secondary", value: 4210, color: "var(--color-success)" },
-  { label: "Tertiary / CUSA", value: 1860, color: "var(--color-violet)" },
-  { label: "Working Youth", value: 2040, color: "var(--color-gold)" },
+  { label: "Primary", value: categoryTotals.primary, color: "var(--color-info)" },
+  { label: "Secondary", value: categoryTotals.secondary, color: "var(--color-success)" },
+  { label: "Tertiary / CUSA", value: categoryTotals.tertiary, color: "var(--color-violet)" },
+  { label: "Working Youth", value: categoryTotals.working, color: "var(--color-gold)" },
 ];
 
-export const TOP_PARISHES = [
-  { name: "St. Joseph Murang'a", enrolled: 482 },
-  { name: "Holy Family Maragua", enrolled: 421 },
-  { name: "St. Peter Kandara", enrolled: 398 },
-  { name: "Christ the King Kigumo", enrolled: 356 },
-  { name: "St. Mary Kangema", enrolled: 312 },
-];
+export const TOP_PARISHES = ORGANIZATION.flatMap((deanery) =>
+  deanery.parishes.map((parish) => ({
+    name: parish.name,
+    enrolled: parish.churches.reduce((sum, church) => sum + church.enrolled, 0),
+  })),
+)
+  .sort((a, b) => b.enrolled - a.enrolled)
+  .slice(0, 5);
 
 export const ACTIVITY_FEED = [
-  { kind: "enroll", title: "Enrolled", who: "Grace Wanjiku", where: "St. Joseph · Secondary", time: "2m" },
+  { kind: "enroll", title: "Enrolled", who: "Grace Wanjiku", where: "Cathedral · Secondary", time: "2m" },
   { kind: "event", title: "Event scheduled", who: "Diocesan Youth Day", where: "Palm Sunday · 29 Mar", time: "1h" },
-  { kind: "mission", title: "Mission Week", who: "47 nominees", where: "8 parish coordinators", time: "3h" },
+  { kind: "mission", title: "Mission Week", who: `${totals.missionNominees} nominees`, where: "8 deanery coordinators", time: "3h" },
   { kind: "welfare", title: "Welfare case opened", who: "Mental Health", where: "Anonymous · Assigned", time: "5h" },
   { kind: "uniform", title: "Uniform order", who: "120 sets", where: "Mwea Deanery", time: "8h" },
   { kind: "formation", title: "Content published", who: "Lent Reflection #4", where: "Diocese Library", time: "12h" },
@@ -102,16 +246,16 @@ export const MISSION_PHASES = [
 export const UPCOMING_EVENTS = [
   { day: "29", month: "Mar", name: "Diocesan Youth Day", parish: "All Parishes", rsvp: 1240 },
   { day: "06", month: "Apr", name: "CUSA Easter Retreat", parish: "Subukia Shrine", rsvp: 184 },
-  { day: "13", month: "Apr", name: "Confirmation Class", parish: "St. Joseph Murang'a", rsvp: 86 },
+  { day: "13", month: "Apr", name: "Confirmation Class", parish: "Cathedral", rsvp: 86 },
   { day: "27", month: "Apr", name: "Youth Leaders Forum", parish: "Bishop's House", rsvp: 56 },
 ];
 
 export const WELFARE_CASES = [
-  { id: "WF-2026-014", category: "Mental Health", urgency: "high", parish: "St. Peter Kandara", opened: "5h ago", assigned: "Fr. James" },
+  { id: "WF-2026-014", category: "Mental Health", urgency: "high", parish: "Kagio", opened: "5h ago", assigned: "Fr. James" },
   { id: "WF-2026-013", category: "Early Pregnancy", urgency: "high", parish: "Anonymous", opened: "1d ago", assigned: "Sr. Mary" },
-  { id: "WF-2026-012", category: "Substance Abuse", urgency: "medium", parish: "Holy Family Maragua", opened: "2d ago", assigned: "Fr. Paul" },
-  { id: "WF-2026-011", category: "School Fees", urgency: "low", parish: "St. Mary Kangema", opened: "4d ago", assigned: "Office" },
-  { id: "WF-2026-010", category: "Family Crisis", urgency: "medium", parish: "Christ the King Kigumo", opened: "6d ago", assigned: "Fr. James" },
+  { id: "WF-2026-012", category: "Substance Abuse", urgency: "medium", parish: "Maragwā", opened: "2d ago", assigned: "Fr. Paul" },
+  { id: "WF-2026-011", category: "School Fees", urgency: "low", parish: "Kangari", opened: "4d ago", assigned: "Office" },
+  { id: "WF-2026-010", category: "Family Crisis", urgency: "medium", parish: "Kiria-Ini", opened: "6d ago", assigned: "Fr. James" },
 ];
 
 export const FORMATION_ITEMS = [
