@@ -330,38 +330,31 @@ function Stat({ value, label, tone = "up" }: { value: string; label: string; ton
 function CusaTab() {
   return (
     <>
+      <OrgFilterBar scope="CUSA analytics" />
+
       <div className="mb-3.5 grid grid-cols-2 gap-2.5 lg:grid-cols-4">
         {KPIS_CUSA.map((k) => (
           <Kpi key={k.label} {...k} accent="var(--color-violet)" />
         ))}
       </div>
-      <Card>
-        <CardHead
-          title="University Chapters"
-          subtitle="Catholic University Students Association"
-          action="Manage chapters →"
-        />
-        <CardBody>
-          {[
-            { name: "University of Nairobi", members: 68, lead: "Faith Wairimu" },
-            { name: "Kenyatta University", members: 54, lead: "Brian Otieno" },
-            { name: "JKUAT", members: 42, lead: "Mercy Akinyi" },
-            { name: "Murang'a University", members: 38, lead: "Samuel Mwangi" },
-            { name: "Strathmore", members: 31, lead: "Joy Wanjiru" },
-          ].map((c) => (
-            <div
-              key={c.name}
-              className="flex items-center justify-between border-b border-border/30 py-2.5 last:border-0"
-            >
-              <div>
-                <div className="text-[11px] font-semibold text-text-1">{c.name}</div>
-                <div className="text-[9px] text-text-3">Lead: {c.lead}</div>
-              </div>
-              <Pill tone="violet">{c.members} members</Pill>
-            </div>
-          ))}
-        </CardBody>
-      </Card>
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.25fr_1fr]">
+        <Card>
+          <CardHead title="CUSA Members by Deanery" subtitle="Tertiary youth membership distribution" />
+          <CardBody>
+            {CUSA_BY_DEANERY.map((d) => (
+              <ProgressRow key={d.name} label={d.name} value={d.members} max={74} color="var(--color-violet)" />
+            ))}
+          </CardBody>
+        </Card>
+        <Card>
+          <CardHead title="Chapter Reporting" subtitle="Active members against registered members" />
+          <CardBody>
+            {CUSA_BY_DEANERY.slice(0, 6).map((d) => (
+              <ProgressRow key={d.name} label={d.name} value={d.active} max={d.members} color="var(--color-success)" />
+            ))}
+          </CardBody>
+        </Card>
+      </div>
     </>
   );
 }
@@ -371,6 +364,8 @@ function CusaTab() {
 function MissionTab() {
   return (
     <>
+      <OrgFilterBar scope="Mission Week analytics" />
+
       <Card className="mb-3.5">
         <CardHead title="Mission Week 2026 — Phase Tracker" subtitle="Cross-parish reshuffle in progress" />
         <CardBody className="space-y-1.5">
@@ -412,6 +407,25 @@ function MissionTab() {
         <Kpi label="Nominees" value="247" trend="+47 today" tone="up" />
         <Kpi label="Parishes Participating" value="56 / 56" trend="100%" tone="up" />
         <Kpi label="Reshuffle Pairs" value="124" trend="auto-generated" tone="info" />
+      </div>
+
+      <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+        <Card>
+          <CardHead title="Nominees by Deanery" subtitle="Mission candidates submitted" />
+          <CardBody>
+            {MISSION_BY_DEANERY.map((d) => (
+              <ProgressRow key={d.name} label={d.name} value={d.nominees} max={42} color="var(--color-gold)" />
+            ))}
+          </CardBody>
+        </Card>
+        <Card>
+          <CardHead title="Reports Returned" subtitle="Post-mission reporting completion" />
+          <CardBody>
+            {MISSION_BY_DEANERY.map((d) => (
+              <ProgressRow key={d.name} label={d.name} value={d.reports} max={d.pairs} color="var(--color-info)" />
+            ))}
+          </CardBody>
+        </Card>
       </div>
     </>
   );
