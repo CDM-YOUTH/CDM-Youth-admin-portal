@@ -150,13 +150,15 @@ export function ProgressRow({
   value,
   max,
   color = "var(--color-gold)",
+  suffix = "",
 }: {
   label: string;
   value: number;
   max: number;
   color?: string;
+  suffix?: string;
 }) {
-  const pct = Math.min(100, Math.round((value / max) * 100));
+  const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
   return (
     <div className="mb-2 flex items-center gap-2">
       <span className="w-32 shrink-0 truncate text-[10px] text-text-2">{label}</span>
@@ -166,7 +168,9 @@ export function ProgressRow({
           style={{ width: `${pct}%`, background: color }}
         />
       </div>
-      <span className="w-9 shrink-0 text-right text-[10px] font-bold text-text-1">{pct}%</span>
+      <span className="w-14 shrink-0 text-right text-[10px] font-bold text-text-1">
+        {value.toLocaleString()}{suffix}
+      </span>
     </div>
   );
 }
