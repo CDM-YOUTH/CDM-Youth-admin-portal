@@ -292,7 +292,15 @@ function GeneralTab() {
   );
 }
 
-function OrgFilterBar({ filters, setFilters, selectedDeanery, selectedParish, scope }: ReturnType<typeof useFilteredAnalytics>) {
+function OrgFilterBar({
+  filters,
+  setFilters,
+  selectedDeanery,
+  selectedParish,
+  scope,
+  institution,
+  onInstitutionChange,
+}: ReturnType<typeof useFilteredAnalytics> & { institution?: string; onInstitutionChange?: (value: string) => void }) {
   return (
     <FilterBar>
       <FilterLabel>Filter by</FilterLabel>
@@ -331,8 +339,24 @@ function OrgFilterBar({ filters, setFilters, selectedDeanery, selectedParish, sc
           <option key={church.id} value={church.id}>{church.name}</option>
         ))}
       </select>
+      {onInstitutionChange && (
+        <>
+          <span className="text-text-4">›</span>
+          <select
+            value={institution ?? ""}
+            onChange={(event) => onInstitutionChange(event.target.value)}
+            className="min-w-[168px] rounded-md border border-violet bg-bg-3 px-2.5 py-1.5 text-[11px] font-semibold text-violet outline-none"
+          >
+            <option value="">All Institutions</option>
+            {CUSA_INSTITUTIONS.map((name) => <option key={name} value={name}>{name}</option>)}
+          </select>
+        </>
+      )}
       <button
-        onClick={() => setFilters(emptyFilters)}
+        onClick={() => {
+          setFilters(emptyFilters);
+          onInstitutionChange?.("");
+        }}
         className="rounded-md border border-border bg-transparent px-2.5 py-1 text-[9px] text-text-3 hover:border-danger hover:text-danger"
       >
         ✕ Clear
