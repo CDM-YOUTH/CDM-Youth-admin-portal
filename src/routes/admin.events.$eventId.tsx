@@ -120,3 +120,29 @@ function RowItem({ title, meta }: { title: string; meta: string }) {
     </div>
   );
 }
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="space-y-1 text-[10px] font-bold uppercase tracking-wide text-text-3">
+      <span>{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function SelectField({ label, placeholder, values }: { label: string; placeholder: string; values: string[] }) {
+  return (
+    <Field label={label}>
+      <Select>
+        <SelectTrigger>
+          <SelectValue placeholder={placeholder} />
+        </SelectTrigger>
+        <SelectContent>
+          {values.map((value) => (
+            <SelectItem key={value} value={value}>{value}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </Field>
+  );
+}
