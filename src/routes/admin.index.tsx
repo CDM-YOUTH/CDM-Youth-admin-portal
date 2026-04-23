@@ -46,6 +46,7 @@ export const Route = createFileRoute("/admin/")({
 
 type Tab = "general" | "enrollment" | "cusa" | "mission";
 type FilterState = { deaneryCode: string; parishId: string; churchId: string };
+type ChartDisplay = "count" | "percent";
 
 const emptyFilters: FilterState = { deaneryCode: "", parishId: "", churchId: "" };
 
@@ -184,6 +185,24 @@ function pct(value: number, max: number) {
   return max > 0 ? Math.round((value / max) * 100) : 0;
 }
 
+function ChartDisplayToggle({ value, onChange }: { value: ChartDisplay; onChange: (value: ChartDisplay) => void }) {
+  return (
+    <div className="inline-flex rounded-md border border-border bg-bg-3 p-0.5">
+      {(["count", "percent"] as const).map((mode) => (
+        <button
+          key={mode}
+          onClick={() => onChange(mode)}
+          className={`rounded px-2 py-0.5 text-[9px] font-bold transition ${
+            value === mode ? "bg-gold text-gold-foreground" : "text-text-3 hover:text-gold"
+          }`}
+        >
+          {mode === "count" ? "No." : "%"}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function genderRows(units: AnalyticsUnit[], metric: "enrolled" | "missionNominees") {
   const total = units.reduce((sum, unit) => sum + unit[metric], 0);
   const female = units.reduce((sum, unit) => sum + Math.round(unit[metric] * (0.46 + (unit.youths % 13) / 100)), 0);
@@ -212,6 +231,7 @@ function enrollmentTrendRows(units: AnalyticsUnit[]) {
 
 function GeneralTab() {
   const analytics = useFilteredAnalytics();
+  const [chartDisplay, setChartDisplay] = useState<ChartDisplay>("count");
   const totals = totalsFor(analytics.units);
   const enrollmentRows = rollupRows(analytics.units, analytics.filters, "enrolled", "youths");
   const topParishes = analytics.filters.deaneryCode
@@ -233,26 +253,26 @@ function GeneralTab() {
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.3fr_1fr]">
         <div className="flex flex-col gap-3">
           <Card>
-            <CardHead title="Enrollment Analytics" subtitle="Changes with deanery, parish, and outstation filters" />
+            <CardHead title="Enrollment Analytics" subtitle="Changes with deanery, parish, and outstation filters" action={<ChartDisplayToggle value={chartDisplay} onChange={setChartDisplay} />} />
             <CardBody>
               {enrollmentRows.slice(0, 8).map((d) => (
-                <ProgressRow key={d.label} label={d.label} value={d.value} max={d.max} color="var(--color-gold)" />
+                <ProgressRow key={d.label} label={d.label} value={d.value} max={d.max} color="var(--color-gold)" display={chartDisplay} />
               ))}
             </CardBody>
           </Card>
 
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <Card>
-              <CardHead title="By Category" />
+              <CardHead title="By Category" action={<ChartDisplayToggle value={chartDisplay} onChange={setChartDisplay} />} />
               <CardBody>
-                <Donut data={categorySplit(analytics.units)} />
+                <Donut data={categorySplit(analytics.units)} display={chartDisplay} />
               </CardBody>
             </Card>
             <Card>
-              <CardHead title="Gender Split" />
+              <CardHead title="Gender Split" action={<ChartDisplayToggle value={chartDisplay} onChange={setChartDisplay} />} />
               <CardBody>
-                <ProgressRow label="Male" value={Math.round(totals.enrolled * 0.54)} max={totals.enrolled || 1} color="var(--color-info)" />
-                <ProgressRow label="Female" value={Math.round(totals.enrolled * 0.46)} max={totals.enrolled || 1} color="var(--color-pink)" />
+                <ProgressRow label="Male" value={Math.round(totals.enrolled * 0.54)} max={totals.enrolled || 1} color="var(--color-info)" display={chartDisplay} />
+                <ProgressRow label="Female" value={Math.round(totals.enrolled * 0.46)} max={totals.enrolled || 1} color="var(--color-pink)" display={chartDisplay} />
                 <div className="my-2 h-px bg-border" />
                 <div className="label-eyebrow mb-2">Top Parishes</div>
                 {topParishes.map((p) => (
@@ -401,9 +421,14 @@ function FeedItem({ kind, title, who, where, time }: { kind: string; title: stri
 
 function EnrollmentTab() {
   const analytics = useFilteredAnalytics();
+  const [chartDisplay, setChartDisplay] = useState<ChartDisplay>("count");
   const totals = totalsFor(analytics.units);
   const rows = rollupRows(analytics.units, analytics.filters, "enrolled", "youths");
-  const trendRows = enrollmentTrendRows(analytics.units);
+  const trendRows = enrollmentTrendRows(analytics.units).map((row) => ({
+    ...row,
+    displayValue: chartDisplay === "percent" ? pct(row.value, totals.enrolled) : row.value,
+    displayCumulative: chartDisplay === "percent" ? pct(row.cumulative, totals.enrolled) : row.cumulative,
+  }));
 
   return (
     <>
@@ -432,39 +457,39 @@ function EnrollmentTab() {
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.25fr_1fr]">
         <Card>
-          <CardHead title="Enrollment Analytics" subtitle="Enrolled against selected scope target" />
+          <CardHead title="Enrollment Analytics" subtitle="Enrolled against selected scope target" action={<ChartDisplayToggle value={chartDisplay} onChange={setChartDisplay} />} />
           <CardBody>
-            {rows.map((d) => <ProgressRow key={d.label} label={d.label} value={d.value} max={d.max} />)}
+            {rows.map((d) => <ProgressRow key={d.label} label={d.label} value={d.value} max={d.max} display={chartDisplay} />)}
           </CardBody>
         </Card>
         <Card>
-          <CardHead title="Enrollment Category Mix" subtitle="Registered youths only" />
+          <CardHead title="Enrollment Category Mix" subtitle="Registered youths only" action={<ChartDisplayToggle value={chartDisplay} onChange={setChartDisplay} />} />
           <CardBody>
-            <Donut data={categorySplit(analytics.units)} />
+            <Donut data={categorySplit(analytics.units)} display={chartDisplay} />
           </CardBody>
         </Card>
       </div>
 
       <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
         <Card>
-          <CardHead title="Enrollment Trend" subtitle="Monthly bars with cumulative year trend" />
+          <CardHead title="Enrollment Trend" subtitle="Monthly bars with cumulative year trend" action={<ChartDisplayToggle value={chartDisplay} onChange={setChartDisplay} />} />
           <CardBody className="h-[240px]">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={trendRows} margin={{ top: 10, right: 10, left: -16, bottom: 0 }}>
                 <CartesianGrid stroke="var(--color-border)" vertical={false} />
                 <XAxis dataKey="label" tick={{ fill: "var(--color-text-3)", fontSize: 10 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fill: "var(--color-text-3)", fontSize: 10 }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={{ background: "var(--color-bg-2)", border: "1px solid var(--color-border)", borderRadius: 8, color: "var(--color-text-1)" }} />
-                <Bar dataKey="value" name="Monthly" fill="var(--color-success)" radius={[5, 5, 0, 0]} />
-                <Line type="monotone" dataKey="cumulative" name="Cumulative" stroke="var(--color-gold)" strokeWidth={2.5} dot={{ r: 2, fill: "var(--color-gold)" }} />
+                <Tooltip formatter={(value) => chartDisplay === "percent" ? `${value}%` : Number(value).toLocaleString()} contentStyle={{ background: "var(--color-bg-2)", border: "1px solid var(--color-border)", borderRadius: 8, color: "var(--color-text-1)" }} />
+                <Bar dataKey="displayValue" name="Monthly" fill="var(--color-success)" radius={[5, 5, 0, 0]} />
+                <Line type="monotone" dataKey="displayCumulative" name="Cumulative" stroke="var(--color-gold)" strokeWidth={2.5} dot={{ r: 2, fill: "var(--color-gold)" }} />
               </ComposedChart>
             </ResponsiveContainer>
           </CardBody>
         </Card>
         <Card>
-          <CardHead title="Gender Split" subtitle="Enrolled youths within selected filters" />
+          <CardHead title="Gender Split" subtitle="Enrolled youths within selected filters" action={<ChartDisplayToggle value={chartDisplay} onChange={setChartDisplay} />} />
           <CardBody>
-            {genderRows(analytics.units, "enrolled").map((row) => <ProgressRow key={row.label} label={row.label} value={row.value} max={totals.enrolled || 1} color={row.color} />)}
+            {genderRows(analytics.units, "enrolled").map((row) => <ProgressRow key={row.label} label={row.label} value={row.value} max={totals.enrolled || 1} color={row.color} display={chartDisplay} />)}
           </CardBody>
         </Card>
       </div>
@@ -486,6 +511,7 @@ function Stat({ value, label, tone = "up" }: { value: string; label: string; ton
 function CusaTab() {
   const analytics = useFilteredAnalytics();
   const [institution, setInstitution] = useState("");
+  const [chartDisplay, setChartDisplay] = useState<ChartDisplay>("count");
   const totals = totalsFor(analytics.units);
   const filteredMembers = analytics.units.reduce((sum, unit) => sum + cusaMembersFor(unit, institution), 0);
   const memberRows = cusaRollupRows(analytics.units, analytics.filters, institution);
@@ -505,23 +531,23 @@ function CusaTab() {
       </div>
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.25fr_1fr]">
         <Card>
-          <CardHead title="CUSA Members Analytics" subtitle="Members by parish or outstation" />
+          <CardHead title="CUSA Members Analytics" subtitle="Members by parish or outstation" action={<ChartDisplayToggle value={chartDisplay} onChange={setChartDisplay} />} />
           <CardBody>
-            {memberRows.map((d) => <ProgressRow key={d.label} label={d.label} value={d.value} max={memberRows[0]?.value || 1} color="var(--color-violet)" />)}
+            {memberRows.map((d) => <ProgressRow key={d.label} label={d.label} value={d.value} max={memberRows[0]?.value || 1} color="var(--color-violet)" display={chartDisplay} />)}
           </CardBody>
         </Card>
         <Card>
-          <CardHead title="Chapter Reporting" subtitle="Members by institution" />
+          <CardHead title="Chapter Reporting" subtitle="Members by institution" action={<ChartDisplayToggle value={chartDisplay} onChange={setChartDisplay} />} />
           <CardBody>
-            {(institution ? institutionRows.filter((row) => row.label === institution) : institutionRows).map((d) => <ProgressRow key={d.label} label={d.label} value={d.value} max={maxInstitution} color="var(--color-success)" />)}
+            {(institution ? institutionRows.filter((row) => row.label === institution) : institutionRows).map((d) => <ProgressRow key={d.label} label={d.label} value={d.value} max={maxInstitution} color="var(--color-success)" display={chartDisplay} />)}
           </CardBody>
         </Card>
       </div>
       <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
         <Card>
-          <CardHead title="Gender Split" subtitle="CUSA members within selected filters" />
+          <CardHead title="Gender Split" subtitle="CUSA members within selected filters" action={<ChartDisplayToggle value={chartDisplay} onChange={setChartDisplay} />} />
           <CardBody>
-            {gender.map((row) => <ProgressRow key={row.label} label={row.label} value={row.value} max={filteredMembers || 1} color={row.color} />)}
+            {gender.map((row) => <ProgressRow key={row.label} label={row.label} value={row.value} max={filteredMembers || 1} color={row.color} display={chartDisplay} />)}
           </CardBody>
         </Card>
         <CusaMemberTable units={analytics.units} institution={institution} />
@@ -568,6 +594,7 @@ function CusaMemberTable({ units, institution }: { units: AnalyticsUnit[]; insti
 
 function MissionTab() {
   const analytics = useFilteredAnalytics();
+  const [chartDisplay, setChartDisplay] = useState<ChartDisplay>("count");
   const totals = totalsFor(analytics.units);
   const nomineeRows = rollupRows(analytics.units, analytics.filters, "missionNominees", "missionNominees");
   const reportRows = rollupRows(analytics.units, analytics.filters, "missionReports", "missionPairs");
@@ -584,21 +611,21 @@ function MissionTab() {
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         <Card>
-          <CardHead title="Nominees Analytics" subtitle="Mission candidates submitted" />
+          <CardHead title="Nominees Analytics" subtitle="Mission candidates submitted" action={<ChartDisplayToggle value={chartDisplay} onChange={setChartDisplay} />} />
           <CardBody>
-            {nomineeRows.map((d) => <ProgressRow key={d.label} label={d.label} value={d.value} max={nomineeRows[0]?.value || 1} color="var(--color-gold)" />)}
+            {nomineeRows.map((d) => <ProgressRow key={d.label} label={d.label} value={d.value} max={nomineeRows[0]?.value || 1} color="var(--color-gold)" display={chartDisplay} />)}
           </CardBody>
         </Card>
         <Card>
-          <CardHead title="Reports Returned" subtitle="Post-mission reporting completion" />
+          <CardHead title="Reports Returned" subtitle="Post-mission reporting completion" action={<ChartDisplayToggle value={chartDisplay} onChange={setChartDisplay} />} />
           <CardBody>
-            {reportRows.map((d) => <ProgressRow key={d.label} label={d.label} value={d.value} max={d.max} color="var(--color-info)" />)}
+            {reportRows.map((d) => <ProgressRow key={d.label} label={d.label} value={d.value} max={d.max} color="var(--color-info)" display={chartDisplay} />)}
           </CardBody>
         </Card>
         <Card>
-          <CardHead title="Gender Split" subtitle="Mission nominees within selected filters" />
+          <CardHead title="Gender Split" subtitle="Mission nominees within selected filters" action={<ChartDisplayToggle value={chartDisplay} onChange={setChartDisplay} />} />
           <CardBody>
-            {genderRows(analytics.units, "missionNominees").map((row) => <ProgressRow key={row.label} label={row.label} value={row.value} max={totals.missionNominees || 1} color={row.color} />)}
+            {genderRows(analytics.units, "missionNominees").map((row) => <ProgressRow key={row.label} label={row.label} value={row.value} max={totals.missionNominees || 1} color={row.color} display={chartDisplay} />)}
           </CardBody>
         </Card>
       </div>
