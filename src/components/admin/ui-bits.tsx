@@ -151,14 +151,18 @@ export function ProgressRow({
   max,
   color = "var(--color-gold)",
   suffix = "",
+  display = "count",
 }: {
   label: string;
   value: number;
   max: number;
   color?: string;
   suffix?: string;
+  display?: "count" | "percent";
 }) {
   const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
+  const primary = display === "percent" ? `${pct}%` : `${value.toLocaleString()}${suffix}`;
+  const secondary = display === "percent" ? `${value.toLocaleString()}${suffix}` : `${pct}%`;
   return (
     <div className="mb-2 grid grid-cols-[8rem_1fr_5.75rem] items-center gap-2">
       <span className="w-32 shrink-0 truncate text-[10px] text-text-2">{label}</span>
@@ -169,7 +173,7 @@ export function ProgressRow({
         />
       </div>
       <span className="shrink-0 text-right text-[10px] font-bold text-text-1">
-        {value.toLocaleString()}{suffix} <span className="font-semibold text-text-4">· {pct}%</span>
+        {primary} <span className="font-semibold text-text-4">· {secondary}</span>
       </span>
     </div>
   );
