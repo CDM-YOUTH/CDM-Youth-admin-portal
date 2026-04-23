@@ -404,7 +404,6 @@ function EnrollmentTab() {
   const totals = totalsFor(analytics.units);
   const rows = rollupRows(analytics.units, analytics.filters, "enrolled", "youths");
   const trendRows = enrollmentTrendRows(analytics.units);
-  const maxTrend = Math.max(...trendRows.map((row) => row.value), 1);
 
   return (
     <>
@@ -448,9 +447,18 @@ function EnrollmentTab() {
 
       <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
         <Card>
-          <CardHead title="Enrollment Trend" subtitle="Monthly enrollments within selected filters" />
-          <CardBody>
-            {trendRows.map((row) => <ProgressRow key={row.label} label={row.label} value={row.value} max={maxTrend} color="var(--color-success)" />)}
+          <CardHead title="Enrollment Trend" subtitle="Monthly bars with cumulative year trend" />
+          <CardBody className="h-[240px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={trendRows} margin={{ top: 10, right: 10, left: -16, bottom: 0 }}>
+                <CartesianGrid stroke="var(--color-border)" vertical={false} />
+                <XAxis dataKey="label" tick={{ fill: "var(--color-text-3)", fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: "var(--color-text-3)", fontSize: 10 }} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={{ background: "var(--color-bg-2)", border: "1px solid var(--color-border)", borderRadius: 8, color: "var(--color-text-1)" }} />
+                <Bar dataKey="value" name="Monthly" fill="var(--color-success)" radius={[5, 5, 0, 0]} />
+                <Line type="monotone" dataKey="cumulative" name="Cumulative" stroke="var(--color-gold)" strokeWidth={2.5} dot={{ r: 2, fill: "var(--color-gold)" }} />
+              </ComposedChart>
+            </ResponsiveContainer>
           </CardBody>
         </Card>
         <Card>
