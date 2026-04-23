@@ -1,7 +1,15 @@
 type Slice = { label: string; value: number; color: string };
 
 /** Lightweight SVG donut — no chart lib needed for Phase 1. */
-export function Donut({ data, size = 96 }: { data: Slice[]; size?: number }) {
+export function Donut({
+  data,
+  size = 96,
+  display = "percent",
+}: {
+  data: Slice[];
+  size?: number;
+  display?: "count" | "percent";
+}) {
   const total = data.reduce((s, d) => s + d.value, 0) || 1;
   const radius = size / 2;
   const stroke = size * 0.18;
@@ -45,11 +53,14 @@ export function Donut({ data, size = 96 }: { data: Slice[]; size?: number }) {
       <div className="flex flex-1 flex-col gap-1.5">
         {data.map((d, i) => {
           const pct = Math.round((d.value / total) * 100);
+          const primary = display === "percent" ? `${pct}%` : d.value.toLocaleString();
+          const secondary = display === "percent" ? d.value.toLocaleString() : `${pct}%`;
           return (
             <div key={i} className="flex items-center gap-1.5">
               <span className="h-2 w-2 shrink-0 rounded-sm" style={{ background: d.color }} />
               <span className="flex-1 text-[10px] text-text-2">{d.label}</span>
-              <span className="text-[10px] font-bold text-text-1">{pct}%</span>
+              <span className="text-[10px] font-bold text-text-1">{primary}</span>
+              <span className="text-[9px] font-semibold text-text-4">{secondary}</span>
             </div>
           );
         })}
