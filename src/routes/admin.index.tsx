@@ -46,6 +46,7 @@ export const Route = createFileRoute("/admin/")({
 
 type Tab = "general" | "enrollment" | "cusa" | "mission";
 type FilterState = { deaneryCode: string; parishId: string; churchId: string };
+type ChartDisplay = "count" | "percent";
 
 const emptyFilters: FilterState = { deaneryCode: "", parishId: "", churchId: "" };
 
@@ -182,6 +183,24 @@ function categorySplit(units: AnalyticsUnit[]) {
 
 function pct(value: number, max: number) {
   return max > 0 ? Math.round((value / max) * 100) : 0;
+}
+
+function ChartDisplayToggle({ value, onChange }: { value: ChartDisplay; onChange: (value: ChartDisplay) => void }) {
+  return (
+    <div className="inline-flex rounded-md border border-border bg-bg-3 p-0.5">
+      {(["count", "percent"] as const).map((mode) => (
+        <button
+          key={mode}
+          onClick={() => onChange(mode)}
+          className={`rounded px-2 py-0.5 text-[9px] font-bold transition ${
+            value === mode ? "bg-gold text-gold-foreground" : "text-text-3 hover:text-gold"
+          }`}
+        >
+          {mode === "count" ? "No." : "%"}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 function genderRows(units: AnalyticsUnit[], metric: "enrolled" | "missionNominees") {
