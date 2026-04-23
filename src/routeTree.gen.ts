@@ -22,6 +22,7 @@ import { Route as AdminFormationRouteImport } from './routes/admin.formation'
 import { Route as AdminEventsRouteImport } from './routes/admin.events'
 import { Route as AdminEnrollmentRouteImport } from './routes/admin.enrollment'
 import { Route as AdminCusaRouteImport } from './routes/admin.cusa'
+import { Route as AdminEventsEventIdRouteImport } from './routes/admin.events.$eventId'
 
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
@@ -88,13 +89,18 @@ const AdminCusaRoute = AdminCusaRouteImport.update({
   path: '/cusa',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminEventsEventIdRoute = AdminEventsEventIdRouteImport.update({
+  id: '/$eventId',
+  path: '/$eventId',
+  getParentRoute: () => AdminEventsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/admin/cusa': typeof AdminCusaRoute
   '/admin/enrollment': typeof AdminEnrollmentRoute
-  '/admin/events': typeof AdminEventsRoute
+  '/admin/events': typeof AdminEventsRouteWithChildren
   '/admin/formation': typeof AdminFormationRoute
   '/admin/mission': typeof AdminMissionRoute
   '/admin/reports': typeof AdminReportsRoute
@@ -103,12 +109,13 @@ export interface FileRoutesByFullPath {
   '/admin/welfare': typeof AdminWelfareRoute
   '/admin/youths': typeof AdminYouthsRoute
   '/admin/': typeof AdminIndexRoute
+  '/admin/events/$eventId': typeof AdminEventsEventIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin/cusa': typeof AdminCusaRoute
   '/admin/enrollment': typeof AdminEnrollmentRoute
-  '/admin/events': typeof AdminEventsRoute
+  '/admin/events': typeof AdminEventsRouteWithChildren
   '/admin/formation': typeof AdminFormationRoute
   '/admin/mission': typeof AdminMissionRoute
   '/admin/reports': typeof AdminReportsRoute
@@ -117,6 +124,7 @@ export interface FileRoutesByTo {
   '/admin/welfare': typeof AdminWelfareRoute
   '/admin/youths': typeof AdminYouthsRoute
   '/admin': typeof AdminIndexRoute
+  '/admin/events/$eventId': typeof AdminEventsEventIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -124,7 +132,7 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteWithChildren
   '/admin/cusa': typeof AdminCusaRoute
   '/admin/enrollment': typeof AdminEnrollmentRoute
-  '/admin/events': typeof AdminEventsRoute
+  '/admin/events': typeof AdminEventsRouteWithChildren
   '/admin/formation': typeof AdminFormationRoute
   '/admin/mission': typeof AdminMissionRoute
   '/admin/reports': typeof AdminReportsRoute
@@ -133,6 +141,7 @@ export interface FileRoutesById {
   '/admin/welfare': typeof AdminWelfareRoute
   '/admin/youths': typeof AdminYouthsRoute
   '/admin/': typeof AdminIndexRoute
+  '/admin/events/$eventId': typeof AdminEventsEventIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -150,6 +159,7 @@ export interface FileRouteTypes {
     | '/admin/welfare'
     | '/admin/youths'
     | '/admin/'
+    | '/admin/events/$eventId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -164,6 +174,7 @@ export interface FileRouteTypes {
     | '/admin/welfare'
     | '/admin/youths'
     | '/admin'
+    | '/admin/events/$eventId'
   id:
     | '__root__'
     | '/'
@@ -179,6 +190,7 @@ export interface FileRouteTypes {
     | '/admin/welfare'
     | '/admin/youths'
     | '/admin/'
+    | '/admin/events/$eventId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -279,13 +291,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminCusaRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/events/$eventId': {
+      id: '/admin/events/$eventId'
+      path: '/$eventId'
+      fullPath: '/admin/events/$eventId'
+      preLoaderRoute: typeof AdminEventsEventIdRouteImport
+      parentRoute: typeof AdminEventsRoute
+    }
   }
 }
+
+interface AdminEventsRouteChildren {
+  AdminEventsEventIdRoute: typeof AdminEventsEventIdRoute
+}
+
+const AdminEventsRouteChildren: AdminEventsRouteChildren = {
+  AdminEventsEventIdRoute: AdminEventsEventIdRoute,
+}
+
+const AdminEventsRouteWithChildren = AdminEventsRoute._addFileChildren(
+  AdminEventsRouteChildren,
+)
 
 interface AdminRouteChildren {
   AdminCusaRoute: typeof AdminCusaRoute
   AdminEnrollmentRoute: typeof AdminEnrollmentRoute
-  AdminEventsRoute: typeof AdminEventsRoute
+  AdminEventsRoute: typeof AdminEventsRouteWithChildren
   AdminFormationRoute: typeof AdminFormationRoute
   AdminMissionRoute: typeof AdminMissionRoute
   AdminReportsRoute: typeof AdminReportsRoute
@@ -299,7 +330,7 @@ interface AdminRouteChildren {
 const AdminRouteChildren: AdminRouteChildren = {
   AdminCusaRoute: AdminCusaRoute,
   AdminEnrollmentRoute: AdminEnrollmentRoute,
-  AdminEventsRoute: AdminEventsRoute,
+  AdminEventsRoute: AdminEventsRouteWithChildren,
   AdminFormationRoute: AdminFormationRoute,
   AdminMissionRoute: AdminMissionRoute,
   AdminReportsRoute: AdminReportsRoute,

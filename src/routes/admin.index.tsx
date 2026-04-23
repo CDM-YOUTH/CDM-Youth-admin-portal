@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
   Topbar,
   TopbarTab,
@@ -194,11 +195,17 @@ function genderRows(units: AnalyticsUnit[], metric: "enrolled" | "missionNominee
 
 function enrollmentTrendRows(units: AnalyticsUnit[]) {
   const total = totalsFor(units).enrolled;
-  const weights = [0.16, 0.22, 0.27, 0.35];
-  return ["Jan", "Feb", "Mar", "Apr"].map((label, index) => ({
+  const weights = [0.04, 0.06, 0.08, 0.1, 0.08, 0.07, 0.09, 0.11, 0.1, 0.09, 0.1, 0.08];
+  let cumulative = 0;
+  return ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].map((label, index) => {
+    const monthly = Math.round(total * weights[index]);
+    cumulative += monthly;
+    return {
     label,
-    value: Math.round(total * weights[index]),
-  }));
+      value: monthly,
+      cumulative: Math.min(total, cumulative),
+    };
+  });
 }
 
 /* ---------- TAB: General ---------- */
@@ -281,7 +288,7 @@ function GeneralTab() {
                     <div className="text-[11px] font-semibold text-text-1">{e.name}</div>
                     <div className="text-[9px] text-text-3">{e.parish}</div>
                   </div>
-                  <Pill tone="success">{e.rsvp} RSVP</Pill>
+                  <Pill tone="success">{e.registered} RSVP</Pill>
                 </div>
               ))}
             </CardBody>
@@ -397,7 +404,6 @@ function EnrollmentTab() {
   const totals = totalsFor(analytics.units);
   const rows = rollupRows(analytics.units, analytics.filters, "enrolled", "youths");
   const trendRows = enrollmentTrendRows(analytics.units);
-  const maxTrend = Math.max(...trendRows.map((row) => row.value), 1);
 
   return (
     <>
@@ -441,9 +447,18 @@ function EnrollmentTab() {
 
       <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
         <Card>
-          <CardHead title="Enrollment Trend" subtitle="Monthly enrollments within selected filters" />
-          <CardBody>
-            {trendRows.map((row) => <ProgressRow key={row.label} label={row.label} value={row.value} max={maxTrend} color="var(--color-success)" />)}
+          <CardHead title="Enrollment Trend" subtitle="Monthly bars with cumulative year trend" />
+          <CardBody className="h-[240px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={trendRows} margin={{ top: 10, right: 10, left: -16, bottom: 0 }}>
+                <CartesianGrid stroke="var(--color-border)" vertical={false} />
+                <XAxis dataKey="label" tick={{ fill: "var(--color-text-3)", fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: "var(--color-text-3)", fontSize: 10 }} axisLine={false} tickLine={false} />
+                <Tooltip contentStyle={{ background: "var(--color-bg-2)", border: "1px solid var(--color-border)", borderRadius: 8, color: "var(--color-text-1)" }} />
+                <Bar dataKey="value" name="Monthly" fill="var(--color-success)" radius={[5, 5, 0, 0]} />
+                <Line type="monotone" dataKey="cumulative" name="Cumulative" stroke="var(--color-gold)" strokeWidth={2.5} dot={{ r: 2, fill: "var(--color-gold)" }} />
+              </ComposedChart>
+            </ResponsiveContainer>
           </CardBody>
         </Card>
         <Card>
