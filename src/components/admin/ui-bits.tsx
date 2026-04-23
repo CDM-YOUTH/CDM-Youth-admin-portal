@@ -160,7 +160,7 @@ export function ProgressRow({
 }) {
   const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0;
   return (
-    <div className="mb-2 flex items-center gap-2">
+    <div className="mb-2 grid grid-cols-[8rem_1fr_5.75rem] items-center gap-2">
       <span className="w-32 shrink-0 truncate text-[10px] text-text-2">{label}</span>
       <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-bg-4">
         <div
@@ -168,8 +168,8 @@ export function ProgressRow({
           style={{ width: `${pct}%`, background: color }}
         />
       </div>
-      <span className="w-14 shrink-0 text-right text-[10px] font-bold text-text-1">
-        {value.toLocaleString()}{suffix}
+      <span className="shrink-0 text-right text-[10px] font-bold text-text-1">
+        {value.toLocaleString()}{suffix} <span className="font-semibold text-text-4">· {pct}%</span>
       </span>
     </div>
   );
