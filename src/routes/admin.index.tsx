@@ -234,9 +234,8 @@ function enrollmentTrendRows(units: AnalyticsUnit[]) {
 
 /* ---------- TAB: General ---------- */
 
-function GeneralTab() {
+function GeneralTab({ chartDisplay }: { chartDisplay: ChartDisplay }) {
   const analytics = useFilteredAnalytics();
-  const [chartDisplay, setChartDisplay] = useState<ChartDisplay>("count");
   const totals = totalsFor(analytics.units);
   const enrollmentRows = rollupRows(analytics.units, analytics.filters, "enrolled", "youths");
   const topParishes = analytics.filters.deaneryCode
@@ -258,7 +257,7 @@ function GeneralTab() {
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.3fr_1fr]">
         <div className="flex flex-col gap-3">
           <Card>
-            <CardHead title="Enrollment Analytics" subtitle="Changes with deanery, parish, and outstation filters" action={<ChartDisplayToggle value={chartDisplay} onChange={setChartDisplay} />} />
+              <CardHead title="Enrollment Analytics" subtitle="Changes with deanery, parish, and outstation filters" />
             <CardBody>
               {enrollmentRows.slice(0, 8).map((d) => (
                 <ProgressRow key={d.label} label={d.label} value={d.value} max={d.max} color="var(--color-gold)" display={chartDisplay} />
@@ -268,13 +267,13 @@ function GeneralTab() {
 
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             <Card>
-              <CardHead title="By Category" action={<ChartDisplayToggle value={chartDisplay} onChange={setChartDisplay} />} />
+              <CardHead title="By Category" />
               <CardBody>
                 <Donut data={categorySplit(analytics.units)} display={chartDisplay} />
               </CardBody>
             </Card>
             <Card>
-              <CardHead title="Gender Split" action={<ChartDisplayToggle value={chartDisplay} onChange={setChartDisplay} />} />
+              <CardHead title="Gender Split" />
               <CardBody>
                 <ProgressRow label="Male" value={Math.round(totals.enrolled * 0.54)} max={totals.enrolled || 1} color="var(--color-info)" display={chartDisplay} />
                 <ProgressRow label="Female" value={Math.round(totals.enrolled * 0.46)} max={totals.enrolled || 1} color="var(--color-pink)" display={chartDisplay} />
