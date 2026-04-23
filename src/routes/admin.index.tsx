@@ -423,9 +423,8 @@ function FeedItem({ kind, title, who, where, time }: { kind: string; title: stri
 
 /* ---------- TAB: Enrollment ---------- */
 
-function EnrollmentTab() {
+function EnrollmentTab({ chartDisplay }: { chartDisplay: ChartDisplay }) {
   const analytics = useFilteredAnalytics();
-  const [chartDisplay, setChartDisplay] = useState<ChartDisplay>("count");
   const totals = totalsFor(analytics.units);
   const rows = rollupRows(analytics.units, analytics.filters, "enrolled", "youths");
   const trendRows = enrollmentTrendRows(analytics.units).map((row) => ({
@@ -512,10 +511,9 @@ function Stat({ value, label, tone = "up" }: { value: string; label: string; ton
 
 /* ---------- TAB: CUSA ---------- */
 
-function CusaTab() {
+function CusaTab({ chartDisplay }: { chartDisplay: ChartDisplay }) {
   const analytics = useFilteredAnalytics();
   const [institution, setInstitution] = useState("");
-  const [chartDisplay, setChartDisplay] = useState<ChartDisplay>("count");
   const totals = totalsFor(analytics.units);
   const filteredMembers = analytics.units.reduce((sum, unit) => sum + cusaMembersFor(unit, institution), 0);
   const memberRows = cusaRollupRows(analytics.units, analytics.filters, institution);
@@ -596,9 +594,8 @@ function CusaMemberTable({ units, institution }: { units: AnalyticsUnit[]; insti
 
 /* ---------- TAB: Mission Week ---------- */
 
-function MissionTab() {
+function MissionTab({ chartDisplay }: { chartDisplay: ChartDisplay }) {
   const analytics = useFilteredAnalytics();
-  const [chartDisplay, setChartDisplay] = useState<ChartDisplay>("count");
   const totals = totalsFor(analytics.units);
   const nomineeRows = rollupRows(analytics.units, analytics.filters, "missionNominees", "missionNominees");
   const reportRows = rollupRows(analytics.units, analytics.filters, "missionReports", "missionPairs");
