@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
   Topbar,
   TopbarTab,
@@ -195,11 +195,17 @@ function genderRows(units: AnalyticsUnit[], metric: "enrolled" | "missionNominee
 
 function enrollmentTrendRows(units: AnalyticsUnit[]) {
   const total = totalsFor(units).enrolled;
-  const weights = [0.16, 0.22, 0.27, 0.35];
-  return ["Jan", "Feb", "Mar", "Apr"].map((label, index) => ({
+  const weights = [0.04, 0.06, 0.08, 0.1, 0.08, 0.07, 0.09, 0.11, 0.1, 0.09, 0.1, 0.08];
+  let cumulative = 0;
+  return ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].map((label, index) => {
+    const monthly = Math.round(total * weights[index]);
+    cumulative += monthly;
+    return {
     label,
-    value: Math.round(total * weights[index]),
-  }));
+      value: monthly,
+      cumulative: Math.min(total, cumulative),
+    };
+  });
 }
 
 /* ---------- TAB: General ---------- */
