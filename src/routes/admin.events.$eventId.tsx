@@ -1,7 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
+import type { ReactNode } from "react";
 import { Topbar, TopbarButton } from "@/components/admin/topbar";
 import { Card, CardBody, CardHead, Kpi, PageHeader, Pill, ProgressRow } from "@/components/admin/ui-bits";
-import { EVENTS } from "@/lib/mock-data";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { EVENTS, ORGANIZATION } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/admin/events/$eventId")({
   head: () => ({
@@ -18,6 +22,9 @@ function EventDetailPage() {
   const event = EVENTS.find((item) => item.id === eventId) ?? EVENTS[0];
   const attendanceBase = event.status === "done" ? event.attended : event.registered;
   const memberAttendance = Math.max(0, attendanceBase - event.guests);
+  const deaneries = ORGANIZATION.map((item) => item.name);
+  const parishes = ORGANIZATION.flatMap((deanery) => deanery.parishes.map((parish) => parish.name));
+  const locals = ORGANIZATION.flatMap((deanery) => deanery.parishes.flatMap((parish) => parish.churches.map((church) => church.name)));
 
   return (
     <>
@@ -34,27 +41,34 @@ function EventDetailPage() {
 
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.2fr_0.8fr]">
           <Card>
-            <CardHead title="Day Report & Analytics" subtitle="Members, guests, and attendance against target" action={<Pill tone={event.status === "done" ? "success" : "info"}>{event.status}</Pill>} />
+            <CardHead title="Event Details" subtitle="View and edit the core information" action={<Pill tone={event.status === "done" ? "success" : "info"}>{event.status}</Pill>} />
             <CardBody>
-              <ProgressRow label="Registered" value={event.registered} max={event.expected} color="var(--color-gold)" />
-              <ProgressRow label="Members" value={memberAttendance} max={event.expected} color="var(--color-success)" />
-              <ProgressRow label="Guests" value={event.guests} max={event.expected} color="var(--color-info)" />
-              <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
-                {["Deanery", "Parish", "Outstation", "Generated No."].map((label) => (
-                  <button key={label} className="rounded-lg border border-border bg-bg-2 px-3 py-2 text-[10px] font-bold text-text-1 hover:border-gold-3 hover:text-gold">
-                    Select {label}
-                  </button>
-                ))}
-                <button className="rounded-lg border border-info/40 bg-info-soft px-3 py-2 text-[10px] font-bold text-info">Add Non-member Guest</button>
-                <button className="rounded-lg border border-success/40 bg-success-soft px-3 py-2 text-[10px] font-bold text-success">Mark In Attendance</button>
+              <div className="grid gap-3 md:grid-cols-2">
+                <Field label="Event name"><Input defaultValue={event.name} /></Field>
+                <Field label="Date"><Input defaultValue={event.date} /></Field>
+                <SelectField label="Deanery" placeholder="Select deanery" values={deaneries} />
+                <SelectField label="Parish" placeholder={event.parish} values={parishes} />
+                <SelectField label="Local church / outstation" placeholder="Select local" values={locals.slice(0, 24)} />
+                <Field label="Venue"><Input defaultValue={event.venue} /></Field>
+                <Field label="Expected"><Input type="number" defaultValue={event.expected} /></Field>
+                <Field label="Registered"><Input type="number" defaultValue={event.registered} /></Field>
+                <Field label="Notes"><Textarea defaultValue={`${event.name} planning, attendance and reporting notes.`} /></Field>
               </div>
             </CardBody>
           </Card>
 
           <Card>
-            <CardHead title="Activities" subtitle="What happened during the event" />
+            <CardHead title="Day Report & Analytics" subtitle="Members, guests, and attendance against target" />
             <CardBody className="space-y-2">
-              {event.activities.map((activity) => <RowItem key={activity} title={activity} meta="tracked in day report" />)}
+              <ProgressRow label="Registered" value={event.registered} max={event.expected} color="var(--color-gold)" />
+              <ProgressRow label="Members" value={memberAttendance} max={event.expected} color="var(--color-success)" />
+              <ProgressRow label="Guests" value={event.guests} max={event.expected} color="var(--color-info)" />
+              <div className="grid grid-cols-2 gap-2 pt-2">
+                <SelectField label="Find member" placeholder="Name / number" values={["CY-2026-1042", "CY-2026-0871", "Grace Wanjiku", "Peter Mwangi"]} />
+                <SelectField label="Attendance" placeholder="Mark status" values={["In attendance", "Expected", "Absent", "Guest"]} />
+                <button className="rounded-lg border border-info/40 bg-info-soft px-3 py-2 text-[10px] font-bold text-info">Add non-member</button>
+                <button className="rounded-lg border border-success/40 bg-success-soft px-3 py-2 text-[10px] font-bold text-success">Generate number</button>
+              </div>
             </CardBody>
           </Card>
         </div>
@@ -104,5 +118,31 @@ function RowItem({ title, meta }: { title: string; meta: string }) {
       <div className="text-[11px] font-bold text-text-1">{title}</div>
       <div className="text-[9px] text-text-3">{meta}</div>
     </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="space-y-1 text-[10px] font-bold uppercase tracking-wide text-text-3">
+      <span>{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function SelectField({ label, placeholder, values }: { label: string; placeholder: string; values: string[] }) {
+  return (
+    <Field label={label}>
+      <Select>
+        <SelectTrigger>
+          <SelectValue placeholder={placeholder} />
+        </SelectTrigger>
+        <SelectContent>
+          {values.map((value) => (
+            <SelectItem key={value} value={value}>{value}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </Field>
   );
 }
