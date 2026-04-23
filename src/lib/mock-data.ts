@@ -243,12 +243,197 @@ export const MISSION_PHASES = [
   { phase: "5", name: "Reports & Debrief", status: "upcoming", date: "08 Mar – 15 Mar" },
 ];
 
-export const UPCOMING_EVENTS = [
-  { day: "29", month: "Mar", name: "Diocesan Youth Day", parish: "All Parishes", rsvp: 1240 },
-  { day: "06", month: "Apr", name: "CUSA Easter Retreat", parish: "Subukia Shrine", rsvp: 184 },
-  { day: "13", month: "Apr", name: "Confirmation Class", parish: "Cathedral", rsvp: 86 },
-  { day: "27", month: "Apr", name: "Youth Leaders Forum", parish: "Bishop's House", rsvp: 56 },
+export type EventStatus = "upcoming" | "done";
+
+export type YouthEvent = {
+  id: string;
+  day: string;
+  month: string;
+  date: string;
+  name: string;
+  parish: string;
+  venue: string;
+  status: EventStatus;
+  expected: number;
+  registered: number;
+  attended: number;
+  guests: number;
+  activities: string[];
+  assignments: Array<{ role: string; person: string; area: string }>;
+  items: Array<{ name: string; quantity: string; status: "ready" | "pending" | "used" }>;
+  program: Array<{ time: string; activity: string; facilitator: string }>;
+  topics: string[];
+  gallery: string[];
+};
+
+export const EVENTS: YouthEvent[] = [
+  {
+    id: "diocesan-youth-day-2026",
+    day: "29",
+    month: "Mar",
+    date: "29 Mar 2026",
+    name: "Diocesan Youth Day",
+    parish: "All Parishes",
+    venue: "Murang’a Cathedral Grounds",
+    status: "upcoming",
+    expected: 1580,
+    registered: 1240,
+    attended: 0,
+    guests: 0,
+    activities: ["Opening Mass", "Deanery procession", "Talent showcase", "Youth pledge"],
+    assignments: [
+      { role: "Liturgy", person: "Cathedral Youth Choir", area: "Main altar" },
+      { role: "Registration", person: "Deanery secretaries", area: "Entry gates" },
+      { role: "Security", person: "St. Peter Team", area: "Parking" },
+    ],
+    items: [
+      { name: "Tents", quantity: "18", status: "ready" },
+      { name: "Sound system", quantity: "1 full set", status: "ready" },
+      { name: "Lunch packs", quantity: "1,600", status: "pending" },
+    ],
+    program: [
+      { time: "08:00", activity: "Arrival and registration", facilitator: "Event secretariat" },
+      { time: "10:00", activity: "Holy Mass", facilitator: "Bishop and clergy" },
+      { time: "14:00", activity: "Deanery presentations", facilitator: "Youth council" },
+    ],
+    topics: ["Synodal youth leadership", "Responsible digital life", "Vocations"],
+    gallery: ["Mass setup", "Deanery banners", "Youth choir"],
+  },
+  {
+    id: "cusa-easter-retreat-2026",
+    day: "06",
+    month: "Apr",
+    date: "06 Apr 2026",
+    name: "CUSA Easter Retreat",
+    parish: "Subukia Shrine",
+    venue: "Subukia Shrine",
+    status: "upcoming",
+    expected: 220,
+    registered: 184,
+    attended: 0,
+    guests: 0,
+    activities: ["Praise session", "Confessions", "Campus chapter reports", "Commissioning"],
+    assignments: [
+      { role: "Transport", person: "CUSA coordinators", area: "Campus routes" },
+      { role: "Talk facilitation", person: "Fr. Peter", area: "Main hall" },
+    ],
+    items: [
+      { name: "Retreat booklets", quantity: "230", status: "ready" },
+      { name: "Water", quantity: "25 crates", status: "pending" },
+    ],
+    program: [
+      { time: "09:00", activity: "Praise and worship", facilitator: "KU Chapter" },
+      { time: "11:00", activity: "Easter faith talk", facilitator: "Fr. Peter" },
+      { time: "15:00", activity: "Chapter commitments", facilitator: "CUSA chair" },
+    ],
+    topics: ["Faith after campus", "Catholic witness", "Chapter accountability"],
+    gallery: ["Shrine arrival", "Group photo", "Prayer walk"],
+  },
+  {
+    id: "confirmation-class-2026",
+    day: "13",
+    month: "Apr",
+    date: "13 Apr 2026",
+    name: "Confirmation Class",
+    parish: "Cathedral",
+    venue: "Cathedral Hall",
+    status: "upcoming",
+    expected: 110,
+    registered: 86,
+    attended: 0,
+    guests: 0,
+    activities: ["Catechesis", "Sponsor briefing", "Confession preparation"],
+    assignments: [{ role: "Catechesis", person: "Sr. Mary", area: "Hall A" }],
+    items: [{ name: "Catechism sheets", quantity: "120", status: "ready" }],
+    program: [{ time: "09:30", activity: "Class session", facilitator: "Sr. Mary" }],
+    topics: ["Sacraments", "Christian maturity"],
+    gallery: ["Class setup", "Sponsor desk"],
+  },
+  {
+    id: "youth-leaders-forum-2026",
+    day: "27",
+    month: "Apr",
+    date: "27 Apr 2026",
+    name: "Youth Leaders Forum",
+    parish: "Bishop's House",
+    venue: "Bishop's House",
+    status: "upcoming",
+    expected: 80,
+    registered: 56,
+    attended: 0,
+    guests: 0,
+    activities: ["Strategy review", "Deanery reporting", "Annual calendar planning"],
+    assignments: [{ role: "Minutes", person: "Diocese secretary", area: "Boardroom" }],
+    items: [{ name: "Planning templates", quantity: "80", status: "ready" }],
+    program: [{ time: "10:00", activity: "Planning workshop", facilitator: "Youth chaplain" }],
+    topics: ["Leadership", "Reporting", "Safeguarding"],
+    gallery: ["Council table", "Workshop notes"],
+  },
+  {
+    id: "lent-service-week-2026",
+    day: "08",
+    month: "Mar",
+    date: "08 Mar 2026",
+    name: "Lent Service Week",
+    parish: "Kagio",
+    venue: "Kagio Parish",
+    status: "done",
+    expected: 420,
+    registered: 386,
+    attended: 354,
+    guests: 27,
+    activities: ["Home visits", "Tree planting", "Evening recollection", "Youth confession"],
+    assignments: [
+      { role: "Home visit teams", person: "Parish leaders", area: "Small Christian communities" },
+      { role: "Environment", person: "Mission Week nominees", area: "Parish compound" },
+    ],
+    items: [
+      { name: "Seedlings", quantity: "500", status: "used" },
+      { name: "Reflective jackets", quantity: "40", status: "used" },
+      { name: "First aid kit", quantity: "3", status: "used" },
+    ],
+    program: [
+      { time: "07:30", activity: "Commissioning prayer", facilitator: "Parish priest" },
+      { time: "09:00", activity: "Service teams deployed", facilitator: "Team captains" },
+      { time: "16:00", activity: "Daily report sharing", facilitator: "Youth chair" },
+    ],
+    topics: ["Mercy in action", "Care for creation", "Lenten conversion"],
+    gallery: ["Tree planting", "Team briefing", "Closing prayer"],
+  },
+  {
+    id: "youth-choir-festival-2026",
+    day: "22",
+    month: "Feb",
+    date: "22 Feb 2026",
+    name: "Youth Choir Festival",
+    parish: "Kianyaga",
+    venue: "Kianyaga Parish Grounds",
+    status: "done",
+    expected: 760,
+    registered: 702,
+    attended: 681,
+    guests: 44,
+    activities: ["Choir presentations", "Psalm workshop", "Awards", "Mass animation"],
+    assignments: [
+      { role: "Adjudication", person: "Music committee", area: "Main tent" },
+      { role: "Hospitality", person: "Kianyaga youth", area: "Refreshment desk" },
+    ],
+    items: [
+      { name: "Trophies", quantity: "12", status: "used" },
+      { name: "Microphones", quantity: "8", status: "used" },
+    ],
+    program: [
+      { time: "08:30", activity: "Choir check-in", facilitator: "Registration desk" },
+      { time: "10:00", activity: "Festival performances", facilitator: "Music committee" },
+      { time: "15:30", activity: "Awards", facilitator: "Youth chaplain" },
+    ],
+    topics: ["Liturgical music", "Psalm leadership", "Youth creativity"],
+    gallery: ["Winning choir", "Stage setup", "Award moment"],
+  },
 ];
+
+export const UPCOMING_EVENTS = EVENTS.filter((event) => event.status === "upcoming");
+export const DONE_EVENTS = EVENTS.filter((event) => event.status === "done");
 
 export const WELFARE_CASES = [
   { id: "WF-2026-014", category: "Mental Health", urgency: "high", parish: "Kagio", opened: "5h ago", assigned: "Fr. James" },
