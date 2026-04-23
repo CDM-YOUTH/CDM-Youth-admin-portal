@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { Bar, BarChart, CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
   Topbar,
   TopbarTab,
@@ -281,7 +282,7 @@ function GeneralTab() {
                     <div className="text-[11px] font-semibold text-text-1">{e.name}</div>
                     <div className="text-[9px] text-text-3">{e.parish}</div>
                   </div>
-                  <Pill tone="success">{e.rsvp} RSVP</Pill>
+                  <Pill tone="success">{e.registered} RSVP</Pill>
                 </div>
               ))}
             </CardBody>
