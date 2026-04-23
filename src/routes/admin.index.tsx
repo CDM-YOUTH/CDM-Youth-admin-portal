@@ -421,9 +421,14 @@ function FeedItem({ kind, title, who, where, time }: { kind: string; title: stri
 
 function EnrollmentTab() {
   const analytics = useFilteredAnalytics();
+  const [chartDisplay, setChartDisplay] = useState<ChartDisplay>("count");
   const totals = totalsFor(analytics.units);
   const rows = rollupRows(analytics.units, analytics.filters, "enrolled", "youths");
-  const trendRows = enrollmentTrendRows(analytics.units);
+  const trendRows = enrollmentTrendRows(analytics.units).map((row) => ({
+    ...row,
+    displayValue: chartDisplay === "percent" ? pct(row.value, totals.enrolled) : row.value,
+    displayCumulative: chartDisplay === "percent" ? pct(row.cumulative, totals.enrolled) : row.cumulative,
+  }));
 
   return (
     <>
@@ -452,39 +457,39 @@ function EnrollmentTab() {
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.25fr_1fr]">
         <Card>
-          <CardHead title="Enrollment Analytics" subtitle="Enrolled against selected scope target" />
+          <CardHead title="Enrollment Analytics" subtitle="Enrolled against selected scope target" action={<ChartDisplayToggle value={chartDisplay} onChange={setChartDisplay} />} />
           <CardBody>
-            {rows.map((d) => <ProgressRow key={d.label} label={d.label} value={d.value} max={d.max} />)}
+            {rows.map((d) => <ProgressRow key={d.label} label={d.label} value={d.value} max={d.max} display={chartDisplay} />)}
           </CardBody>
         </Card>
         <Card>
-          <CardHead title="Enrollment Category Mix" subtitle="Registered youths only" />
+          <CardHead title="Enrollment Category Mix" subtitle="Registered youths only" action={<ChartDisplayToggle value={chartDisplay} onChange={setChartDisplay} />} />
           <CardBody>
-            <Donut data={categorySplit(analytics.units)} />
+            <Donut data={categorySplit(analytics.units)} display={chartDisplay} />
           </CardBody>
         </Card>
       </div>
 
       <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
         <Card>
-          <CardHead title="Enrollment Trend" subtitle="Monthly bars with cumulative year trend" />
+          <CardHead title="Enrollment Trend" subtitle="Monthly bars with cumulative year trend" action={<ChartDisplayToggle value={chartDisplay} onChange={setChartDisplay} />} />
           <CardBody className="h-[240px]">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={trendRows} margin={{ top: 10, right: 10, left: -16, bottom: 0 }}>
                 <CartesianGrid stroke="var(--color-border)" vertical={false} />
                 <XAxis dataKey="label" tick={{ fill: "var(--color-text-3)", fontSize: 10 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fill: "var(--color-text-3)", fontSize: 10 }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={{ background: "var(--color-bg-2)", border: "1px solid var(--color-border)", borderRadius: 8, color: "var(--color-text-1)" }} />
-                <Bar dataKey="value" name="Monthly" fill="var(--color-success)" radius={[5, 5, 0, 0]} />
-                <Line type="monotone" dataKey="cumulative" name="Cumulative" stroke="var(--color-gold)" strokeWidth={2.5} dot={{ r: 2, fill: "var(--color-gold)" }} />
+                <Tooltip formatter={(value) => chartDisplay === "percent" ? `${value}%` : Number(value).toLocaleString()} contentStyle={{ background: "var(--color-bg-2)", border: "1px solid var(--color-border)", borderRadius: 8, color: "var(--color-text-1)" }} />
+                <Bar dataKey="displayValue" name="Monthly" fill="var(--color-success)" radius={[5, 5, 0, 0]} />
+                <Line type="monotone" dataKey="displayCumulative" name="Cumulative" stroke="var(--color-gold)" strokeWidth={2.5} dot={{ r: 2, fill: "var(--color-gold)" }} />
               </ComposedChart>
             </ResponsiveContainer>
           </CardBody>
         </Card>
         <Card>
-          <CardHead title="Gender Split" subtitle="Enrolled youths within selected filters" />
+          <CardHead title="Gender Split" subtitle="Enrolled youths within selected filters" action={<ChartDisplayToggle value={chartDisplay} onChange={setChartDisplay} />} />
           <CardBody>
-            {genderRows(analytics.units, "enrolled").map((row) => <ProgressRow key={row.label} label={row.label} value={row.value} max={totals.enrolled || 1} color={row.color} />)}
+            {genderRows(analytics.units, "enrolled").map((row) => <ProgressRow key={row.label} label={row.label} value={row.value} max={totals.enrolled || 1} color={row.color} display={chartDisplay} />)}
           </CardBody>
         </Card>
       </div>
