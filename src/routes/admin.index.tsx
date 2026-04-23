@@ -533,13 +533,13 @@ function CusaTab({ chartDisplay }: { chartDisplay: ChartDisplay }) {
       </div>
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.25fr_1fr]">
         <Card>
-          <CardHead title="CUSA Members Analytics" subtitle="Members by parish or outstation" action={<ChartDisplayToggle value={chartDisplay} onChange={setChartDisplay} />} />
+          <CardHead title="CUSA Members Analytics" subtitle="Members by parish or outstation" />
           <CardBody>
             {memberRows.map((d) => <ProgressRow key={d.label} label={d.label} value={d.value} max={memberRows[0]?.value || 1} color="var(--color-violet)" display={chartDisplay} />)}
           </CardBody>
         </Card>
         <Card>
-          <CardHead title="Chapter Reporting" subtitle="Members by institution" action={<ChartDisplayToggle value={chartDisplay} onChange={setChartDisplay} />} />
+          <CardHead title="Chapter Reporting" subtitle="Members by institution" />
           <CardBody>
             {(institution ? institutionRows.filter((row) => row.label === institution) : institutionRows).map((d) => <ProgressRow key={d.label} label={d.label} value={d.value} max={maxInstitution} color="var(--color-success)" display={chartDisplay} />)}
           </CardBody>
@@ -547,7 +547,7 @@ function CusaTab({ chartDisplay }: { chartDisplay: ChartDisplay }) {
       </div>
       <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
         <Card>
-          <CardHead title="Gender Split" subtitle="CUSA members within selected filters" action={<ChartDisplayToggle value={chartDisplay} onChange={setChartDisplay} />} />
+          <CardHead title="Gender Split" subtitle="CUSA members within selected filters" />
           <CardBody>
             {gender.map((row) => <ProgressRow key={row.label} label={row.label} value={row.value} max={filteredMembers || 1} color={row.color} display={chartDisplay} />)}
           </CardBody>
@@ -612,19 +612,19 @@ function MissionTab({ chartDisplay }: { chartDisplay: ChartDisplay }) {
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         <Card>
-          <CardHead title="Nominees Analytics" subtitle="Mission candidates submitted" action={<ChartDisplayToggle value={chartDisplay} onChange={setChartDisplay} />} />
+          <CardHead title="Nominees Analytics" subtitle="Mission candidates submitted" />
           <CardBody>
             {nomineeRows.map((d) => <ProgressRow key={d.label} label={d.label} value={d.value} max={nomineeRows[0]?.value || 1} color="var(--color-gold)" display={chartDisplay} />)}
           </CardBody>
         </Card>
         <Card>
-          <CardHead title="Reports Returned" subtitle="Post-mission reporting completion" action={<ChartDisplayToggle value={chartDisplay} onChange={setChartDisplay} />} />
+          <CardHead title="Reports Returned" subtitle="Post-mission reporting completion" />
           <CardBody>
             {reportRows.map((d) => <ProgressRow key={d.label} label={d.label} value={d.value} max={d.max} color="var(--color-info)" display={chartDisplay} />)}
           </CardBody>
         </Card>
         <Card>
-          <CardHead title="Gender Split" subtitle="Mission nominees within selected filters" action={<ChartDisplayToggle value={chartDisplay} onChange={setChartDisplay} />} />
+          <CardHead title="Gender Split" subtitle="Mission nominees within selected filters" />
           <CardBody>
             {genderRows(analytics.units, "missionNominees").map((row) => <ProgressRow key={row.label} label={row.label} value={row.value} max={totals.missionNominees || 1} color={row.color} display={chartDisplay} />)}
           </CardBody>
