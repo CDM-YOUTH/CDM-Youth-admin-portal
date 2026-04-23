@@ -52,6 +52,7 @@ const emptyFilters: FilterState = { deaneryCode: "", parishId: "", churchId: "" 
 
 function DashboardPage() {
   const [tab, setTab] = useState<Tab>("general");
+  const [chartDisplay, setChartDisplay] = useState<ChartDisplay>("count");
 
   return (
     <>
@@ -73,14 +74,19 @@ function DashboardPage() {
             </TopbarTab>
           </>
         }
-        action={<TopbarButton>Export Report</TopbarButton>}
+        action={
+          <>
+            <ChartDisplayToggle value={chartDisplay} onChange={setChartDisplay} />
+            <TopbarButton>Export Report</TopbarButton>
+          </>
+        }
       />
 
       <div className="flex-1 overflow-y-auto px-5 py-4">
-        {tab === "general" && <GeneralTab />}
-        {tab === "enrollment" && <EnrollmentTab />}
-        {tab === "cusa" && <CusaTab />}
-        {tab === "mission" && <MissionTab />}
+        {tab === "general" && <GeneralTab chartDisplay={chartDisplay} />}
+        {tab === "enrollment" && <EnrollmentTab chartDisplay={chartDisplay} />}
+        {tab === "cusa" && <CusaTab chartDisplay={chartDisplay} />}
+        {tab === "mission" && <MissionTab chartDisplay={chartDisplay} />}
       </div>
     </>
   );
@@ -214,15 +220,14 @@ function genderRows(units: AnalyticsUnit[], metric: "enrolled" | "missionNominee
 
 function enrollmentTrendRows(units: AnalyticsUnit[]) {
   const total = totalsFor(units).enrolled;
-  const weights = [0.04, 0.06, 0.08, 0.1, 0.08, 0.07, 0.09, 0.11, 0.1, 0.09, 0.1, 0.08];
-  let cumulative = 0;
-  return ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].map((label, index) => {
-    const monthly = Math.round(total * weights[index]);
-    cumulative += monthly;
+  const baseline = Math.max(1, Math.round(total * 0.58));
+  const multipliers = [0.72, 0.81, 0.9, 1, 1.12, 1.24];
+  return ["2021", "2022", "2023", "2024", "2025", "2026"].map((label, index) => {
+    const annual = index === 5 ? total : Math.round(baseline * multipliers[index]);
     return {
-    label,
-      value: monthly,
-      cumulative: Math.min(total, cumulative),
+      label,
+      value: annual,
+      cumulative: Math.round(((annual - baseline) / baseline) * 100),
     };
   });
 }
