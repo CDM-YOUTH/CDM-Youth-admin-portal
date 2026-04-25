@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { EVENTS, ORGANIZATION } from "@/lib/mock-data";
 
-export const Route = createFileRoute("/admin/events/$eventId")({
+export const Route = createFileRoute("/admin/event/$eventId")({
   head: () => ({
     meta: [
       { title: "Event Report — CDM Youth Office" },
