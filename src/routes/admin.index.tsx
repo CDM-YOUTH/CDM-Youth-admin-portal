@@ -21,6 +21,7 @@ import {
 import { Donut } from "@/components/admin/donut";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CUSA_INSTITUTIONS, buildCusaMembers, cusaGenderRows, cusaInstitutionRows, cusaMembersFor } from "@/lib/cusa-data";
+import { TablePagination, usePagination } from "@/components/admin/table-pagination";
 import {
   ACTIVITY_FEED,
   ANALYTICS_UNITS,
@@ -559,7 +560,8 @@ function CusaTab({ chartDisplay }: { chartDisplay: ChartDisplay }) {
 }
 
 function CusaMemberTable({ units, institution }: { units: AnalyticsUnit[]; institution: string }) {
-  const members = buildCusaMembers(units, institution).slice(0, 10);
+  const members = useMemo(() => buildCusaMembers(units, institution), [units, institution]);
+  const pagination = usePagination(members, 10);
 
   return (
     <Card>
@@ -574,7 +576,7 @@ function CusaMemberTable({ units, institution }: { units: AnalyticsUnit[]; insti
             </TableRow>
           </TableHeader>
           <TableBody>
-            {members.map((member) => (
+            {pagination.pageRows.map((member) => (
               <TableRow key={member.id} className="border-border/30 hover:bg-bg-3">
                 <TableCell className="px-3 py-2 text-[10px] font-semibold text-foreground">{member.name}</TableCell>
                 <TableCell className="px-3 py-2 text-[10px] text-text-1">{member.institution}</TableCell>
@@ -587,6 +589,14 @@ function CusaMemberTable({ units, institution }: { units: AnalyticsUnit[]; insti
             ))}
           </TableBody>
         </Table>
+        <TablePagination
+          page={pagination.page}
+          pageSize={pagination.pageSize}
+          total={pagination.total}
+          totalPages={pagination.totalPages}
+          onPageChange={pagination.setPage}
+          onPageSizeChange={pagination.setPageSize}
+        />
       </CardBody>
     </Card>
   );
