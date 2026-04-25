@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Topbar, TopbarButton } from "@/components/admin/topbar";
 import { Card, CardBody, CardHead, Kpi, PageHeader, Pill, ProgressRow } from "@/components/admin/ui-bits";
 import { Input } from "@/components/ui/input";
@@ -26,9 +26,29 @@ function EventDetailPage() {
   const parishes = ORGANIZATION.flatMap((deanery) => deanery.parishes.map((parish) => parish.name));
   const locals = ORGANIZATION.flatMap((deanery) => deanery.parishes.flatMap((parish) => parish.churches.map((church) => church.name)));
 
+  const [mode, setMode] = useState<"view" | "edit">("view");
+  const isEdit = mode === "edit";
+
   return (
     <>
-      <Topbar title="Event Detail" action={<TopbarButton>Edit Event</TopbarButton>} />
+      <Topbar
+        title={isEdit ? "Edit Event" : "Event Detail"}
+        action={
+          isEdit ? (
+            <div className="flex gap-2">
+              <button
+                onClick={() => setMode("view")}
+                className="rounded-lg border border-border bg-bg-3 px-3 py-1.5 text-[11px] font-bold text-text-2"
+              >
+                Cancel
+              </button>
+              <TopbarButton onClick={() => setMode("view")}>Save Changes</TopbarButton>
+            </div>
+          ) : (
+            <TopbarButton onClick={() => setMode("edit")}>Edit Event</TopbarButton>
+          )
+        }
+      />
       <div className="flex-1 overflow-y-auto px-5 py-4">
         <PageHeader title={event.name} description={`${event.date} · ${event.venue} · ${event.parish}`} />
 
@@ -41,18 +61,22 @@ function EventDetailPage() {
 
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.2fr_0.8fr]">
           <Card>
-            <CardHead title="Event Details" subtitle="View and edit the core information" action={<Pill tone={event.status === "done" ? "success" : "info"}>{event.status}</Pill>} />
+            <CardHead
+              title="Event Details"
+              subtitle={isEdit ? "Editing core information" : "Read-only view"}
+              action={<Pill tone={event.status === "done" ? "success" : "info"}>{event.status}</Pill>}
+            />
             <CardBody>
               <div className="grid gap-3 md:grid-cols-2">
-                <Field label="Event name"><Input defaultValue={event.name} /></Field>
-                <Field label="Date"><Input defaultValue={event.date} /></Field>
-                <SelectField label="Deanery" placeholder="Select deanery" values={deaneries} />
-                <SelectField label="Parish" placeholder={event.parish} values={parishes} />
-                <SelectField label="Local church / outstation" placeholder="Select local" values={locals.slice(0, 24)} />
-                <Field label="Venue"><Input defaultValue={event.venue} /></Field>
-                <Field label="Expected"><Input type="number" defaultValue={event.expected} /></Field>
-                <Field label="Registered"><Input type="number" defaultValue={event.registered} /></Field>
-                <Field label="Notes"><Textarea defaultValue={`${event.name} planning, attendance and reporting notes.`} /></Field>
+                <Field label="Event name"><Input defaultValue={event.name} readOnly={!isEdit} /></Field>
+                <Field label="Date"><Input defaultValue={event.date} readOnly={!isEdit} /></Field>
+                <SelectField label="Deanery" placeholder="Select deanery" values={deaneries} disabled={!isEdit} />
+                <SelectField label="Parish" placeholder={event.parish} values={parishes} disabled={!isEdit} />
+                <SelectField label="Local church / outstation" placeholder="Select local" values={locals.slice(0, 24)} disabled={!isEdit} />
+                <Field label="Venue"><Input defaultValue={event.venue} readOnly={!isEdit} /></Field>
+                <Field label="Expected"><Input type="number" defaultValue={event.expected} readOnly={!isEdit} /></Field>
+                <Field label="Registered"><Input type="number" defaultValue={event.registered} readOnly={!isEdit} /></Field>
+                <Field label="Notes"><Textarea defaultValue={`${event.name} planning, attendance and reporting notes.`} readOnly={!isEdit} /></Field>
               </div>
             </CardBody>
           </Card>
@@ -64,8 +88,8 @@ function EventDetailPage() {
               <ProgressRow label="Members" value={memberAttendance} max={event.expected} color="var(--color-success)" />
               <ProgressRow label="Guests" value={event.guests} max={event.expected} color="var(--color-info)" />
               <div className="grid grid-cols-2 gap-2 pt-2">
-                <SelectField label="Find member" placeholder="Name / number" values={["CY-2026-1042", "CY-2026-0871", "Grace Wanjiku", "Peter Mwangi"]} />
-                <SelectField label="Attendance" placeholder="Mark status" values={["In attendance", "Expected", "Absent", "Guest"]} />
+                <SelectField label="Find member" placeholder="Name / number" values={["CY-2026-1042", "CY-2026-0871", "Grace Wanjiku", "Peter Mwangi"]} disabled={!isEdit} />
+                <SelectField label="Attendance" placeholder="Mark status" values={["In attendance", "Expected", "Absent", "Guest"]} disabled={!isEdit} />
                 <button className="rounded-lg border border-info/40 bg-info-soft px-3 py-2 text-[10px] font-bold text-info">Add non-member</button>
                 <button className="rounded-lg border border-success/40 bg-success-soft px-3 py-2 text-[10px] font-bold text-success">Generate number</button>
               </div>
@@ -98,7 +122,7 @@ function EventDetailPage() {
         </div>
 
         <Card className="mt-3">
-          <CardHead title="Gallery" subtitle="Photos and evidence attached to this event" action="Upload →" />
+          <CardHead title="Gallery" subtitle="Photos and evidence attached to this event" action={isEdit ? "Upload →" : undefined} />
           <CardBody className="grid grid-cols-2 gap-2 md:grid-cols-3">
             {event.gallery.map((item) => (
               <div key={item} className="flex aspect-[4/3] items-end rounded-lg border border-border bg-gradient-to-br from-bg-4 to-bg-2 p-3 text-[11px] font-bold text-text-1">
@@ -130,10 +154,10 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function SelectField({ label, placeholder, values }: { label: string; placeholder: string; values: string[] }) {
+function SelectField({ label, placeholder, values, disabled }: { label: string; placeholder: string; values: string[]; disabled?: boolean }) {
   return (
     <Field label={label}>
-      <Select>
+      <Select disabled={disabled}>
         <SelectTrigger>
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
