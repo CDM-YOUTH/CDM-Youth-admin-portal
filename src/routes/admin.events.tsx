@@ -82,7 +82,7 @@ function EventList({ title, events }: { title: string; events: typeof EVENTS }) 
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <Pill tone={event.status === "done" ? "success" : "info"}>{event.status === "done" ? `${event.attended} attended` : `${event.registered} RSVP`}</Pill>
-              <Link to="/admin/events/$eventId" params={{ eventId: event.id }} className="rounded-md border border-border bg-bg-3 px-3 py-1.5 text-[10px] font-semibold text-text-1 hover:border-gold-3 hover:text-gold">
+              <Link to="/admin/event/$eventId" params={{ eventId: event.id }} className="rounded-md border border-border bg-bg-3 px-3 py-1.5 text-[10px] font-semibold text-text-1 hover:border-gold-3 hover:text-gold">
                 View / Edit
               </Link>
             </div>
