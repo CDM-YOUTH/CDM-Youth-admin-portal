@@ -5,6 +5,7 @@ import { Card, CardBody, CardHead, Kpi, PageHeader, Pill } from "@/components/ad
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CUSA_INSTITUTIONS, buildCusaMembers, cusaMembersFor } from "@/lib/cusa-data";
 import { ANALYTICS_UNITS, ORGANIZATION, type AnalyticsUnit } from "@/lib/mock-data";
+import { TablePagination, usePagination } from "@/components/admin/table-pagination";
 
 export const Route = createFileRoute("/admin/cusa")({
   head: () => ({
@@ -27,6 +28,7 @@ function CusaPage() {
   const members = buildCusaMembers(units, filters.institution);
   const totalMembers = units.reduce((sum, unit) => sum + cusaMembersFor(unit, filters.institution), 0);
   const activeMembers = members.filter((member) => member.status === "active").length;
+  const pagination = usePagination(members, 15);
 
   return (
     <>
@@ -56,7 +58,7 @@ function CusaPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {members.slice(0, 18).map((member) => (
+                {pagination.pageRows.map((member) => (
                   <TableRow key={member.id} className="border-border/30 hover:bg-bg-3">
                     <TableCell className="px-3 py-2 text-[11px] font-semibold text-foreground">{member.name}</TableCell>
                     <TableCell className="px-3 py-2 text-[11px] text-text-1">{member.institution}</TableCell>
@@ -70,6 +72,14 @@ function CusaPage() {
                 ))}
               </TableBody>
             </Table>
+            <TablePagination
+              page={pagination.page}
+              pageSize={pagination.pageSize}
+              total={pagination.total}
+              totalPages={pagination.totalPages}
+              onPageChange={pagination.setPage}
+              onPageSizeChange={pagination.setPageSize}
+            />
           </CardBody>
         </Card>
       </div>

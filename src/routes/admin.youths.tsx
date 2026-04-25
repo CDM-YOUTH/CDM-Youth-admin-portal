@@ -1,6 +1,8 @@
+import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Topbar, TopbarButton } from "@/components/admin/topbar";
 import { Card, CardBody, CardHead, Kpi, PageHeader, Pill } from "@/components/admin/ui-bits";
+import { TablePagination, usePagination } from "@/components/admin/table-pagination";
 
 export const Route = createFileRoute("/admin/youths")({
   head: () => ({
@@ -12,7 +14,7 @@ export const Route = createFileRoute("/admin/youths")({
   component: YouthsPage,
 });
 
-const SAMPLE = [
+const BASE_SAMPLE = [
   ["Grace Wanjiku", "F", "17", "St. Joseph Murang'a", "Secondary", "active"],
   ["Peter Kamau", "M", "21", "Holy Family Maragua", "Tertiary", "active"],
   ["Mary Njeri", "F", "16", "St. Peter Kandara", "Secondary", "active"],
@@ -25,7 +27,26 @@ const SAMPLE = [
   ["David Kariuki", "M", "26", "St. Mary Kangema", "Working", "active"],
 ];
 
+// expand sample so pagination is meaningful in the demo
+const SAMPLE = Array.from({ length: 12 }, (_, batch) =>
+  BASE_SAMPLE.map((row, i) => [
+    `${row[0]} ${batch + 1}`,
+    row[1],
+    String(Math.max(12, (Number(row[2]) + batch) % 30)),
+    row[3],
+    row[4],
+    (batch + i) % 11 === 0 ? "inactive" : "active",
+  ]),
+).flat();
+
 function YouthsPage() {
+  const [query, setQuery] = useState("");
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return SAMPLE;
+    return SAMPLE.filter((row) => row.some((cell) => cell.toLowerCase().includes(q)));
+  }, [query]);
+  const pagination = usePagination(filtered, 10);
   return (
     <>
       <Topbar title="Youth Records" action={<TopbarButton>Export CSV</TopbarButton>} />
@@ -44,6 +65,11 @@ function YouthsPage() {
             <div className="border-b border-border px-3.5 py-2.5">
               <input
                 placeholder="Search by name, ID, parish…"
+                value={query}
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  pagination.setPage(1);
+                }}
                 className="w-full rounded-md border border-border bg-bg-2 px-3 py-2 text-[12px] text-foreground outline-none focus:border-gold-3"
               />
             </div>
@@ -56,7 +82,7 @@ function YouthsPage() {
                 </tr>
               </thead>
               <tbody>
-                {SAMPLE.map((row, i) => (
+                {pagination.pageRows.map((row, i) => (
                   <tr key={i} className="border-b border-border/30 last:border-0 hover:bg-bg-3">
                     <td className="px-3.5 py-2.5 text-[11px] font-semibold text-foreground">{row[0]}</td>
                     <td className="px-3.5 py-2.5 text-[11px] text-text-1">{row[1]}</td>
@@ -68,8 +94,23 @@ function YouthsPage() {
                     </td>
                   </tr>
                 ))}
+                {pagination.pageRows.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-3.5 py-6 text-center text-[11px] text-text-3">
+                      No youths match your search.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
+            <TablePagination
+              page={pagination.page}
+              pageSize={pagination.pageSize}
+              total={pagination.total}
+              totalPages={pagination.totalPages}
+              onPageChange={pagination.setPage}
+              onPageSizeChange={pagination.setPageSize}
+            />
           </CardBody>
         </Card>
       </div>
