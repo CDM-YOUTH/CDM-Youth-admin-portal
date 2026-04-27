@@ -23,7 +23,7 @@ const filterValueSchema = fallback(
     })
     .optional(),
   undefined,
-).default(undefined);
+);
 
 const youthSearchSchema = z.object({
   q: fallback(z.string(), "").default(""),

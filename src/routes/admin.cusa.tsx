@@ -24,7 +24,7 @@ const filterValueSchema = fallback(
     })
     .optional(),
   undefined,
-).default(undefined);
+);
 
 const cusaSearchSchema = z.object({
   q: fallback(z.string(), "").default(""),
