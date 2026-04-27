@@ -2,28 +2,42 @@ import { useMemo } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
-import { Topbar, TopbarButton } from "@/components/admin/topbar";
-import { Card, CardBody, CardHead, Kpi, PageHeader, Pill } from "@/components/admin/ui-bits";
+import { Topbar } from "@/components/admin/topbar";
+import { Card, CardBody, PageHeader, Pill } from "@/components/admin/ui-bits";
 import { TablePagination, usePagination } from "@/components/admin/table-pagination";
 import {
-  ActiveFilterCount,
-  FilterClear,
-  FilterRow,
-  FilterSearch,
-  FilterSelect,
+  ColumnFilter,
+  ColumnHeader,
+  TableToolbar,
+  applyColumnFilter,
+  type ColumnFilterValue,
 } from "@/components/admin/table-filters";
 import { ORGANIZATION } from "@/lib/mock-data";
 import { YOUTH_CATEGORIES, YOUTH_GENDERS, YOUTH_REGISTRY } from "@/lib/youth-data";
 
+const filterValueSchema = fallback(
+  z
+    .object({
+      operator: z.enum(["equals", "contains", "startsWith", "notEquals"]),
+      value: z.string(),
+    })
+    .optional(),
+  undefined,
+);
+
 const youthSearchSchema = z.object({
   q: fallback(z.string(), "").default(""),
-  gender: fallback(z.string(), "").default(""),
-  deanery: fallback(z.string(), "").default(""),
-  parish: fallback(z.string(), "").default(""),
-  outstation: fallback(z.string(), "").default(""),
-  category: fallback(z.string(), "").default(""),
-  status: fallback(z.string(), "").default(""),
+  f_cdm: filterValueSchema,
+  f_name: filterValueSchema,
+  f_sex: filterValueSchema,
+  f_deanery: filterValueSchema,
+  f_parish: filterValueSchema,
+  f_outstation: filterValueSchema,
+  f_category: filterValueSchema,
+  f_status: filterValueSchema,
 });
+
+type YouthSearch = z.infer<typeof youthSearchSchema>;
 
 export const Route = createFileRoute("/admin/youths")({
   head: () => ({
@@ -40,22 +54,21 @@ function YouthsPage() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
 
-  const setFilter = (patch: Partial<typeof search>) => {
-    navigate({ search: (prev: typeof search) => ({ ...prev, ...patch }), replace: true });
+  const setFilter = (patch: Partial<YouthSearch>) => {
+    navigate({ search: (prev: YouthSearch) => ({ ...prev, ...patch }), replace: true });
   };
-
-  const selectedDeanery = ORGANIZATION.find((deanery) => deanery.code === search.deanery);
-  const selectedParish = selectedDeanery?.parishes.find((parish) => parish.id === search.parish);
 
   const filtered = useMemo(() => {
     const q = search.q.trim().toLowerCase();
     return YOUTH_REGISTRY.filter((row) => {
-      if (search.gender && row.gender !== search.gender) return false;
-      if (search.deanery && row.deaneryCode !== search.deanery) return false;
-      if (search.parish && row.parishId !== search.parish) return false;
-      if (search.outstation && row.churchId !== search.outstation) return false;
-      if (search.category && row.category !== search.category) return false;
-      if (search.status && row.status !== search.status) return false;
+      if (!applyColumnFilter(row.cdmId, search.f_cdm)) return false;
+      if (!applyColumnFilter(row.name, search.f_name)) return false;
+      if (!applyColumnFilter(row.gender, search.f_sex)) return false;
+      if (!applyColumnFilter(row.deaneryName, search.f_deanery)) return false;
+      if (!applyColumnFilter(row.parishName, search.f_parish)) return false;
+      if (!applyColumnFilter(row.churchName, search.f_outstation)) return false;
+      if (!applyColumnFilter(row.category, search.f_category)) return false;
+      if (!applyColumnFilter(row.status, search.f_status)) return false;
       if (q) {
         const haystack = [
           row.cdmId,
@@ -75,103 +88,86 @@ function YouthsPage() {
 
   const pagination = usePagination(filtered, 10);
 
-  const totalActiveFilters =
-    (search.q ? 1 : 0) +
-    (search.gender ? 1 : 0) +
-    (search.deanery ? 1 : 0) +
-    (search.parish ? 1 : 0) +
-    (search.outstation ? 1 : 0) +
-    (search.category ? 1 : 0) +
-    (search.status ? 1 : 0);
+  const deaneryOptions = ORGANIZATION.map((d) => ({ value: d.name, label: d.name }));
+  const parishOptions = Array.from(
+    new Set(ORGANIZATION.flatMap((d) => d.parishes.map((p) => p.name))),
+  ).map((name) => ({ value: name, label: name }));
+  const outstationOptions = Array.from(
+    new Set(
+      ORGANIZATION.flatMap((d) => d.parishes.flatMap((p) => p.churches.map((c) => c.name))),
+    ),
+  ).map((name) => ({ value: name, label: name }));
 
-  const totals = YOUTH_REGISTRY.length;
-  const activeCount = YOUTH_REGISTRY.filter((y) => y.status === "active").length;
-  const enrolledCount = YOUTH_REGISTRY.filter((y) => y.enrolled).length;
+  const fc = (key: keyof YouthSearch, label: string, mode: "text" | "select" = "text", options?: { value: string; label: string }[]) => (
+    <ColumnFilter
+      label={label}
+      mode={mode}
+      options={options}
+      value={search[key] as ColumnFilterValue | undefined}
+      onChange={(v) => setFilter({ [key]: v } as Partial<YouthSearch>)}
+    />
+  );
 
   return (
     <>
-      <Topbar title="Youth Records" action={<TopbarButton>Export CSV</TopbarButton>} />
+      <Topbar title="Youth Records" />
       <div className="flex-1 overflow-y-auto px-5 py-4">
         <PageHeader
           title="Youth Directory"
-          description={`${filtered.length.toLocaleString()} of ${totals.toLocaleString()} youths shown · share this URL to share the same view.`}
+          description={`${filtered.length.toLocaleString()} of ${YOUTH_REGISTRY.length.toLocaleString()} youths · share this URL to share the same view.`}
         />
-        <div className="mb-4 grid grid-cols-1 gap-2.5 sm:grid-cols-4">
-          <Kpi label="Total" value={totals.toLocaleString()} trend="registry sample" tone="up" />
-          <Kpi label="Active" value={activeCount.toLocaleString()} trend={`${Math.round((activeCount / totals) * 100)}%`} tone="up" />
-          <Kpi label="Enrolled (2026)" value={enrolledCount.toLocaleString()} trend="confirmed" tone="info" />
-          <Kpi label="In View" value={filtered.length.toLocaleString()} trend={`${totalActiveFilters} filter${totalActiveFilters === 1 ? "" : "s"}`} tone={totalActiveFilters ? "warn" : "info"} />
-        </div>
 
         <Card>
-          <CardHead
-            title="All Youths"
-            subtitle="Filter by name, CDM No., deanery, parish, outstation, category or gender — every filter is in the URL."
-            action={<ActiveFilterCount count={totalActiveFilters} />}
+          <TableToolbar
+            searchValue={search.q}
+            onSearchChange={(value) => setFilter({ q: value })}
+            searchPlaceholder="Search name, CDM No., parish, deanery, outstation, institution…"
+            onImport={() => {}}
+            onExport={() => {}}
+            onAdd={() => {}}
+            addLabel="Add Youth"
           />
           <CardBody className="p-0">
-            <FilterRow>
-              <FilterSearch
-                value={search.q}
-                onChange={(value) => setFilter({ q: value })}
-                placeholder="Search name, CDM No., parish, deanery, outstation, institution…"
-              />
-              <FilterSelect
-                label="All Genders"
-                value={search.gender}
-                onChange={(value) => setFilter({ gender: value })}
-                options={YOUTH_GENDERS.map((g) => ({ value: g, label: g }))}
-                accent="pink"
-              />
-              <FilterSelect
-                label="All Deaneries"
-                value={search.deanery}
-                onChange={(value) => setFilter({ deanery: value, parish: "", outstation: "" })}
-                options={ORGANIZATION.map((d) => ({ value: d.code, label: d.name }))}
-                accent="gold"
-              />
-              <FilterSelect
-                label="All Parishes"
-                value={search.parish}
-                onChange={(value) => setFilter({ parish: value, outstation: "" })}
-                options={(selectedDeanery?.parishes ?? []).map((p) => ({ value: p.id, label: p.name }))}
-                disabled={!selectedDeanery}
-              />
-              <FilterSelect
-                label="All Outstations"
-                value={search.outstation}
-                onChange={(value) => setFilter({ outstation: value })}
-                options={(selectedParish?.churches ?? []).map((c) => ({ value: c.id, label: c.name }))}
-                disabled={!selectedParish}
-              />
-              <FilterSelect
-                label="All Categories"
-                value={search.category}
-                onChange={(value) => setFilter({ category: value })}
-                options={YOUTH_CATEGORIES.map((c) => ({ value: c, label: c }))}
-              />
-              <FilterSelect
-                label="Any Status"
-                value={search.status}
-                onChange={(value) => setFilter({ status: value })}
-                options={[
-                  { value: "active", label: "Active" },
-                  { value: "inactive", label: "Inactive" },
-                ]}
-              />
-              <FilterClear
-                visible={totalActiveFilters > 0}
-                onClick={() =>
-                  setFilter({ q: "", gender: "", deanery: "", parish: "", outstation: "", category: "", status: "" })
-                }
-              />
-            </FilterRow>
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border">
-                  {["CDM No.", "Name", "Sex", "Age", "Deanery", "Parish", "Outstation", "Category", "Status"].map((h) => (
-                    <th key={h} className="label-eyebrow px-3.5 py-2.5 text-left">{h}</th>
-                  ))}
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
+                    <ColumnHeader label="CDM No." filter={fc("f_cdm", "CDM No.")} />
+                  </th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
+                    <ColumnHeader label="Name" filter={fc("f_name", "Name")} />
+                  </th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
+                    <ColumnHeader
+                      label="Sex"
+                      filter={fc("f_sex", "Sex", "select", YOUTH_GENDERS.map((g) => ({ value: g, label: g })))}
+                    />
+                  </th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">Age</th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
+                    <ColumnHeader label="Deanery" filter={fc("f_deanery", "Deanery", "select", deaneryOptions)} />
+                  </th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
+                    <ColumnHeader label="Parish" filter={fc("f_parish", "Parish", "select", parishOptions)} />
+                  </th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
+                    <ColumnHeader label="Outstation" filter={fc("f_outstation", "Outstation", "select", outstationOptions)} />
+                  </th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
+                    <ColumnHeader
+                      label="Category"
+                      filter={fc("f_category", "Category", "select", YOUTH_CATEGORIES.map((c) => ({ value: c, label: c })))}
+                    />
+                  </th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
+                    <ColumnHeader
+                      label="Status"
+                      filter={fc("f_status", "Status", "select", [
+                        { value: "active", label: "Active" },
+                        { value: "inactive", label: "Inactive" },
+                      ])}
+                    />
+                  </th>
                 </tr>
               </thead>
               <tbody>

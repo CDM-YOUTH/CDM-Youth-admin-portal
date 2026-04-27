@@ -2,28 +2,40 @@ import { useMemo } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
-import { Topbar, TopbarButton } from "@/components/admin/topbar";
-import { Card, CardBody, CardHead, Kpi, PageHeader, Pill } from "@/components/admin/ui-bits";
+import { Topbar } from "@/components/admin/topbar";
+import { Card, CardBody, PageHeader, Pill } from "@/components/admin/ui-bits";
 import { TablePagination, usePagination } from "@/components/admin/table-pagination";
 import {
-  ActiveFilterCount,
-  FilterClear,
-  FilterRow,
-  FilterSearch,
-  FilterSelect,
+  ColumnFilter,
+  ColumnHeader,
+  TableToolbar,
+  applyColumnFilter,
+  type ColumnFilterValue,
 } from "@/components/admin/table-filters";
 import { ORGANIZATION } from "@/lib/mock-data";
-import { YOUTH_CATEGORIES, YOUTH_GENDERS, YOUTH_REGISTRY } from "@/lib/youth-data";
+import { YOUTH_CATEGORIES, YOUTH_REGISTRY } from "@/lib/youth-data";
+
+const filterValueSchema = fallback(
+  z
+    .object({
+      operator: z.enum(["equals", "contains", "startsWith", "notEquals"]),
+      value: z.string(),
+    })
+    .optional(),
+  undefined,
+);
 
 const enrollmentSearchSchema = z.object({
   q: fallback(z.string(), "").default(""),
-  gender: fallback(z.string(), "").default(""),
-  deanery: fallback(z.string(), "").default(""),
-  parish: fallback(z.string(), "").default(""),
-  outstation: fallback(z.string(), "").default(""),
-  category: fallback(z.string(), "").default(""),
-  status: fallback(z.string(), "").default(""),
+  f_cdm: filterValueSchema,
+  f_name: filterValueSchema,
+  f_deanery: filterValueSchema,
+  f_parish: filterValueSchema,
+  f_category: filterValueSchema,
+  f_payment: filterValueSchema,
 });
+
+type EnrollmentSearch = z.infer<typeof enrollmentSearchSchema>;
 
 const FEE_BY_CATEGORY: Record<string, string> = {
   Primary: "KES 300",
@@ -49,12 +61,9 @@ export const Route = createFileRoute("/admin/enrollment")({
 function EnrollmentPage() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
-  const setFilter = (patch: Partial<typeof search>) => {
-    navigate({ search: (prev: typeof search) => ({ ...prev, ...patch }), replace: true });
+  const setFilter = (patch: Partial<EnrollmentSearch>) => {
+    navigate({ search: (prev: EnrollmentSearch) => ({ ...prev, ...patch }), replace: true });
   };
-
-  const selectedDeanery = ORGANIZATION.find((deanery) => deanery.code === search.deanery);
-  const selectedParish = selectedDeanery?.parishes.find((parish) => parish.id === search.parish);
 
   const enrollmentRows = useMemo(() => {
     const q = search.q.trim().toLowerCase();
@@ -65,12 +74,12 @@ function EnrollmentPage() {
         fee: FEE_BY_CATEGORY[row.category] ?? "KES 500",
       }))
       .filter((row) => {
-        if (search.gender && row.gender !== search.gender) return false;
-        if (search.deanery && row.deaneryCode !== search.deanery) return false;
-        if (search.parish && row.parishId !== search.parish) return false;
-        if (search.outstation && row.churchId !== search.outstation) return false;
-        if (search.category && row.category !== search.category) return false;
-        if (search.status && row.paymentStatus !== search.status) return false;
+        if (!applyColumnFilter(row.cdmId, search.f_cdm)) return false;
+        if (!applyColumnFilter(row.name, search.f_name)) return false;
+        if (!applyColumnFilter(row.deaneryName, search.f_deanery)) return false;
+        if (!applyColumnFilter(row.parishName, search.f_parish)) return false;
+        if (!applyColumnFilter(row.category, search.f_category)) return false;
+        if (!applyColumnFilter(row.paymentStatus, search.f_payment)) return false;
         if (q) {
           const haystack = [row.cdmId, row.name, row.parishName, row.deaneryName, row.churchName].join(" ").toLowerCase();
           if (!haystack.includes(q)) return false;
@@ -80,100 +89,73 @@ function EnrollmentPage() {
   }, [search]);
 
   const pagination = usePagination(enrollmentRows, 10);
-  const totalActiveFilters =
-    (search.q ? 1 : 0) +
-    (search.gender ? 1 : 0) +
-    (search.deanery ? 1 : 0) +
-    (search.parish ? 1 : 0) +
-    (search.outstation ? 1 : 0) +
-    (search.category ? 1 : 0) +
-    (search.status ? 1 : 0);
+
+  const deaneryOptions = ORGANIZATION.map((d) => ({ value: d.name, label: d.name }));
+  const parishOptions = Array.from(
+    new Set(ORGANIZATION.flatMap((d) => d.parishes.map((p) => p.name))),
+  ).map((name) => ({ value: name, label: name }));
+
+  const fc = (key: keyof EnrollmentSearch, label: string, mode: "text" | "select" = "text", options?: { value: string; label: string }[]) => (
+    <ColumnFilter
+      label={label}
+      mode={mode}
+      options={options}
+      value={search[key] as ColumnFilterValue | undefined}
+      onChange={(v) => setFilter({ [key]: v } as Partial<EnrollmentSearch>)}
+    />
+  );
 
   return (
     <>
-      <Topbar title="Enrollment" action={<TopbarButton>+ Enroll Youth</TopbarButton>} />
+      <Topbar title="Enrollment" />
       <div className="flex-1 overflow-y-auto px-5 py-4">
         <PageHeader
           title="Annual Enrollment 2026"
           description={`${enrollmentRows.length.toLocaleString()} matching enrollments — share this URL to share the same view.`}
         />
 
-        <div className="mb-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
-          <Kpi label="Enrolled" value="8,240" trend="75% of target" tone="up" sub="of 11,000" />
-          <Kpi label="Pending Payment" value="412" trend="KES 206,000" tone="warn" sub="outstanding" />
-          <Kpi label="Awaiting Approval" value="23" trend="parish review" tone="warn" sub="queue" />
-          <Kpi label="Self-Registered" value="3,180" trend="39% of total" tone="info" sub="via portal" />
-        </div>
-
         <Card>
-          <CardHead
-            title="Enrollment Register"
-            subtitle="Search by name, CDM No., deanery, parish, outstation. All filters live in the URL."
-            action={<ActiveFilterCount count={totalActiveFilters} />}
+          <TableToolbar
+            searchValue={search.q}
+            onSearchChange={(value) => setFilter({ q: value })}
+            searchPlaceholder="Search name, CDM No., parish, deanery, outstation…"
+            onImport={() => {}}
+            onExport={() => {}}
+            onAdd={() => {}}
+            addLabel="Enroll Youth"
           />
           <CardBody className="p-0">
-            <FilterRow>
-              <FilterSearch
-                value={search.q}
-                onChange={(value) => setFilter({ q: value })}
-                placeholder="Search name, CDM No., parish, deanery, outstation…"
-              />
-              <FilterSelect
-                label="All Genders"
-                value={search.gender}
-                onChange={(value) => setFilter({ gender: value })}
-                options={YOUTH_GENDERS.map((g) => ({ value: g, label: g }))}
-                accent="pink"
-              />
-              <FilterSelect
-                label="All Deaneries"
-                value={search.deanery}
-                onChange={(value) => setFilter({ deanery: value, parish: "", outstation: "" })}
-                options={ORGANIZATION.map((d) => ({ value: d.code, label: d.name }))}
-                accent="gold"
-              />
-              <FilterSelect
-                label="All Parishes"
-                value={search.parish}
-                onChange={(value) => setFilter({ parish: value, outstation: "" })}
-                options={(selectedDeanery?.parishes ?? []).map((p) => ({ value: p.id, label: p.name }))}
-                disabled={!selectedDeanery}
-              />
-              <FilterSelect
-                label="All Outstations"
-                value={search.outstation}
-                onChange={(value) => setFilter({ outstation: value })}
-                options={(selectedParish?.churches ?? []).map((c) => ({ value: c.id, label: c.name }))}
-                disabled={!selectedParish}
-              />
-              <FilterSelect
-                label="All Categories"
-                value={search.category}
-                onChange={(value) => setFilter({ category: value })}
-                options={YOUTH_CATEGORIES.map((c) => ({ value: c, label: c }))}
-              />
-              <FilterSelect
-                label="Any Payment"
-                value={search.status}
-                onChange={(value) => setFilter({ status: value })}
-                options={[
-                  { value: "approved", label: "Approved" },
-                  { value: "pending", label: "Pending" },
-                ]}
-              />
-              <FilterClear
-                visible={totalActiveFilters > 0}
-                onClick={() =>
-                  setFilter({ q: "", gender: "", deanery: "", parish: "", outstation: "", category: "", status: "" })
-                }
-              />
-            </FilterRow>
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border">
-                  {["CDM No.", "Name", "Deanery", "Parish", "Category", "Fee", "Payment"].map((h) => (
-                    <th key={h} className="label-eyebrow px-3.5 py-2.5 text-left">{h}</th>
-                  ))}
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
+                    <ColumnHeader label="CDM No." filter={fc("f_cdm", "CDM No.")} />
+                  </th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
+                    <ColumnHeader label="Name" filter={fc("f_name", "Name")} />
+                  </th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
+                    <ColumnHeader label="Deanery" filter={fc("f_deanery", "Deanery", "select", deaneryOptions)} />
+                  </th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
+                    <ColumnHeader label="Parish" filter={fc("f_parish", "Parish", "select", parishOptions)} />
+                  </th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
+                    <ColumnHeader
+                      label="Category"
+                      filter={fc("f_category", "Category", "select", YOUTH_CATEGORIES.map((c) => ({ value: c, label: c })))}
+                    />
+                  </th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">Fee</th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
+                    <ColumnHeader
+                      label="Payment"
+                      filter={fc("f_payment", "Payment", "select", [
+                        { value: "approved", label: "Approved" },
+                        { value: "pending", label: "Pending" },
+                      ])}
+                    />
+                  </th>
                 </tr>
               </thead>
               <tbody>
