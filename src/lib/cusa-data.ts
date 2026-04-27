@@ -52,11 +52,15 @@ export function cusaGenderRows(units: AnalyticsUnit[], institution = "") {
 
 export type CusaMember = {
   id: string;
+  cdmId: string;
   name: string;
   gender: "Female" | "Male";
   institution: string;
+  deaneryCode: string;
   deaneryName: string;
+  parishId: string;
   parishName: string;
+  churchId: string;
   churchName: string;
   course: string;
   year: string;
@@ -64,17 +68,23 @@ export type CusaMember = {
 };
 
 export function buildCusaMembers(units: AnalyticsUnit[], institution = ""): CusaMember[] {
+  let serial = 0;
   return units.flatMap((unit) =>
     Array.from({ length: unit.cusaMembers }, (_, index) => {
       const selectedInstitution = institutionFor(unit, index);
       const gender = (unitSeed(unit) + index) % 2 === 0 ? "Female" : "Male";
+      serial += 1;
       return {
         id: `${unit.id}-cusa-${index}`,
+        cdmId: `CDM-2026-C${String(serial).padStart(4, "0")}`,
         name: `${firstNames[(unitSeed(unit) + index) % firstNames.length]} ${lastNames[(unitSeed(unit) + index * 2) % lastNames.length]}`,
         gender,
         institution: selectedInstitution,
+        deaneryCode: unit.deaneryCode,
         deaneryName: unit.deaneryName,
+        parishId: unit.parishId,
         parishName: unit.parishName,
+        churchId: unit.id,
         churchName: unit.name,
         course: ["Education", "Commerce", "Nursing", "Engineering", "Arts", "ICT"][(unitSeed(unit) + index) % 6],
         year: `Year ${1 + ((unitSeed(unit) + index) % 4)}`,
