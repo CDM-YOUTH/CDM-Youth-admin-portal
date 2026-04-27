@@ -41,7 +41,7 @@ function YouthsPage() {
   const navigate = useNavigate({ from: Route.fullPath });
 
   const setFilter = (patch: Partial<typeof search>) => {
-    navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true });
+    navigate({ search: (prev: typeof search) => ({ ...prev, ...patch }), replace: true });
   };
 
   const selectedDeanery = ORGANIZATION.find((deanery) => deanery.code === search.deanery);
