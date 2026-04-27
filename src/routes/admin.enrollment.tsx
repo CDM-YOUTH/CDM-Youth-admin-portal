@@ -62,7 +62,7 @@ function EnrollmentPage() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const setFilter = (patch: Partial<EnrollmentSearch>) => {
-    navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true });
+    navigate({ search: (prev: EnrollmentSearch) => ({ ...prev, ...patch }), replace: true });
   };
 
   const enrollmentRows = useMemo(() => {

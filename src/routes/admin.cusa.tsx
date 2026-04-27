@@ -55,7 +55,7 @@ function CusaPage() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const setFilter = (patch: Partial<CusaSearch>) => {
-    navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true });
+    navigate({ search: (prev: CusaSearch) => ({ ...prev, ...patch }), replace: true });
   };
 
   const allMembers = useMemo(() => buildCusaMembers(ANALYTICS_UNITS, ""), []);

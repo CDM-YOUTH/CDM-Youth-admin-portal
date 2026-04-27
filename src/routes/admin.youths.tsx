@@ -55,7 +55,7 @@ function YouthsPage() {
   const navigate = useNavigate({ from: Route.fullPath });
 
   const setFilter = (patch: Partial<YouthSearch>) => {
-    navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true });
+    navigate({ search: (prev: YouthSearch) => ({ ...prev, ...patch }), replace: true });
   };
 
   const filtered = useMemo(() => {
