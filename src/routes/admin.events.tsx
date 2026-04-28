@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Plus, Trash2 } from "lucide-react";
 import { DONE_EVENTS, EVENTS, ORGANIZATION, UPCOMING_EVENTS } from "@/lib/mock-data";
 
 export const Route = createFileRoute("/admin/events")({
@@ -93,12 +94,25 @@ function EventList({ title, events }: { title: string; events: typeof EVENTS }) 
   );
 }
 
-const eventSteps = ["Basics", "Program", "Activities", "Assignments", "Items", "Registration"];
+const eventSteps = ["Basics", "Program", "Activities", "Duties", "Items", "Registration"];
+
+type Row = Record<string, string>;
+const blankRow = (labels: string[]): Row => Object.fromEntries(labels.map((l) => [l, ""]));
 
 function CreateEventDialog() {
   const [step, setStep] = useState(0);
   const parishes = useMemo(() => ORGANIZATION.flatMap((deanery) => deanery.parishes), []);
   const selectedStep = eventSteps[step];
+
+  const programLabels = ["Time", "Program activity", "Facilitator / speaker", "Talk topic"];
+  const activityLabels = ["Activity", "Responsible team", "Location", "Notes"];
+  const dutyLabels = ["Duty", "Assigned person / team", "Area", "Instructions"];
+  const itemLabels = ["Required item", "Quantity", "Status", "Used for"];
+
+  const [program, setProgram] = useState<Row[]>([blankRow(programLabels)]);
+  const [activities, setActivities] = useState<Row[]>([blankRow(activityLabels)]);
+  const [duties, setDuties] = useState<Row[]>([blankRow(dutyLabels)]);
+  const [items, setItems] = useState<Row[]>([blankRow(itemLabels)]);
 
   return (
     <Dialog>
@@ -137,10 +151,10 @@ function CreateEventDialog() {
                 <Field label="Description"><Textarea className="md:col-span-2" placeholder="Purpose and notes for the event" /></Field>
               </div>
             )}
-            {step === 1 && <RepeatingFields labels={["Time", "Program activity", "Facilitator / speaker", "Talk topic"]} />}
-            {step === 2 && <RepeatingFields labels={["Activity", "Responsible team", "Location", "Notes"]} />}
-            {step === 3 && <RepeatingFields labels={["Role", "Assigned person / team", "Area", "Instructions"]} />}
-            {step === 4 && <RepeatingFields labels={["Required item", "Quantity", "Status", "Used for"]} />}
+            {step === 1 && <RepeatingRows itemLabel="program entry" labels={programLabels} rows={program} setRows={setProgram} />}
+            {step === 2 && <RepeatingRows itemLabel="activity" labels={activityLabels} rows={activities} setRows={setActivities} />}
+            {step === 3 && <RepeatingRows itemLabel="duty" labels={dutyLabels} rows={duties} setRows={setDuties} />}
+            {step === 4 && <RepeatingRows itemLabel="item" labels={itemLabels} rows={items} setRows={setItems} />}
             {step === 5 && (
               <div className="grid gap-3 md:grid-cols-2">
                 <SelectField label="Register by" placeholder="Choose level" values={["Deanery", "Parish", "Local church", "CUSA institution"]} />
@@ -175,6 +189,64 @@ function SelectField({ label, placeholder, values }: { label: string; placeholde
   );
 }
 
-function RepeatingFields({ labels }: { labels: string[] }) {
-  return <div className="grid gap-3 md:grid-cols-2">{labels.map((label) => <Field key={label} label={label}><Input placeholder={label} /></Field>)}</div>;
+export function RepeatingRows({
+  labels,
+  rows,
+  setRows,
+  itemLabel,
+}: {
+  labels: string[];
+  rows: Row[];
+  setRows: (rows: Row[]) => void;
+  itemLabel: string;
+}) {
+  const update = (index: number, key: string, value: string) => {
+    const next = rows.map((row, i) => (i === index ? { ...row, [key]: value } : row));
+    setRows(next);
+  };
+  const remove = (index: number) => {
+    if (rows.length === 1) {
+      setRows([blankRow(labels)]);
+      return;
+    }
+    setRows(rows.filter((_, i) => i !== index));
+  };
+  const add = () => setRows([...rows, blankRow(labels)]);
+
+  return (
+    <div className="space-y-3">
+      {rows.map((row, index) => (
+        <div key={index} className="rounded-lg border border-border bg-bg-3 p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wide text-text-3">#{index + 1}</span>
+            <button
+              type="button"
+              onClick={() => remove(index)}
+              className="flex items-center gap-1 rounded-md border border-border bg-bg-2 px-2 py-1 text-[10px] font-bold text-text-2 hover:border-danger/50 hover:text-danger"
+            >
+              <Trash2 className="h-3 w-3" /> Remove
+            </button>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            {labels.map((label) => (
+              <Field key={label} label={label}>
+                <Input
+                  placeholder={label}
+                  value={row[label] ?? ""}
+                  onChange={(e) => update(index, label, e.target.value)}
+                />
+              </Field>
+            ))}
+          </div>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={add}
+        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border bg-bg-3 px-3 py-2 text-[11px] font-bold text-text-2 hover:border-gold-3 hover:text-gold"
+      >
+        <Plus className="h-3.5 w-3.5" /> Add another {itemLabel}
+      </button>
+    </div>
+  );
 }
