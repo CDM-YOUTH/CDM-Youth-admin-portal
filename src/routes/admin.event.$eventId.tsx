@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Topbar, TopbarButton } from "@/components/admin/topbar";
 import { Card, CardBody, CardHead, Kpi, PageHeader, Pill, ProgressRow } from "@/components/admin/ui-bits";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { EVENTS, ORGANIZATION } from "@/lib/mock-data";
+import { RepeatingRows } from "@/routes/admin.events";
 
 export const Route = createFileRoute("/admin/event/$eventId")({
   head: () => ({
@@ -28,6 +29,26 @@ function EventDetailPage() {
 
   const [mode, setMode] = useState<"view" | "edit">("view");
   const isEdit = mode === "edit";
+
+  const [program, setProgram] = useState(
+    event.program.map((p) => ({ Time: p.time, "Program activity": p.activity, "Facilitator / speaker": p.facilitator, "Talk topic": "" })),
+  );
+  const [duties, setDuties] = useState(
+    event.assignments.map((a) => ({ Duty: a.role, "Assigned person / team": a.person, Area: a.area, Instructions: "" })),
+  );
+  const [items, setItems] = useState(
+    event.items.map((i) => ({ "Required item": i.name, Quantity: i.quantity, Status: i.status, "Used for": "" })),
+  );
+  const [activities, setActivities] = useState(
+    event.activities.map((a) => ({ Activity: a, "Responsible team": "", Location: "", Notes: "" })),
+  );
+
+  useEffect(() => {
+    setProgram(event.program.map((p) => ({ Time: p.time, "Program activity": p.activity, "Facilitator / speaker": p.facilitator, "Talk topic": "" })));
+    setDuties(event.assignments.map((a) => ({ Duty: a.role, "Assigned person / team": a.person, Area: a.area, Instructions: "" })));
+    setItems(event.items.map((i) => ({ "Required item": i.name, Quantity: i.quantity, Status: i.status, "Used for": "" })));
+    setActivities(event.activities.map((a) => ({ Activity: a, "Responsible team": "", Location: "", Notes: "" })));
+  }, [event]);
 
   return (
     <>
@@ -99,27 +120,76 @@ function EventDetailPage() {
 
         <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
           <Card>
-            <CardHead title="Program & Talks" subtitle="Sessions, topics, and facilitators" />
+            <CardHead title="Program & Activities" subtitle="Sessions, topics, and facilitators" />
             <CardBody className="space-y-2">
-              {event.program.map((item) => <RowItem key={`${item.time}-${item.activity}`} title={`${item.time} · ${item.activity}`} meta={item.facilitator} />)}
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {event.topics.map((topic) => <Pill key={topic} tone="gold">{topic}</Pill>)}
-              </div>
+              {isEdit ? (
+                <RepeatingRows
+                  itemLabel="activity"
+                  labels={["Time", "Program activity", "Facilitator / speaker", "Talk topic"]}
+                  rows={program}
+                  setRows={setProgram}
+                />
+              ) : (
+                <>
+                  {program.map((item, i) => (
+                    <RowItem key={i} title={`${item.Time} · ${item["Program activity"]}`} meta={item["Facilitator / speaker"]} />
+                  ))}
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {event.topics.map((topic) => <Pill key={topic} tone="gold">{topic}</Pill>)}
+                  </div>
+                </>
+              )}
             </CardBody>
           </Card>
           <Card>
-            <CardHead title="Assignments" subtitle="Who was assigned what and where" />
+            <CardHead title="Duties" subtitle="Who was assigned what and where" />
             <CardBody className="space-y-2">
-              {event.assignments.map((item) => <RowItem key={item.role} title={`${item.role} — ${item.person}`} meta={item.area} />)}
+              {isEdit ? (
+                <RepeatingRows
+                  itemLabel="duty"
+                  labels={["Duty", "Assigned person / team", "Area", "Instructions"]}
+                  rows={duties}
+                  setRows={setDuties}
+                />
+              ) : (
+                duties.map((item, i) => (
+                  <RowItem key={i} title={`${item.Duty} — ${item["Assigned person / team"]}`} meta={item.Area} />
+                ))
+              )}
             </CardBody>
           </Card>
           <Card>
             <CardHead title="Required Items" subtitle="Planning and actual use" />
             <CardBody className="space-y-2">
-              {event.items.map((item) => <RowItem key={item.name} title={`${item.name} · ${item.quantity}`} meta={item.status} />)}
+              {isEdit ? (
+                <RepeatingRows
+                  itemLabel="item"
+                  labels={["Required item", "Quantity", "Status", "Used for"]}
+                  rows={items}
+                  setRows={setItems}
+                />
+              ) : (
+                items.map((item, i) => (
+                  <RowItem key={i} title={`${item["Required item"]} · ${item.Quantity}`} meta={item.Status} />
+                ))
+              )}
             </CardBody>
           </Card>
         </div>
+
+        {isEdit && (
+          <Card className="mt-3">
+            <CardHead title="Activities" subtitle="High-level activities for this event" />
+            <CardBody>
+              <RepeatingRows
+                itemLabel="activity"
+                labels={["Activity", "Responsible team", "Location", "Notes"]}
+                rows={activities}
+                setRows={setActivities}
+              />
+            </CardBody>
+          </Card>
+        )}
 
         <Card className="mt-3">
           <CardHead title="Gallery" subtitle="Photos and evidence attached to this event" action={isEdit ? "Upload →" : undefined} />
