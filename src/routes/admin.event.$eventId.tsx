@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { EVENTS, ORGANIZATION } from "@/lib/mock-data";
 import { RepeatingRows } from "@/routes/admin.events";
+import { EventCheckinPanel } from "@/components/admin/event-checkin";
 
 type Row = Record<string, string>;
 
@@ -203,6 +204,10 @@ function EventDetailPage() {
             ))}
           </CardBody>
         </Card>
+
+        <div className="mt-3">
+          <EventCheckinPanel eventId={event.id} eventName={event.name} />
+        </div>
       </div>
     </>
   );
