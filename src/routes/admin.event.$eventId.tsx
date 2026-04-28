@@ -8,6 +8,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { EVENTS, ORGANIZATION } from "@/lib/mock-data";
 import { RepeatingRows } from "@/routes/admin.events";
 
+type Row = Record<string, string>;
+
 export const Route = createFileRoute("/admin/event/$eventId")({
   head: () => ({
     meta: [
@@ -30,16 +32,16 @@ function EventDetailPage() {
   const [mode, setMode] = useState<"view" | "edit">("view");
   const isEdit = mode === "edit";
 
-  const [program, setProgram] = useState(
+  const [program, setProgram] = useState<Row[]>(
     event.program.map((p) => ({ Time: p.time, "Program activity": p.activity, "Facilitator / speaker": p.facilitator, "Talk topic": "" })),
   );
-  const [duties, setDuties] = useState(
+  const [duties, setDuties] = useState<Row[]>(
     event.assignments.map((a) => ({ Duty: a.role, "Assigned person / team": a.person, Area: a.area, Instructions: "" })),
   );
-  const [items, setItems] = useState(
+  const [items, setItems] = useState<Row[]>(
     event.items.map((i) => ({ "Required item": i.name, Quantity: i.quantity, Status: i.status, "Used for": "" })),
   );
-  const [activities, setActivities] = useState(
+  const [activities, setActivities] = useState<Row[]>(
     event.activities.map((a) => ({ Activity: a, "Responsible team": "", Location: "", Notes: "" })),
   );
 
