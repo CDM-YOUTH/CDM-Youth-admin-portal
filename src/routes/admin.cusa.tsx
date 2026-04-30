@@ -1,7 +1,8 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
+import { toast } from "sonner";
 import { Topbar } from "@/components/admin/topbar";
 import { Card, CardBody, PageHeader, Pill } from "@/components/admin/ui-bits";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -15,6 +16,7 @@ import {
   applyColumnFilter,
   type ColumnFilterValue,
 } from "@/components/admin/table-filters";
+import { RecordFormDialog, type FieldDef } from "@/components/admin/record-form-dialog";
 
 const filterValueSchema = fallback(
   z
@@ -54,6 +56,7 @@ export const Route = createFileRoute("/admin/cusa")({
 function CusaPage() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
+  const [addOpen, setAddOpen] = useState(false);
   const setFilter = (patch: Partial<CusaSearch>) => {
     navigate({ search: (prev: CusaSearch) => ({ ...prev, ...patch }), replace: true });
   };
@@ -101,6 +104,42 @@ function CusaPage() {
     ),
   ).map((name) => ({ value: name, label: name }));
 
+  const nextCusaId = useMemo(() => {
+    const max = allMembers.reduce((m, r) => {
+      const n = parseInt(r.cdmId.replace(/\D/g, "").slice(-4) || "0", 10);
+      return n > m ? n : m;
+    }, 0);
+    return `CDM-2026-C${String(max + 1).padStart(4, "0")}`;
+  }, [allMembers]);
+
+  const cusaFields: FieldDef[] = [
+    { key: "cdmId", label: "Unique CUSA No.", placeholder: nextCusaId },
+    { key: "fullName", label: "Full name", required: true, placeholder: "Grace Wanjiku" },
+    { key: "gender", label: "Gender", type: "select", options: ["Female", "Male"], required: true },
+    { key: "phone", label: "Phone", type: "tel" },
+    { key: "email", label: "Email", type: "email", placeholder: "name@uni.ac.ke" },
+    { key: "institution", label: "Institution", type: "select", options: [...CUSA_INSTITUTIONS], required: true },
+    { key: "course", label: "Course", placeholder: "e.g. Education", required: true },
+    { key: "year", label: "Year of study", type: "select", options: ["Year 1", "Year 2", "Year 3", "Year 4", "Year 5"], required: true },
+    {
+      key: "deanery", label: "Home deanery", type: "select", required: true,
+      options: ORGANIZATION.map((d) => d.name),
+    },
+    {
+      key: "parish", label: "Home parish", type: "select", required: true,
+      dynamicOptions: (v) => ORGANIZATION.find((d) => d.name === v.deanery)?.parishes.map((p) => p.name) ?? [],
+    },
+    {
+      key: "outstation", label: "Home outstation", type: "select",
+      dynamicOptions: (v) => {
+        const d = ORGANIZATION.find((d) => d.name === v.deanery);
+        const p = d?.parishes.find((p) => p.name === v.parish);
+        return p?.churches.map((c) => c.name) ?? [];
+      },
+    },
+    { key: "status", label: "Status", type: "select", options: ["active", "reporting"], required: true },
+  ];
+
   const fc = (key: keyof CusaSearch, label: string, mode: "text" | "select" = "text", options?: { value: string; label: string }[]) => (
     <ColumnFilter
       label={label}
@@ -125,9 +164,9 @@ function CusaPage() {
             searchValue={search.q}
             onSearchChange={(value) => setFilter({ q: value })}
             searchPlaceholder="Search name, CDM No., institution, parish…"
-            onImport={() => {}}
-            onExport={() => {}}
-            onAdd={() => {}}
+            onImport={() => toast.info("Import CUSA members — bring CSV soon")}
+            onExport={() => toast.success(`Exporting ${filteredMembers.length} CUSA members`)}
+            onAdd={() => setAddOpen(true)}
             addLabel="Add Member"
           />
           <CardBody className="p-0">
@@ -210,6 +249,18 @@ function CusaPage() {
           </CardBody>
         </Card>
       </div>
+      <RecordFormDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        title="Add CUSA Member"
+        description={`Auto-assigned No.: ${nextCusaId}`}
+        fields={cusaFields}
+        submitLabel="Save Member"
+        onSubmit={(values) => {
+          const id = values.cdmId?.trim() || nextCusaId;
+          toast.success(`${values.fullName} added to CUSA · ${id}`);
+        }}
+      />
     </>
   );
 }
