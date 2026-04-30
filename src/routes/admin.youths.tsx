@@ -1,7 +1,8 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
+import { toast } from "sonner";
 import { Topbar } from "@/components/admin/topbar";
 import { Card, CardBody, PageHeader, Pill } from "@/components/admin/ui-bits";
 import { TablePagination, usePagination } from "@/components/admin/table-pagination";
@@ -12,6 +13,7 @@ import {
   applyColumnFilter,
   type ColumnFilterValue,
 } from "@/components/admin/table-filters";
+import { RecordFormDialog, type FieldDef } from "@/components/admin/record-form-dialog";
 import { ORGANIZATION } from "@/lib/mock-data";
 import { YOUTH_CATEGORIES, YOUTH_GENDERS, YOUTH_REGISTRY } from "@/lib/youth-data";
 
@@ -53,6 +55,7 @@ export const Route = createFileRoute("/admin/youths")({
 function YouthsPage() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
+  const [addOpen, setAddOpen] = useState(false);
 
   const setFilter = (patch: Partial<YouthSearch>) => {
     navigate({ search: (prev: YouthSearch) => ({ ...prev, ...patch }), replace: true });
@@ -98,6 +101,42 @@ function YouthsPage() {
     ),
   ).map((name) => ({ value: name, label: name }));
 
+  const nextCdmId = useMemo(() => {
+    const max = YOUTH_REGISTRY.reduce((m, r) => {
+      const n = parseInt(r.cdmId.split("-").pop() ?? "0", 10);
+      return n > m ? n : m;
+    }, 0);
+    return `CDM-2026-${String(max + 1).padStart(5, "0")}`;
+  }, []);
+
+  const youthFields: FieldDef[] = [
+    { key: "cdmId", label: "Unique CDM No.", placeholder: nextCdmId },
+    { key: "fullName", label: "Full name", required: true, placeholder: "Grace Wanjiku" },
+    { key: "gender", label: "Gender", type: "select", options: [...YOUTH_GENDERS], required: true },
+    { key: "age", label: "Age", type: "number", placeholder: "16", required: true },
+    { key: "phone", label: "Phone", type: "tel", placeholder: "+254…" },
+    { key: "email", label: "Email", type: "email", placeholder: "name@example.com" },
+    {
+      key: "deanery", label: "Deanery", type: "select", required: true,
+      options: ORGANIZATION.map((d) => d.name),
+    },
+    {
+      key: "parish", label: "Parish", type: "select", required: true,
+      dynamicOptions: (v) => ORGANIZATION.find((d) => d.name === v.deanery)?.parishes.map((p) => p.name) ?? [],
+    },
+    {
+      key: "outstation", label: "Outstation / Local church", type: "select",
+      dynamicOptions: (v) => {
+        const d = ORGANIZATION.find((d) => d.name === v.deanery);
+        const p = d?.parishes.find((p) => p.name === v.parish);
+        return p?.churches.map((c) => c.name) ?? [];
+      },
+    },
+    { key: "category", label: "Category", type: "select", options: [...YOUTH_CATEGORIES], required: true },
+    { key: "institution", label: "Institution (if Tertiary)", placeholder: "e.g. Murang'a University" },
+    { key: "notes", label: "Notes", type: "textarea", placeholder: "Anything worth recording" },
+  ];
+
   const fc = (key: keyof YouthSearch, label: string, mode: "text" | "select" = "text", options?: { value: string; label: string }[]) => (
     <ColumnFilter
       label={label}
@@ -122,9 +161,9 @@ function YouthsPage() {
             searchValue={search.q}
             onSearchChange={(value) => setFilter({ q: value })}
             searchPlaceholder="Search name, CDM No., parish, deanery, outstation, institution…"
-            onImport={() => {}}
-            onExport={() => {}}
-            onAdd={() => {}}
+            onImport={() => toast.info("Import youths — bring CSV soon")}
+            onExport={() => toast.success(`Exporting ${filtered.length} youths`)}
+            onAdd={() => setAddOpen(true)}
             addLabel="Add Youth"
           />
           <CardBody className="p-0">
@@ -206,6 +245,18 @@ function YouthsPage() {
           </CardBody>
         </Card>
       </div>
+      <RecordFormDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        title="Add Youth"
+        description={`Auto-assigned Unique No.: ${nextCdmId}`}
+        fields={youthFields}
+        submitLabel="Save Youth"
+        onSubmit={(values) => {
+          const id = values.cdmId?.trim() || nextCdmId;
+          toast.success(`${values.fullName} added · ${id}`);
+        }}
+      />
     </>
   );
 }
