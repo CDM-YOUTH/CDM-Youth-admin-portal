@@ -1,7 +1,8 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
+import { toast } from "sonner";
 import { Topbar } from "@/components/admin/topbar";
 import { Card, CardBody, PageHeader, Pill } from "@/components/admin/ui-bits";
 import { TablePagination, usePagination } from "@/components/admin/table-pagination";
@@ -12,6 +13,7 @@ import {
   applyColumnFilter,
   type ColumnFilterValue,
 } from "@/components/admin/table-filters";
+import { RecordFormDialog, type FieldDef } from "@/components/admin/record-form-dialog";
 import { ORGANIZATION } from "@/lib/mock-data";
 import { YOUTH_CATEGORIES, YOUTH_REGISTRY } from "@/lib/youth-data";
 
@@ -61,6 +63,7 @@ export const Route = createFileRoute("/admin/enrollment")({
 function EnrollmentPage() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
+  const [addOpen, setAddOpen] = useState(false);
   const setFilter = (patch: Partial<EnrollmentSearch>) => {
     navigate({ search: (prev: EnrollmentSearch) => ({ ...prev, ...patch }), replace: true });
   };
@@ -95,6 +98,33 @@ function EnrollmentPage() {
     new Set(ORGANIZATION.flatMap((d) => d.parishes.map((p) => p.name))),
   ).map((name) => ({ value: name, label: name }));
 
+  const enrollFields: FieldDef[] = [
+    { key: "cdmId", label: "Existing CDM No. (optional)", placeholder: "CDM-2026-00001" },
+    { key: "fullName", label: "Youth name", required: true, placeholder: "Search or enter name" },
+    { key: "phone", label: "Phone", type: "tel", placeholder: "+254…" },
+    {
+      key: "deanery", label: "Deanery", type: "select", required: true,
+      options: ORGANIZATION.map((d) => d.name),
+    },
+    {
+      key: "parish", label: "Parish", type: "select", required: true,
+      dynamicOptions: (v) => ORGANIZATION.find((d) => d.name === v.deanery)?.parishes.map((p) => p.name) ?? [],
+    },
+    {
+      key: "outstation", label: "Outstation", type: "select",
+      dynamicOptions: (v) => {
+        const d = ORGANIZATION.find((d) => d.name === v.deanery);
+        const p = d?.parishes.find((p) => p.name === v.parish);
+        return p?.churches.map((c) => c.name) ?? [];
+      },
+    },
+    { key: "category", label: "Category", type: "select", options: [...YOUTH_CATEGORIES], required: true },
+    { key: "fee", label: "Fee", type: "select", options: Object.values(FEE_BY_CATEGORY) },
+    { key: "payment", label: "Payment status", type: "select", options: ["pending", "approved"], required: true },
+    { key: "method", label: "Payment method", type: "select", options: ["M-Pesa", "Cash", "Bank transfer", "Waiver"] },
+    { key: "reference", label: "Payment reference", placeholder: "MPESA / receipt no." },
+  ];
+
   const fc = (key: keyof EnrollmentSearch, label: string, mode: "text" | "select" = "text", options?: { value: string; label: string }[]) => (
     <ColumnFilter
       label={label}
@@ -119,9 +149,9 @@ function EnrollmentPage() {
             searchValue={search.q}
             onSearchChange={(value) => setFilter({ q: value })}
             searchPlaceholder="Search name, CDM No., parish, deanery, outstation…"
-            onImport={() => {}}
-            onExport={() => {}}
-            onAdd={() => {}}
+            onImport={() => toast.info("Import enrollments — bring CSV soon")}
+            onExport={() => toast.success(`Exporting ${enrollmentRows.length} enrollments`)}
+            onAdd={() => setAddOpen(true)}
             addLabel="Enroll Youth"
           />
           <CardBody className="p-0">
@@ -192,6 +222,17 @@ function EnrollmentPage() {
           </CardBody>
         </Card>
       </div>
+      <RecordFormDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        title="Enroll Youth · 2026"
+        description="Pick the parish/outstation, choose category, and record the fee payment."
+        fields={enrollFields}
+        submitLabel="Save Enrollment"
+        onSubmit={(values) => {
+          toast.success(`Enrolled ${values.fullName || "youth"} (${values.category}) · ${values.payment}`);
+        }}
+      />
     </>
   );
 }
