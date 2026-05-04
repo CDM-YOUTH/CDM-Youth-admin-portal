@@ -60,6 +60,18 @@ function YouthsPage() {
   const setFilter = (patch: Partial<YouthSearch>) => {
     navigate({ search: (prev: YouthSearch) => ({ ...prev, ...patch }), replace: true });
   };
+  const setDeaneryFilter = (v: ColumnFilterValue | undefined) => {
+    navigate({
+      search: (prev: YouthSearch) => ({ ...prev, f_deanery: v, f_parish: undefined, f_outstation: undefined }),
+      replace: true,
+    });
+  };
+  const setParishFilter = (v: ColumnFilterValue | undefined) => {
+    navigate({
+      search: (prev: YouthSearch) => ({ ...prev, f_parish: v, f_outstation: undefined }),
+      replace: true,
+    });
+  };
 
   const filtered = useMemo(() => {
     const q = search.q.trim().toLowerCase();
@@ -92,13 +104,22 @@ function YouthsPage() {
   const pagination = usePagination(filtered, 10);
 
   const deaneryOptions = ORGANIZATION.map((d) => ({ value: d.name, label: d.name }));
-  const parishOptions = Array.from(
-    new Set(ORGANIZATION.flatMap((d) => d.parishes.map((p) => p.name))),
-  ).map((name) => ({ value: name, label: name }));
+  const selectedDeaneryName =
+    search.f_deanery?.operator === "equals" ? search.f_deanery.value : "";
+  const selectedParishName =
+    search.f_parish?.operator === "equals" ? search.f_parish.value : "";
+  const parishScope = selectedDeaneryName
+    ? ORGANIZATION.find((d) => d.name === selectedDeaneryName)?.parishes ?? []
+    : ORGANIZATION.flatMap((d) => d.parishes);
+  const parishOptions = Array.from(new Set(parishScope.map((p) => p.name))).map((name) => ({
+    value: name,
+    label: name,
+  }));
+  const outstationScope = selectedParishName
+    ? parishScope.filter((p) => p.name === selectedParishName)
+    : parishScope;
   const outstationOptions = Array.from(
-    new Set(
-      ORGANIZATION.flatMap((d) => d.parishes.flatMap((p) => p.churches.map((c) => c.name))),
-    ),
+    new Set(outstationScope.flatMap((p) => p.churches.map((c) => c.name))),
   ).map((name) => ({ value: name, label: name }));
 
   const nextCdmId = useMemo(() => {
@@ -184,10 +205,32 @@ function YouthsPage() {
                   </th>
                   <th className="label-eyebrow px-3.5 py-2.5 text-left">Age</th>
                   <th className="label-eyebrow px-3.5 py-2.5 text-left">
-                    <ColumnHeader label="Deanery" filter={fc("f_deanery", "Deanery", "select", deaneryOptions)} />
+                    <ColumnHeader
+                      label="Deanery"
+                      filter={
+                        <ColumnFilter
+                          label="Deanery"
+                          mode="select"
+                          options={deaneryOptions}
+                          value={search.f_deanery}
+                          onChange={setDeaneryFilter}
+                        />
+                      }
+                    />
                   </th>
                   <th className="label-eyebrow px-3.5 py-2.5 text-left">
-                    <ColumnHeader label="Parish" filter={fc("f_parish", "Parish", "select", parishOptions)} />
+                    <ColumnHeader
+                      label="Parish"
+                      filter={
+                        <ColumnFilter
+                          label="Parish"
+                          mode="select"
+                          options={parishOptions}
+                          value={search.f_parish}
+                          onChange={setParishFilter}
+                        />
+                      }
+                    />
                   </th>
                   <th className="label-eyebrow px-3.5 py-2.5 text-left">
                     <ColumnHeader label="Outstation" filter={fc("f_outstation", "Outstation", "select", outstationOptions)} />
