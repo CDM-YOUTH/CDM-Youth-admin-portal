@@ -9,6 +9,18 @@ import { Plus, Trash2 } from "lucide-react";
 import { DONE_EVENTS, EVENTS, UPCOMING_EVENTS } from "@/lib/mock-data";
 import { EventTabsForm } from "@/components/admin/event-tabs-form";
 
+type Row = Record<string, string>;
+const blankRow = (labels: string[]): Row => Object.fromEntries(labels.map((l) => [l, ""]));
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="space-y-1 text-[10px] font-bold uppercase tracking-wide text-text-3">
+      <span>{label}</span>
+      {children}
+    </label>
+  );
+}
+
 export const Route = createFileRoute("/admin/events")({
   head: () => ({
     meta: [
