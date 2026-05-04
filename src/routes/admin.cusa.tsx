@@ -208,10 +208,32 @@ function CusaPage() {
                     />
                   </TableHead>
                   <TableHead className="label-eyebrow px-3 py-2">
-                    <ColumnHeader label="Deanery" filter={fc("f_deanery", "Deanery", "select", deaneryOptions)} />
+                    <ColumnHeader
+                      label="Deanery"
+                      filter={
+                        <ColumnFilter
+                          label="Deanery"
+                          mode="select"
+                          options={deaneryOptions}
+                          value={search.f_deanery}
+                          onChange={setDeaneryFilter}
+                        />
+                      }
+                    />
                   </TableHead>
                   <TableHead className="label-eyebrow px-3 py-2">
-                    <ColumnHeader label="Parish" filter={fc("f_parish", "Parish", "select", parishOptions)} />
+                    <ColumnHeader
+                      label="Parish"
+                      filter={
+                        <ColumnFilter
+                          label="Parish"
+                          mode="select"
+                          options={parishOptions}
+                          value={search.f_parish}
+                          onChange={setParishFilter}
+                        />
+                      }
+                    />
                   </TableHead>
                   <TableHead className="label-eyebrow px-3 py-2">
                     <ColumnHeader label="Outstation" filter={fc("f_outstation", "Outstation", "select", outstationOptions)} />
