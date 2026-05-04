@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { toast } from "sonner";
+import { Download } from "lucide-react";
 import { Topbar } from "@/components/admin/topbar";
 import { Card, CardBody, PageHeader, Pill } from "@/components/admin/ui-bits";
 import { TablePagination, usePagination } from "@/components/admin/table-pagination";
@@ -64,6 +65,9 @@ function EnrollmentPage() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const [addOpen, setAddOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [pendingFileName, setPendingFileName] = useState<string>("");
   const setFilter = (patch: Partial<EnrollmentSearch>) => {
     navigate({ search: (prev: EnrollmentSearch) => ({ ...prev, ...patch }), replace: true });
   };
@@ -111,31 +115,57 @@ function EnrollmentPage() {
   }));
 
   const enrollFields: FieldDef[] = [
-    { key: "cdmId", label: "Existing CDM No. (optional)", placeholder: "CDM-2026-00001" },
-    { key: "fullName", label: "Youth name", required: true, placeholder: "Search or enter name" },
-    { key: "phone", label: "Phone", type: "tel", placeholder: "+254…" },
+    { key: "cdmId", label: "CDM No.", required: true, placeholder: "CDM-2026-00001" },
+    { key: "fullName", label: "Name (auto-filled from CDM No.)", required: true, placeholder: "Youth name" },
+    { key: "paymentRef", label: "Payment reference (optional)", placeholder: "Bank slip / transaction ref" },
+  ];
+
+  const importFields: FieldDef[] = [
     {
-      key: "deanery", label: "Deanery", type: "select", required: true,
+      key: "payerType", label: "Who paid?", type: "select", required: true,
+      options: ["Individual youths (each pays own)", "Single bulk payer (parish/outstation leader)"],
+    },
+    { key: "payerName", label: "Bulk payer name (if any)", placeholder: "e.g. John Mwangi (Cathedral Parish leader)" },
+    {
+      key: "payerRole", label: "Payer role (if any)", type: "select",
+      options: ["Parish leader", "Outstation leader", "Deanery leader", "Other"],
+    },
+    { key: "paymentRef", label: "Bulk payment reference", placeholder: "Bank slip number" },
+    { key: "amount", label: "Total amount paid (KES)", type: "number", placeholder: "e.g. 50000" },
+    {
+      key: "deanery", label: "Bulk payer deanery", type: "select",
       options: ORGANIZATION.map((d) => d.name),
     },
     {
-      key: "parish", label: "Parish", type: "select", required: true,
+      key: "parish", label: "Bulk payer parish", type: "select",
       dynamicOptions: (v) => ORGANIZATION.find((d) => d.name === v.deanery)?.parishes.map((p) => p.name) ?? [],
     },
-    {
-      key: "outstation", label: "Outstation", type: "select",
-      dynamicOptions: (v) => {
-        const d = ORGANIZATION.find((d) => d.name === v.deanery);
-        const p = d?.parishes.find((p) => p.name === v.parish);
-        return p?.churches.map((c) => c.name) ?? [];
-      },
-    },
-    { key: "category", label: "Category", type: "select", options: [...YOUTH_CATEGORIES], required: true },
-    { key: "fee", label: "Fee", type: "select", options: Object.values(FEE_BY_CATEGORY) },
-    { key: "payment", label: "Payment status", type: "select", options: ["pending", "approved"], required: true },
-    { key: "method", label: "Payment method", type: "select", options: ["M-Pesa", "Cash", "Bank transfer", "Waiver"] },
-    { key: "reference", label: "Payment reference", placeholder: "MPESA / receipt no." },
+    { key: "notes", label: "Notes", type: "textarea", placeholder: "Anything about this batch" },
   ];
+
+  const SAMPLE_HEADERS = ["cdmId", "fullName", "paymentRef"];
+  const downloadSample = () => {
+    const rows = [
+      SAMPLE_HEADERS.join(","),
+      "CDM-2026-00001,Grace Wanjiku,BANK-2026-001",
+      "CDM-2026-00002,Peter Mwangi,BANK-2026-001",
+      "CDM-2026-00003,Mary Njeri,",
+    ];
+    const csv = rows.join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "enrollment-import-sample.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Sample CSV downloaded");
+  };
+  const onPickFile = () => fileInputRef.current?.click();
+  const handleImportFile = (file: File) => {
+    setPendingFileName(file.name);
+    setImportOpen(true);
+  };
 
   const fc = (key: keyof EnrollmentSearch, label: string, mode: "text" | "select" = "text", options?: { value: string; label: string }[]) => (
     <ColumnFilter
@@ -153,7 +183,7 @@ function EnrollmentPage() {
       <div className="flex-1 overflow-y-auto px-5 py-4">
         <PageHeader
           title="Annual Enrollment 2026"
-          description={`${enrollmentRows.length.toLocaleString()} matching enrollments — share this URL to share the same view.`}
+          description={`${enrollmentRows.length.toLocaleString()} matching enrollments. A youth must be registered (CDM No.) before being enrolled.`}
         />
 
         <Card>
@@ -161,10 +191,31 @@ function EnrollmentPage() {
             searchValue={search.q}
             onSearchChange={(value) => setFilter({ q: value })}
             searchPlaceholder="Search name, CDM No., parish, deanery, outstation…"
-            onImport={() => toast.info("Import enrollments — bring CSV soon")}
+            onImport={onPickFile}
             onExport={() => toast.success(`Exporting ${enrollmentRows.length} enrollments`)}
             onAdd={() => setAddOpen(true)}
             addLabel="Enroll Youth"
+            extra={
+              <button
+                type="button"
+                onClick={downloadSample}
+                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-bg-2 px-2.5 text-[11px] font-semibold text-text-1 transition hover:border-gold-3 hover:text-gold"
+                title="Download CSV sample for import"
+              >
+                <Download className="h-3.5 w-3.5" /> Sample CSV
+              </button>
+            }
+          />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handleImportFile(f);
+              e.target.value = "";
+            }}
           />
           <CardBody className="p-0">
             <table className="w-full">
@@ -249,11 +300,29 @@ function EnrollmentPage() {
         open={addOpen}
         onOpenChange={setAddOpen}
         title="Enroll Youth · 2026"
-        description="Pick the parish/outstation, choose category, and record the fee payment."
+        description="The youth must already be registered. Enter their CDM No. and the bank payment reference (optional)."
         fields={enrollFields}
         submitLabel="Save Enrollment"
         onSubmit={(values) => {
-          toast.success(`Enrolled ${values.fullName || "youth"} (${values.category}) · ${values.payment}`);
+          toast.success(`Enrolled ${values.fullName || values.cdmId}`);
+        }}
+      />
+      <RecordFormDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        title="Import enrollments"
+        description={`File: ${pendingFileName}. If one person paid for the whole batch (e.g. parish/outstation leader), capture them here so the bank reference is recorded against everyone in the file.`}
+        fields={importFields}
+        submitLabel="Import & save payment"
+        onSubmit={(values) => {
+          const isBulk = values.payerType?.startsWith("Single");
+          if (isBulk) {
+            toast.success(
+              `Imported batch · paid by ${values.payerName || "payer"} (${values.paymentRef || "no ref"})`,
+            );
+          } else {
+            toast.success("Imported · per-person payments will be matched by CDM No.");
+          }
         }}
       />
     </>
