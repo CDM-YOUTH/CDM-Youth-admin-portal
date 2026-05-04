@@ -67,6 +67,12 @@ function EnrollmentPage() {
   const setFilter = (patch: Partial<EnrollmentSearch>) => {
     navigate({ search: (prev: EnrollmentSearch) => ({ ...prev, ...patch }), replace: true });
   };
+  const setDeaneryFilter = (v: ColumnFilterValue | undefined) => {
+    navigate({
+      search: (prev: EnrollmentSearch) => ({ ...prev, f_deanery: v, f_parish: undefined }),
+      replace: true,
+    });
+  };
 
   const enrollmentRows = useMemo(() => {
     const q = search.q.trim().toLowerCase();
@@ -94,9 +100,15 @@ function EnrollmentPage() {
   const pagination = usePagination(enrollmentRows, 10);
 
   const deaneryOptions = ORGANIZATION.map((d) => ({ value: d.name, label: d.name }));
-  const parishOptions = Array.from(
-    new Set(ORGANIZATION.flatMap((d) => d.parishes.map((p) => p.name))),
-  ).map((name) => ({ value: name, label: name }));
+  const selectedDeaneryName =
+    search.f_deanery?.operator === "equals" ? search.f_deanery.value : "";
+  const parishScope = selectedDeaneryName
+    ? ORGANIZATION.find((d) => d.name === selectedDeaneryName)?.parishes ?? []
+    : ORGANIZATION.flatMap((d) => d.parishes);
+  const parishOptions = Array.from(new Set(parishScope.map((p) => p.name))).map((name) => ({
+    value: name,
+    label: name,
+  }));
 
   const enrollFields: FieldDef[] = [
     { key: "cdmId", label: "Existing CDM No. (optional)", placeholder: "CDM-2026-00001" },
@@ -165,7 +177,18 @@ function EnrollmentPage() {
                     <ColumnHeader label="Name" filter={fc("f_name", "Name")} />
                   </th>
                   <th className="label-eyebrow px-3.5 py-2.5 text-left">
-                    <ColumnHeader label="Deanery" filter={fc("f_deanery", "Deanery", "select", deaneryOptions)} />
+                    <ColumnHeader
+                      label="Deanery"
+                      filter={
+                        <ColumnFilter
+                          label="Deanery"
+                          mode="select"
+                          options={deaneryOptions}
+                          value={search.f_deanery}
+                          onChange={setDeaneryFilter}
+                        />
+                      }
+                    />
                   </th>
                   <th className="label-eyebrow px-3.5 py-2.5 text-left">
                     <ColumnHeader label="Parish" filter={fc("f_parish", "Parish", "select", parishOptions)} />
