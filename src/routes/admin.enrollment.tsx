@@ -229,7 +229,11 @@ function EnrollmentPage() {
       <div className="flex-1 overflow-y-auto px-5 py-4">
         <PageHeader
           title="Annual Enrollment 2026"
-          description={`${enrollmentRows.length.toLocaleString()} matching enrollments. A youth must be registered (CDM No.) before being enrolled.`}
+          description={
+            isLoading
+              ? "Loading enrollments…"
+              : `${enrollmentRows.length.toLocaleString()} matching enrollments. A youth must be registered (CDM No.) before being enrolled.`
+          }
         />
 
         <Card>
