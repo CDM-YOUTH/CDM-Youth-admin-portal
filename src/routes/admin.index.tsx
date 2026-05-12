@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import {
@@ -21,6 +22,7 @@ import {
 import { Donut } from "@/components/admin/donut";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CUSA_INSTITUTIONS, buildCusaMembers, cusaGenderRows, cusaInstitutionRows, cusaMembersFor } from "@/lib/cusa-data";
+import { getDashboardCounts } from "@/lib/db/analytics";
 import { TablePagination, usePagination } from "@/components/admin/table-pagination";
 import {
   ACTIVITY_FEED,
@@ -237,7 +239,23 @@ function enrollmentTrendRows(units: AnalyticsUnit[]) {
 
 function GeneralTab({ chartDisplay }: { chartDisplay: ChartDisplay }) {
   const analytics = useFilteredAnalytics();
-  const totals = totalsFor(analytics.units);
+  const mockTotals = totalsFor(analytics.units);
+  const { data: liveCounts } = useQuery({
+    queryKey: ["dashboard-counts"],
+    queryFn: () => getDashboardCounts(),
+    staleTime: 30_000,
+  });
+  const isDioceseWide =
+    !analytics.filters.deaneryCode && !analytics.filters.parishId && !analytics.filters.churchId;
+  const totals = isDioceseWide && liveCounts
+    ? {
+        ...mockTotals,
+        youths: liveCounts.youths,
+        enrolled: liveCounts.enrolled,
+        cusaMembers: liveCounts.cusaMembers,
+        cusaActive: liveCounts.cusaActive,
+      }
+    : mockTotals;
   const enrollmentRows = rollupRows(analytics.units, analytics.filters, "enrolled", "youths");
   const topParishes = analytics.filters.deaneryCode
     ? rollupRows(analytics.units, analytics.filters, "enrolled", "youths").slice(0, 4)
