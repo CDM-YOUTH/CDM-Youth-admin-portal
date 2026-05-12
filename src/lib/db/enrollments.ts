@@ -91,3 +91,59 @@ export async function bulkEnroll(cdmIds: string[], sharedRef: string | null, yea
   }
   return { inserted: rows.length, missing };
 }
+
+export type BulkEnrollRow = { cdmId: string; paymentRef?: string | null };
+
+/**
+ * Bulk enroll with optional per-row payment refs. If a row has no ref, falls
+ * back to `sharedRef`. Returns counts and the list of CDM IDs that did not
+ * resolve to an existing youth.
+ */
+export async function bulkEnrollRows(
+  rows: BulkEnrollRow[],
+  sharedRef: string | null,
+  year?: number,
+) {
+  if (!rows.length) return { inserted: 0, missing: [] as string[] };
+  const cdmIds = Array.from(new Set(rows.map((r) => r.cdmId.trim()).filter(Boolean)));
+  const { data: youths, error } = await supabase
+    .from("youths")
+    .select("id, cdm_id")
+    .in("cdm_id", cdmIds);
+  if (error) throw error;
+  const idByCdm = new Map((youths ?? []).map((y) => [y.cdm_id, y.id]));
+  const missing = cdmIds.filter((c) => !idByCdm.has(c));
+  const y = year ?? new Date().getFullYear();
+  const payload = rows
+    .map((r) => {
+      const id = idByCdm.get(r.cdmId.trim());
+      if (!id) return null;
+      return {
+        youth_id: id,
+        year: y,
+        payment_ref: (r.paymentRef && r.paymentRef.trim()) || sharedRef,
+        status: "paid" as const,
+      };
+    })
+    .filter((r): r is NonNullable<typeof r> => r !== null);
+  if (payload.length) {
+    const { error: insErr } = await supabase
+      .from("enrollments")
+      .upsert(payload, { onConflict: "youth_id,year" });
+    if (insErr) throw insErr;
+  }
+  return { inserted: payload.length, missing };
+}
+
+export async function deleteEnrollment(id: string) {
+  const { error } = await supabase.from("enrollments").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function updateEnrollmentStatus(
+  id: string,
+  status: "paid" | "pending" | "waived",
+) {
+  const { error } = await supabase.from("enrollments").update({ status }).eq("id", id);
+  if (error) throw error;
+}

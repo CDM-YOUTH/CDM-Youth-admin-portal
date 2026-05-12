@@ -5,7 +5,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Download } from "lucide-react";
+import { Download, MoreVertical, Trash2, BadgeCheck, Clock } from "lucide-react";
 import { Topbar } from "@/components/admin/topbar";
 import { Card, CardBody, PageHeader, Pill } from "@/components/admin/ui-bits";
 import { TablePagination, usePagination } from "@/components/admin/table-pagination";
@@ -19,7 +19,31 @@ import {
 import { RecordFormDialog, type FieldDef } from "@/components/admin/record-form-dialog";
 import { ORGANIZATION } from "@/lib/mock-data";
 import { YOUTH_CATEGORIES } from "@/lib/youth-data";
-import { bulkEnroll, createEnrollment, listEnrollments } from "@/lib/db/enrollments";
+import {
+  bulkEnrollRows,
+  createEnrollment,
+  deleteEnrollment,
+  listEnrollments,
+  updateEnrollmentStatus,
+  type BulkEnrollRow,
+} from "@/lib/db/enrollments";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const filterValueSchema = fallback(
   z
@@ -71,7 +95,8 @@ function EnrollmentPage() {
   const [importOpen, setImportOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pendingFileName, setPendingFileName] = useState<string>("");
-  const [pendingCdmIds, setPendingCdmIds] = useState<string[]>([]);
+  const [pendingRows, setPendingRows] = useState<BulkEnrollRow[]>([]);
+  const [deleteTarget, setDeleteTarget] = useState<null | { id: string; name: string }>(null);
   const qc = useQueryClient();
   const { data: enrollments = [], isLoading } = useQuery({
     queryKey: ["enrollments"],
@@ -88,10 +113,30 @@ function EnrollmentPage() {
     onError: (e: Error) => toast.error(e.message),
   });
   const bulkMut = useMutation({
-    mutationFn: ({ ids, ref }: { ids: string[]; ref: string | null }) => bulkEnroll(ids, ref),
+    mutationFn: ({ rows, ref }: { rows: BulkEnrollRow[]; ref: string | null }) =>
+      bulkEnrollRows(rows, ref),
     onSuccess: (res) => {
       toast.success(`Enrolled ${res.inserted} youths${res.missing.length ? ` · ${res.missing.length} missing` : ""}`);
       if (res.missing.length) toast.message("Missing CDM IDs", { description: res.missing.slice(0, 5).join(", ") });
+      qc.invalidateQueries({ queryKey: ["enrollments"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => deleteEnrollment(id),
+    onSuccess: () => {
+      toast.success("Enrollment removed");
+      qc.invalidateQueries({ queryKey: ["enrollments"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const statusMut = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: "paid" | "pending" }) =>
+      updateEnrollmentStatus(id, status),
+    onSuccess: () => {
+      toast.success("Payment status updated");
       qc.invalidateQueries({ queryKey: ["enrollments"] });
     },
     onError: (e: Error) => toast.error(e.message),
@@ -201,15 +246,20 @@ function EnrollmentPage() {
       header: true,
       skipEmptyLines: true,
       complete: (res) => {
-        const ids = res.data.map((r) => (r.cdmId || "").trim()).filter(Boolean);
-        if (!ids.length) {
+        const rows: BulkEnrollRow[] = res.data
+          .map((r) => ({
+            cdmId: (r.cdmId || r.cdm_id || "").trim(),
+            paymentRef: (r.paymentRef || r.payment_ref || "").trim() || null,
+          }))
+          .filter((r) => r.cdmId);
+        if (!rows.length) {
           toast.error("No CDM IDs found in CSV");
           return;
         }
-        setPendingCdmIds(ids);
+        setPendingRows(rows);
         setImportOpen(true);
       },
-      error: (err) => toast.error(err.message),
+      error: (err: Error) => toast.error(err.message),
     });
   };
 
@@ -310,6 +360,7 @@ function EnrollmentPage() {
                       ])}
                     />
                   </th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -324,11 +375,42 @@ function EnrollmentPage() {
                     <td className="px-3.5 py-2.5">
                       <Pill tone={row.paymentStatus === "approved" ? "success" : "gold"}>{row.paymentStatus}</Pill>
                     </td>
+                    <td className="px-3.5 py-2.5 text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            type="button"
+                            aria-label="Row actions"
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-bg-2 text-text-2 hover:border-gold-3 hover:text-gold"
+                          >
+                            <MoreVertical className="h-3.5 w-3.5" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-44">
+                          {row.paymentStatus === "approved" ? (
+                            <DropdownMenuItem onClick={() => statusMut.mutate({ id: row.id, status: "pending" })}>
+                              <Clock className="mr-2 h-3.5 w-3.5" /> Mark pending
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem onClick={() => statusMut.mutate({ id: row.id, status: "paid" })}>
+                              <BadgeCheck className="mr-2 h-3.5 w-3.5" /> Mark paid
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-danger focus:text-danger"
+                            onClick={() => setDeleteTarget({ id: row.id, name: row.name })}
+                          >
+                            <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </td>
                   </tr>
                 ))}
                 {pagination.pageRows.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-3.5 py-6 text-center text-[11px] text-text-3">
+                    <td colSpan={8} className="px-3.5 py-6 text-center text-[11px] text-text-3">
                       No enrollments match your search.
                     </td>
                   </tr>
@@ -359,14 +441,35 @@ function EnrollmentPage() {
         open={importOpen}
         onOpenChange={setImportOpen}
         title="Import enrollments"
-        description={`File: ${pendingFileName} · ${pendingCdmIds.length} CDM IDs. If one person paid for the whole batch (e.g. parish/outstation leader), capture them here so the bank reference is recorded against everyone in the file.`}
+        description={`File: ${pendingFileName} · ${pendingRows.length} CDM IDs. Per-row paymentRef is used when present; otherwise the bulk payment reference below applies.`}
         fields={importFields}
         submitLabel="Import & save payment"
         onSubmit={(values) => {
           const ref = values.paymentRef?.trim() || null;
-          bulkMut.mutate({ ids: pendingCdmIds, ref });
+          bulkMut.mutate({ rows: pendingRows, ref });
         }}
       />
+      <AlertDialog open={deleteTarget !== null} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove enrollment?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove the {new Date().getFullYear()} enrollment for <strong>{deleteTarget?.name}</strong>. The youth record stays intact.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteTarget) deleteMut.mutate(deleteTarget.id);
+                setDeleteTarget(null);
+              }}
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
