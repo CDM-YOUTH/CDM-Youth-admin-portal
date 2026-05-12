@@ -221,8 +221,6 @@ function YouthsPage() {
     new Set(outstationScope.flatMap((p) => p.churches.map((c) => c.name))),
   ).map((name) => ({ value: name, label: name }));
 
-  const nextCdmId = "auto-assigned on save";
-
   const youthFields: FieldDef[] = [
     { key: "fullName", label: "Full name", required: true, placeholder: "Grace Wanjiku" },
     { key: "gender", label: "Gender", type: "select", options: [...YOUTH_GENDERS], required: true },
