@@ -1,4 +1,6 @@
 import { useMemo, useRef, useState } from "react";
+import Papa from "papaparse";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
@@ -16,7 +18,8 @@ import {
 } from "@/components/admin/table-filters";
 import { RecordFormDialog, type FieldDef } from "@/components/admin/record-form-dialog";
 import { ORGANIZATION } from "@/lib/mock-data";
-import { YOUTH_CATEGORIES, YOUTH_REGISTRY } from "@/lib/youth-data";
+import { YOUTH_CATEGORIES } from "@/lib/youth-data";
+import { bulkEnroll, createEnrollment, listEnrollments } from "@/lib/db/enrollments";
 
 const filterValueSchema = fallback(
   z
@@ -68,6 +71,31 @@ function EnrollmentPage() {
   const [importOpen, setImportOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pendingFileName, setPendingFileName] = useState<string>("");
+  const [pendingCdmIds, setPendingCdmIds] = useState<string[]>([]);
+  const qc = useQueryClient();
+  const { data: enrollments = [], isLoading } = useQuery({
+    queryKey: ["enrollments"],
+    queryFn: () => listEnrollments(),
+  });
+
+  const createMut = useMutation({
+    mutationFn: (vals: { cdmId: string; paymentRef?: string }) =>
+      createEnrollment({ cdmId: vals.cdmId, paymentRef: vals.paymentRef || null }),
+    onSuccess: () => {
+      toast.success("Enrollment saved");
+      qc.invalidateQueries({ queryKey: ["enrollments"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const bulkMut = useMutation({
+    mutationFn: ({ ids, ref }: { ids: string[]; ref: string | null }) => bulkEnroll(ids, ref),
+    onSuccess: (res) => {
+      toast.success(`Enrolled ${res.inserted} youths${res.missing.length ? ` · ${res.missing.length} missing` : ""}`);
+      if (res.missing.length) toast.message("Missing CDM IDs", { description: res.missing.slice(0, 5).join(", ") });
+      qc.invalidateQueries({ queryKey: ["enrollments"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
   const setFilter = (patch: Partial<EnrollmentSearch>) => {
     navigate({ search: (prev: EnrollmentSearch) => ({ ...prev, ...patch }), replace: true });
   };
@@ -80,11 +108,16 @@ function EnrollmentPage() {
 
   const enrollmentRows = useMemo(() => {
     const q = search.q.trim().toLowerCase();
-    return YOUTH_REGISTRY.filter((row) => row.enrolled)
-      .map((row, index) => ({
-        ...row,
-        paymentStatus: index % 7 === 0 ? "pending" : "approved",
-        fee: FEE_BY_CATEGORY[row.category] ?? "KES 500",
+    return enrollments
+      .map((e) => ({
+        id: e.id,
+        cdmId: e.youth?.cdm_id ?? "",
+        name: e.youth?.full_name ?? "",
+        deaneryName: e.youth?.deanery?.name ?? "",
+        parishName: e.youth?.parish?.name ?? "",
+        category: e.youth?.category ?? "",
+        fee: FEE_BY_CATEGORY[e.youth?.category ?? ""] ?? "KES 500",
+        paymentStatus: e.status === "paid" ? "approved" : "pending",
       }))
       .filter((row) => {
         if (!applyColumnFilter(row.cdmId, search.f_cdm)) return false;
@@ -94,12 +127,12 @@ function EnrollmentPage() {
         if (!applyColumnFilter(row.category, search.f_category)) return false;
         if (!applyColumnFilter(row.paymentStatus, search.f_payment)) return false;
         if (q) {
-          const haystack = [row.cdmId, row.name, row.parishName, row.deaneryName, row.churchName].join(" ").toLowerCase();
+          const haystack = [row.cdmId, row.name, row.parishName, row.deaneryName].join(" ").toLowerCase();
           if (!haystack.includes(q)) return false;
         }
         return true;
       });
-  }, [search]);
+  }, [search, enrollments]);
 
   const pagination = usePagination(enrollmentRows, 10);
 
@@ -164,7 +197,20 @@ function EnrollmentPage() {
   const onPickFile = () => fileInputRef.current?.click();
   const handleImportFile = (file: File) => {
     setPendingFileName(file.name);
-    setImportOpen(true);
+    Papa.parse<Record<string, string>>(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: (res) => {
+        const ids = res.data.map((r) => (r.cdmId || "").trim()).filter(Boolean);
+        if (!ids.length) {
+          toast.error("No CDM IDs found in CSV");
+          return;
+        }
+        setPendingCdmIds(ids);
+        setImportOpen(true);
+      },
+      error: (err) => toast.error(err.message),
+    });
   };
 
   const fc = (key: keyof EnrollmentSearch, label: string, mode: "text" | "select" = "text", options?: { value: string; label: string }[]) => (
@@ -183,7 +229,11 @@ function EnrollmentPage() {
       <div className="flex-1 overflow-y-auto px-5 py-4">
         <PageHeader
           title="Annual Enrollment 2026"
-          description={`${enrollmentRows.length.toLocaleString()} matching enrollments. A youth must be registered (CDM No.) before being enrolled.`}
+          description={
+            isLoading
+              ? "Loading enrollments…"
+              : `${enrollmentRows.length.toLocaleString()} matching enrollments. A youth must be registered (CDM No.) before being enrolled.`
+          }
         />
 
         <Card>
@@ -303,26 +353,18 @@ function EnrollmentPage() {
         description="The youth must already be registered. Enter their CDM No. and the bank payment reference (optional)."
         fields={enrollFields}
         submitLabel="Save Enrollment"
-        onSubmit={(values) => {
-          toast.success(`Enrolled ${values.fullName || values.cdmId}`);
-        }}
+        onSubmit={(values) => createMut.mutate({ cdmId: values.cdmId.trim(), paymentRef: values.paymentRef })}
       />
       <RecordFormDialog
         open={importOpen}
         onOpenChange={setImportOpen}
         title="Import enrollments"
-        description={`File: ${pendingFileName}. If one person paid for the whole batch (e.g. parish/outstation leader), capture them here so the bank reference is recorded against everyone in the file.`}
+        description={`File: ${pendingFileName} · ${pendingCdmIds.length} CDM IDs. If one person paid for the whole batch (e.g. parish/outstation leader), capture them here so the bank reference is recorded against everyone in the file.`}
         fields={importFields}
         submitLabel="Import & save payment"
         onSubmit={(values) => {
-          const isBulk = values.payerType?.startsWith("Single");
-          if (isBulk) {
-            toast.success(
-              `Imported batch · paid by ${values.payerName || "payer"} (${values.paymentRef || "no ref"})`,
-            );
-          } else {
-            toast.success("Imported · per-person payments will be matched by CDM No.");
-          }
+          const ref = values.paymentRef?.trim() || null;
+          bulkMut.mutate({ ids: pendingCdmIds, ref });
         }}
       />
     </>
