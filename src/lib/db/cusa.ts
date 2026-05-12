@@ -102,5 +102,22 @@ export async function deleteCusaMember(id: string) {
   if (error) throw error;
 }
 
+export type CusaUpdateInput = {
+  institution?: string;
+  course?: string | null;
+  yearOfStudy?: string | null;
+  leadershipRole?: string | null;
+};
+
+export async function updateCusaMember(id: string, input: CusaUpdateInput) {
+  const patch: Record<string, string | null> = {};
+  if (input.institution !== undefined) patch.institution = input.institution;
+  if (input.course !== undefined) patch.course = input.course || null;
+  if (input.yearOfStudy !== undefined) patch.year_of_study = input.yearOfStudy || null;
+  if (input.leadershipRole !== undefined) patch.leadership_role = input.leadershipRole || null;
+  const { error } = await supabase.from("cusa_members").update(patch).eq("id", id);
+  if (error) throw error;
+}
+
 // keep import side-effect free for tree-shaking
 export { fetchOrg, resolveOrgIds };
