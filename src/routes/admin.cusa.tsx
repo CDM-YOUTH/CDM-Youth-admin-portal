@@ -169,8 +169,6 @@ function CusaPage() {
     new Set(outstationScope.flatMap((p) => p.churches.map((c) => c.name))),
   ).map((name) => ({ value: name, label: name }));
 
-  const nextCusaId = "auto-assigned on save";
-
   const cusaFields: FieldDef[] = [
     { key: "cdmId", label: "Existing CDM No. (optional — leave blank to register a new youth)", placeholder: "CDM-2026-00001" },
     { key: "fullName", label: "Full name", required: true, placeholder: "Grace Wanjiku" },
