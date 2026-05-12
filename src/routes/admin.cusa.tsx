@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { MoreVertical, Pencil, Trash2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
@@ -9,7 +10,24 @@ import { Card, CardBody, PageHeader, Pill } from "@/components/admin/ui-bits";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CUSA_INSTITUTIONS } from "@/lib/cusa-data";
 import { ORGANIZATION } from "@/lib/mock-data";
-import { createCusaMember, deleteCusaMember, listCusa } from "@/lib/db/cusa";
+import { createCusaMember, deleteCusaMember, listCusa, updateCusaMember } from "@/lib/db/cusa";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { TablePagination, usePagination } from "@/components/admin/table-pagination";
 import {
   ColumnFilter,
@@ -59,6 +77,8 @@ function CusaPage() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const [addOpen, setAddOpen] = useState(false);
+  const [editing, setEditing] = useState<null | { id: string; name: string; values: Record<string, string> }>(null);
+  const [deleteTarget, setDeleteTarget] = useState<null | { id: string; name: string }>(null);
   const qc = useQueryClient();
   const { data: cusa = [], isLoading } = useQuery({ queryKey: ["cusa"], queryFn: listCusa });
   const createMut = useMutation({
@@ -81,6 +101,30 @@ function CusaPage() {
     onSuccess: () => {
       toast.success("CUSA member saved");
       qc.invalidateQueries({ queryKey: ["cusa"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const updateMut = useMutation({
+    mutationFn: ({ id, values }: { id: string; values: Record<string, string> }) =>
+      updateCusaMember(id, {
+        institution: values.institution,
+        course: values.course || null,
+        yearOfStudy: values.year || null,
+        leadershipRole: values.role || null,
+      }),
+    onSuccess: () => {
+      toast.success("CUSA member updated");
+      qc.invalidateQueries({ queryKey: ["cusa"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => deleteCusaMember(id),
+    onSuccess: () => {
+      toast.success("CUSA member removed");
+      qc.invalidateQueries({ queryKey: ["cusa"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -297,6 +341,7 @@ function CusaPage() {
                       ])}
                     />
                   </TableHead>
+                  <TableHead className="label-eyebrow px-3 py-2 text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -311,11 +356,49 @@ function CusaPage() {
                     <TableCell className="px-3 py-2 text-[11px] text-text-2">{member.gender}</TableCell>
                     <TableCell className="px-3 py-2 text-[11px] text-text-2">{member.course} · {member.year}</TableCell>
                     <TableCell className="px-3 py-2"><Pill tone={member.status === "active" ? "success" : "violet"}>{member.status}</Pill></TableCell>
+                    <TableCell className="px-3 py-2 text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            type="button"
+                            aria-label="Row actions"
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-bg-2 text-text-2 hover:border-violet hover:text-violet"
+                          >
+                            <MoreVertical className="h-3.5 w-3.5" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-40">
+                          <DropdownMenuItem
+                            onClick={() =>
+                              setEditing({
+                                id: member.id,
+                                name: member.name,
+                                values: {
+                                  institution: member.institution,
+                                  course: member.course,
+                                  year: member.year,
+                                  role: "",
+                                },
+                              })
+                            }
+                          >
+                            <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-danger focus:text-danger"
+                            onClick={() => setDeleteTarget({ id: member.id, name: member.name })}
+                          >
+                            <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
                   </TableRow>
                 ))}
                 {pagination.pageRows.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={9} className="px-3 py-6 text-center text-[11px] text-text-3">
+                    <TableCell colSpan={10} className="px-3 py-6 text-center text-[11px] text-text-3">
                       No CUSA members match your search.
                     </TableCell>
                   </TableRow>
@@ -342,6 +425,45 @@ function CusaPage() {
         submitLabel="Save Member"
         onSubmit={(values) => createMut.mutate(values)}
       />
+      <RecordFormDialog
+        open={editing !== null}
+        onOpenChange={(o) => !o && setEditing(null)}
+        title={`Edit CUSA · ${editing?.name ?? ""}`}
+        description="Update institution, course, year, or leadership role. Personal info edits go in Youth Records."
+        fields={[
+          { key: "institution", label: "Institution", type: "select", options: [...CUSA_INSTITUTIONS], required: true },
+          { key: "course", label: "Course", placeholder: "e.g. Education" },
+          { key: "year", label: "Year of study", type: "select", options: ["Year 1", "Year 2", "Year 3", "Year 4", "Year 5"] },
+          { key: "role", label: "Leadership role (optional)", placeholder: "e.g. Chairperson" },
+        ]}
+        initial={editing?.values}
+        submitLabel="Save changes"
+        onSubmit={(values) => {
+          if (editing) updateMut.mutate({ id: editing.id, values });
+          setEditing(null);
+        }}
+      />
+      <AlertDialog open={deleteTarget !== null} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove CUSA member?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the CUSA membership for <strong>{deleteTarget?.name}</strong>. The youth record itself is not deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (deleteTarget) deleteMut.mutate(deleteTarget.id);
+                setDeleteTarget(null);
+              }}
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
