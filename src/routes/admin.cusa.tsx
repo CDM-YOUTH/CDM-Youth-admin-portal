@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
@@ -6,8 +7,9 @@ import { toast } from "sonner";
 import { Topbar } from "@/components/admin/topbar";
 import { Card, CardBody, PageHeader, Pill } from "@/components/admin/ui-bits";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { CUSA_INSTITUTIONS, buildCusaMembers } from "@/lib/cusa-data";
-import { ANALYTICS_UNITS, ORGANIZATION } from "@/lib/mock-data";
+import { CUSA_INSTITUTIONS } from "@/lib/cusa-data";
+import { ORGANIZATION } from "@/lib/mock-data";
+import { createCusaMember, deleteCusaMember, listCusa } from "@/lib/db/cusa";
 import { TablePagination, usePagination } from "@/components/admin/table-pagination";
 import {
   ColumnFilter,
@@ -57,6 +59,31 @@ function CusaPage() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const [addOpen, setAddOpen] = useState(false);
+  const qc = useQueryClient();
+  const { data: cusa = [], isLoading } = useQuery({ queryKey: ["cusa"], queryFn: listCusa });
+  const createMut = useMutation({
+    mutationFn: (vals: Record<string, string>) =>
+      createCusaMember({
+        cdmId: vals.cdmId?.trim() || null,
+        fullName: vals.fullName,
+        gender: (vals.gender as "Female" | "Male") || "Female",
+        age: parseInt(vals.age || "0", 10) || undefined,
+        phone: vals.phone || undefined,
+        email: vals.email || undefined,
+        deaneryName: vals.deanery || undefined,
+        parishName: vals.parish || undefined,
+        outstationName: vals.outstation || undefined,
+        institution: vals.institution,
+        course: vals.course || undefined,
+        yearOfStudy: vals.year || undefined,
+        leadershipRole: vals.role || undefined,
+      }),
+    onSuccess: () => {
+      toast.success("CUSA member saved");
+      qc.invalidateQueries({ queryKey: ["cusa"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
   const setFilter = (patch: Partial<CusaSearch>) => {
     navigate({ search: (prev: CusaSearch) => ({ ...prev, ...patch }), replace: true });
   };
@@ -74,7 +101,23 @@ function CusaPage() {
     });
   };
 
-  const allMembers = useMemo(() => buildCusaMembers(ANALYTICS_UNITS, ""), []);
+  const allMembers = useMemo(
+    () =>
+      cusa.map((m) => ({
+        id: m.id,
+        cdmId: m.youth?.cdm_id ?? "",
+        name: m.youth?.full_name ?? "",
+        gender: m.youth?.gender ?? "",
+        institution: m.institution,
+        course: m.course ?? "",
+        year: m.year_of_study ?? "",
+        deaneryName: m.youth?.deanery?.name ?? "",
+        parishName: m.youth?.parish?.name ?? "",
+        churchName: "",
+        status: m.leadership_role ? "active" : "reporting",
+      })),
+    [cusa],
+  );
 
   const filteredMembers = useMemo(() => {
     const q = search.q.trim().toLowerCase();
@@ -126,18 +169,13 @@ function CusaPage() {
     new Set(outstationScope.flatMap((p) => p.churches.map((c) => c.name))),
   ).map((name) => ({ value: name, label: name }));
 
-  const nextCusaId = useMemo(() => {
-    const max = allMembers.reduce((m, r) => {
-      const n = parseInt(r.cdmId.replace(/\D/g, "").slice(-4) || "0", 10);
-      return n > m ? n : m;
-    }, 0);
-    return `CDM-2026-C${String(max + 1).padStart(4, "0")}`;
-  }, [allMembers]);
+  const nextCusaId = "auto-assigned on save";
 
   const cusaFields: FieldDef[] = [
-    { key: "cdmId", label: "Unique CUSA No.", placeholder: nextCusaId },
+    { key: "cdmId", label: "Existing CDM No. (optional — leave blank to register a new youth)", placeholder: "CDM-2026-00001" },
     { key: "fullName", label: "Full name", required: true, placeholder: "Grace Wanjiku" },
     { key: "gender", label: "Gender", type: "select", options: ["Female", "Male"], required: true },
+    { key: "age", label: "Age", type: "number", placeholder: "20" },
     { key: "phone", label: "Phone", type: "tel" },
     { key: "email", label: "Email", type: "email", placeholder: "name@uni.ac.ke" },
     { key: "institution", label: "Institution", type: "select", options: [...CUSA_INSTITUTIONS], required: true },
@@ -159,7 +197,7 @@ function CusaPage() {
         return p?.churches.map((c) => c.name) ?? [];
       },
     },
-    { key: "status", label: "Status", type: "select", options: ["active", "reporting"], required: true },
+    { key: "role", label: "Leadership role (optional)", placeholder: "e.g. Chairperson" },
   ];
 
   const fc = (key: keyof CusaSearch, label: string, mode: "text" | "select" = "text", options?: { value: string; label: string }[]) => (
@@ -178,7 +216,11 @@ function CusaPage() {
       <div className="flex-1 overflow-y-auto px-5 py-4">
         <PageHeader
           title="Catholic University Students Association"
-          description={`${filteredMembers.length.toLocaleString()} of ${allMembers.length.toLocaleString()} members shown — share this URL to share the same view.`}
+          description={
+            isLoading
+              ? "Loading CUSA members…"
+              : `${filteredMembers.length.toLocaleString()} of ${allMembers.length.toLocaleString()} members shown — share this URL to share the same view.`
+          }
         />
 
         <Card>
@@ -297,13 +339,10 @@ function CusaPage() {
         open={addOpen}
         onOpenChange={setAddOpen}
         title="Add CUSA Member"
-        description={`Auto-assigned No.: ${nextCusaId}`}
+        description="Provide an existing CDM No. to link, or leave it blank to register a new youth + CUSA record together."
         fields={cusaFields}
         submitLabel="Save Member"
-        onSubmit={(values) => {
-          const id = values.cdmId?.trim() || nextCusaId;
-          toast.success(`${values.fullName} added to CUSA · ${id}`);
-        }}
+        onSubmit={(values) => createMut.mutate(values)}
       />
     </>
   );
