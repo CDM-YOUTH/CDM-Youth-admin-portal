@@ -110,7 +110,12 @@ export type CusaUpdateInput = {
 };
 
 export async function updateCusaMember(id: string, input: CusaUpdateInput) {
-  const patch: Record<string, string | null> = {};
+  const patch: {
+    institution?: string;
+    course?: string | null;
+    year_of_study?: string | null;
+    leadership_role?: string | null;
+  } = {};
   if (input.institution !== undefined) patch.institution = input.institution;
   if (input.course !== undefined) patch.course = input.course || null;
   if (input.yearOfStudy !== undefined) patch.year_of_study = input.yearOfStudy || null;
