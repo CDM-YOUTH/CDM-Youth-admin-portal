@@ -126,6 +126,7 @@ function YouthsPage() {
       const cdm = (data as { cdm_id?: string })?.cdm_id ?? "";
       toast.success(`Youth registered${cdm ? ` · ${cdm}` : ""}`);
       invalidate();
+      qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -142,6 +143,7 @@ function YouthsPage() {
     onSuccess: () => {
       toast.success("Youth deleted");
       invalidate();
+      qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -150,6 +152,7 @@ function YouthsPage() {
     onSuccess: () => {
       toast.success("Enrollment saved");
       qc.invalidateQueries({ queryKey: ["enrollments"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
       invalidate();
     },
     onError: (e: Error) => toast.error(e.message),
