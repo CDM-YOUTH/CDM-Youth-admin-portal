@@ -1,4 +1,6 @@
 import { useMemo, useRef, useState } from "react";
+import Papa from "papaparse";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
@@ -33,7 +35,18 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ORGANIZATION } from "@/lib/mock-data";
-import { YOUTH_CATEGORIES, YOUTH_GENDERS, YOUTH_REGISTRY } from "@/lib/youth-data";
+import { YOUTH_CATEGORIES, YOUTH_GENDERS } from "@/lib/youth-data";
+import {
+  bulkInsertYouths,
+  createYouth,
+  deleteYouth,
+  listYouths,
+  updateYouth,
+  type YouthCategory,
+  type YouthInput,
+  type YouthRow,
+} from "@/lib/db/youths";
+import { createEnrollment } from "@/lib/db/enrollments";
 
 const filterValueSchema = fallback(
   z
@@ -74,9 +87,73 @@ function YouthsPage() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const [addOpen, setAddOpen] = useState(false);
-  const [editing, setEditing] = useState<null | Record<string, string>>(null);
-  const [deleteTarget, setDeleteTarget] = useState<null | { name: string; cdmId: string }>(null);
+  const [editing, setEditing] = useState<null | { id: string; values: Record<string, string> }>(null);
+  const [deleteTarget, setDeleteTarget] = useState<null | { id: string; name: string; cdmId: string }>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const qc = useQueryClient();
+  const { data: youths = [], isLoading } = useQuery({ queryKey: ["youths"], queryFn: listYouths });
+
+  const rows = useMemo(
+    () =>
+      youths.map((y) => ({
+        id: y.id,
+        cdmId: y.cdm_id,
+        name: y.full_name,
+        gender: y.gender,
+        age: y.age,
+        phone: y.phone ?? "",
+        altPhone: y.alt_phone ?? "",
+        email: y.email ?? "",
+        deaneryName: y.deanery?.name ?? "",
+        parishName: y.parish?.name ?? "",
+        churchName: y.outstation?.name ?? "",
+        category: y.category,
+        institution: y.institution ?? "",
+        yearOfStudy: y.year_of_study ?? "",
+        notes: y.notes ?? "",
+        status: y.status,
+        enrolled: (y.enrollments?.length ?? 0) > 0,
+        raw: y as YouthRow,
+      })),
+    [youths],
+  );
+
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["youths"] });
+
+  const createMut = useMutation({
+    mutationFn: (input: YouthInput) => createYouth(input),
+    onSuccess: (data: { cdm_id?: string } | unknown) => {
+      const cdm = (data as { cdm_id?: string })?.cdm_id ?? "";
+      toast.success(`Youth registered${cdm ? ` · ${cdm}` : ""}`);
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const updateMut = useMutation({
+    mutationFn: ({ id, input }: { id: string; input: YouthInput }) => updateYouth(id, input),
+    onSuccess: () => {
+      toast.success("Youth updated");
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => deleteYouth(id),
+    onSuccess: () => {
+      toast.success("Youth deleted");
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const enrollMut = useMutation({
+    mutationFn: (cdmId: string) => createEnrollment({ cdmId }),
+    onSuccess: () => {
+      toast.success("Enrollment saved");
+      qc.invalidateQueries({ queryKey: ["enrollments"] });
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const setFilter = (patch: Partial<YouthSearch>) => {
     navigate({ search: (prev: YouthSearch) => ({ ...prev, ...patch }), replace: true });
@@ -96,7 +173,7 @@ function YouthsPage() {
 
   const filtered = useMemo(() => {
     const q = search.q.trim().toLowerCase();
-    return YOUTH_REGISTRY.filter((row) => {
+    return rows.filter((row) => {
       if (!applyColumnFilter(row.cdmId, search.f_cdm)) return false;
       if (!applyColumnFilter(row.name, search.f_name)) return false;
       if (!applyColumnFilter(row.gender, search.f_sex)) return false;
@@ -112,7 +189,8 @@ function YouthsPage() {
           row.parishName,
           row.deaneryName,
           row.churchName,
-          row.institution ?? "",
+          row.institution,
+          row.phone,
         ]
           .join(" ")
           .toLowerCase();
@@ -120,7 +198,7 @@ function YouthsPage() {
       }
       return true;
     });
-  }, [search]);
+  }, [search, rows]);
 
   const pagination = usePagination(filtered, 10);
 
@@ -143,16 +221,9 @@ function YouthsPage() {
     new Set(outstationScope.flatMap((p) => p.churches.map((c) => c.name))),
   ).map((name) => ({ value: name, label: name }));
 
-  const nextCdmId = useMemo(() => {
-    const max = YOUTH_REGISTRY.reduce((m, r) => {
-      const n = parseInt(r.cdmId.split("-").pop() ?? "0", 10);
-      return n > m ? n : m;
-    }, 0);
-    return `CDM-2026-${String(max + 1).padStart(5, "0")}`;
-  }, []);
+  const nextCdmId = "auto-assigned on save";
 
   const youthFields: FieldDef[] = [
-    { key: "cdmId", label: "Unique CDM No. (auto-generated)", placeholder: nextCdmId },
     { key: "fullName", label: "Full name", required: true, placeholder: "Grace Wanjiku" },
     { key: "gender", label: "Gender", type: "select", options: [...YOUTH_GENDERS], required: true },
     { key: "age", label: "Age", type: "number", placeholder: "16", required: true },
@@ -201,14 +272,41 @@ function YouthsPage() {
     toast.success("Sample CSV downloaded");
   };
   const handleImportFile = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const text = String(reader.result || "");
-      const lines = text.trim().split(/\r?\n/);
-      const rows = Math.max(0, lines.length - 1);
-      toast.success(`Imported ${rows} youth record${rows === 1 ? "" : "s"} (CDM No. auto-assigned)`);
-    };
-    reader.readAsText(file);
+    Papa.parse<Record<string, string>>(file, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async (res) => {
+        try {
+          const inputs: YouthInput[] = res.data
+            .map((r) => ({
+              fullName: (r.fullName || r.name || "").trim(),
+              gender: ((r.gender || "Female").trim() as "Female" | "Male"),
+              age: parseInt(r.age || "0", 10) || 0,
+              phone: r.phone || null,
+              altPhone: r.altPhone || null,
+              email: r.email || null,
+              deaneryName: r.deanery || null,
+              parishName: r.parish || null,
+              outstationName: r.outstation || null,
+              category: ((r.category || "Secondary").trim() as YouthCategory),
+              institution: r.institution || null,
+              yearOfStudy: r.yearOfStudy || null,
+              notes: r.notes || null,
+            }))
+            .filter((r) => r.fullName && r.age > 0);
+          if (!inputs.length) {
+            toast.error("No valid rows found in CSV");
+            return;
+          }
+          const inserted = await bulkInsertYouths(inputs);
+          toast.success(`Imported ${inserted.length} youth record${inserted.length === 1 ? "" : "s"}`);
+          invalidate();
+        } catch (e) {
+          toast.error((e as Error).message);
+        }
+      },
+      error: (err) => toast.error(err.message),
+    });
   };
 
   const fc = (key: keyof YouthSearch, label: string, mode: "text" | "select" = "text", options?: { value: string; label: string }[]) => (
@@ -227,7 +325,11 @@ function YouthsPage() {
       <div className="flex-1 overflow-y-auto px-5 py-4">
         <PageHeader
           title="Youth Directory"
-          description={`${filtered.length.toLocaleString()} of ${YOUTH_REGISTRY.length.toLocaleString()} youths · share this URL to share the same view.`}
+          description={
+            isLoading
+              ? "Loading youths…"
+              : `${filtered.length.toLocaleString()} of ${rows.length.toLocaleString()} youths · share this URL to share the same view.`
+          }
         />
 
         <Card>
@@ -356,36 +458,36 @@ function YouthsPage() {
                           <DropdownMenuItem
                             onClick={() =>
                               setEditing({
-                                cdmId: row.cdmId,
-                                fullName: row.name,
-                                gender: row.gender,
-                                age: String(row.age),
-                                phone: "",
-                                altPhone: "",
-                                email: "",
-                                deanery: row.deaneryName,
-                                parish: row.parishName,
-                                outstation: row.churchName,
-                                category: row.category,
-                                institution: row.institution ?? "",
-                                yearOfStudy: "",
-                                notes: "",
+                                id: row.id,
+                                values: {
+                                  fullName: row.name,
+                                  gender: row.gender,
+                                  age: String(row.age),
+                                  phone: row.phone,
+                                  altPhone: row.altPhone,
+                                  email: row.email,
+                                  deanery: row.deaneryName,
+                                  parish: row.parishName,
+                                  outstation: row.churchName,
+                                  category: row.category,
+                                  institution: row.institution,
+                                  yearOfStudy: row.yearOfStudy,
+                                  notes: row.notes,
+                                },
                               })
                             }
                           >
                             <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            onClick={() =>
-                              toast.success(`Enrollment started for ${row.name} · ${row.cdmId}`)
-                            }
+                            onClick={() => enrollMut.mutate(row.cdmId)}
                           >
                             <BadgeCheck className="mr-2 h-3.5 w-3.5" /> Enroll
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             className="text-danger focus:text-danger"
-                            onClick={() => setDeleteTarget({ name: row.name, cdmId: row.cdmId })}
+                            onClick={() => setDeleteTarget({ id: row.id, name: row.name, cdmId: row.cdmId })}
                           >
                             <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
                           </DropdownMenuItem>
@@ -418,23 +520,21 @@ function YouthsPage() {
         open={addOpen}
         onOpenChange={setAddOpen}
         title="Register Youth"
-        description={`Auto-assigned Unique No.: ${nextCdmId}`}
+        description="A unique CDM No. is assigned automatically on save."
         fields={youthFields}
         submitLabel="Register Youth"
-        onSubmit={(values) => {
-          toast.success(`${values.fullName} registered · ${nextCdmId}`);
-        }}
+        onSubmit={(values) => createMut.mutate(toYouthInput(values))}
       />
       <RecordFormDialog
         open={editing !== null}
         onOpenChange={(o) => !o && setEditing(null)}
-        title={`Edit Youth · ${editing?.cdmId ?? ""}`}
+        title="Edit Youth"
         description="All fields are editable. Unique CDM No. is permanent."
         fields={youthFields}
-        initial={editing ?? undefined}
+        initial={editing?.values}
         submitLabel="Save changes"
         onSubmit={(values) => {
-          toast.success(`${values.fullName} updated`);
+          if (editing) updateMut.mutate({ id: editing.id, input: toYouthInput(values) });
           setEditing(null);
         }}
       />
@@ -450,7 +550,7 @@ function YouthsPage() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
-                toast.success(`${deleteTarget?.name} deleted`);
+                if (deleteTarget) deleteMut.mutate(deleteTarget.id);
                 setDeleteTarget(null);
               }}
             >
@@ -461,4 +561,22 @@ function YouthsPage() {
       </AlertDialog>
     </>
   );
+}
+
+function toYouthInput(values: Record<string, string>): YouthInput {
+  return {
+    fullName: values.fullName?.trim() ?? "",
+    gender: (values.gender as "Female" | "Male") || "Female",
+    age: parseInt(values.age || "0", 10) || 0,
+    phone: values.phone || null,
+    altPhone: values.altPhone || null,
+    email: values.email || null,
+    deaneryName: values.deanery || null,
+    parishName: values.parish || null,
+    outstationName: values.outstation || null,
+    category: (values.category as YouthCategory) || "Secondary",
+    institution: values.institution || null,
+    yearOfStudy: values.yearOfStudy || null,
+    notes: values.notes || null,
+  };
 }
