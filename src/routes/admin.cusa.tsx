@@ -102,6 +102,7 @@ function CusaPage() {
       toast.success("CUSA member saved");
       qc.invalidateQueries({ queryKey: ["cusa"] });
       qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
+      qc.invalidateQueries({ queryKey: ["live-analytics"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -116,6 +117,7 @@ function CusaPage() {
     onSuccess: () => {
       toast.success("CUSA member updated");
       qc.invalidateQueries({ queryKey: ["cusa"] });
+      qc.invalidateQueries({ queryKey: ["live-analytics"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -125,6 +127,7 @@ function CusaPage() {
       toast.success("CUSA member removed");
       qc.invalidateQueries({ queryKey: ["cusa"] });
       qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
+      qc.invalidateQueries({ queryKey: ["live-analytics"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
