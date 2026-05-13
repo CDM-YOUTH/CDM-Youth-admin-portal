@@ -90,6 +90,7 @@ function YouthsPage() {
   const [editing, setEditing] = useState<null | { id: string; values: Record<string, string> }>(null);
   const [deleteTarget, setDeleteTarget] = useState<null | { id: string; name: string; cdmId: string }>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importResult, setImportResult] = useState<null | { inserted: number; skipped: number; total: number; firstCdms: string[] }>(null);
   const qc = useQueryClient();
   const { data: youths = [], isLoading } = useQuery({ queryKey: ["youths"], queryFn: listYouths });
 
@@ -278,6 +279,18 @@ function YouthsPage() {
       skipEmptyLines: true,
       complete: async (res) => {
         try {
+          const headers = (res.meta.fields ?? []).map((h) => h.trim());
+          const required = ["fullName", "gender", "age", "deanery", "parish", "outstation", "category"];
+          const aliases: Record<string, string[]> = { fullName: ["name"] };
+          const missing = required.filter(
+            (col) => !headers.includes(col) && !(aliases[col] ?? []).some((a) => headers.includes(a)),
+          );
+          if (missing.length) {
+            toast.error(`CSV is missing required column${missing.length > 1 ? "s" : ""}: ${missing.join(", ")}`, {
+              description: `Found columns: ${headers.join(", ") || "(none)"} — download the sample CSV for the expected header row.`,
+            });
+            return;
+          }
           const inputs: YouthInput[] = res.data
             .map((r) => ({
               fullName: (r.fullName || r.name || "").trim(),
@@ -295,13 +308,21 @@ function YouthsPage() {
               notes: r.notes || null,
             }))
             .filter((r) => r.fullName && r.age > 0);
+          const total = res.data.length;
           if (!inputs.length) {
-            toast.error("No valid rows found in CSV");
+            toast.error("CSV has the right columns but no rows with a valid full name + age");
             return;
           }
           const inserted = await bulkInsertYouths(inputs);
-          toast.success(`Imported ${inserted.length} youth record${inserted.length === 1 ? "" : "s"}`);
+          setImportResult({
+            inserted: inserted.length,
+            skipped: total - inputs.length,
+            total,
+            firstCdms: inserted.slice(0, 10).map((r) => (r as { cdm_id?: string }).cdm_id ?? ""),
+          });
           invalidate();
+          qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
+          qc.invalidateQueries({ queryKey: ["live-analytics"] });
         } catch (e) {
           toast.error((e as Error).message);
         }
