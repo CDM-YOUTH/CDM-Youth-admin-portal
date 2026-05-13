@@ -97,6 +97,8 @@ function EnrollmentPage() {
   const [pendingFileName, setPendingFileName] = useState<string>("");
   const [pendingRows, setPendingRows] = useState<BulkEnrollRow[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<null | { id: string; name: string }>(null);
+  const [statusTarget, setStatusTarget] = useState<null | { id: string; name: string; nextStatus: "paid" | "pending" }>(null);
+  const [importResult, setImportResult] = useState<null | { inserted: number; missing: string[]; total: number }>(null);
   const qc = useQueryClient();
   const { data: enrollments = [], isLoading } = useQuery({
     queryKey: ["enrollments"],
@@ -115,11 +117,11 @@ function EnrollmentPage() {
   const bulkMut = useMutation({
     mutationFn: ({ rows, ref }: { rows: BulkEnrollRow[]; ref: string | null }) =>
       bulkEnrollRows(rows, ref),
-    onSuccess: (res) => {
-      toast.success(`Enrolled ${res.inserted} youths${res.missing.length ? ` · ${res.missing.length} missing` : ""}`);
-      if (res.missing.length) toast.message("Missing CDM IDs", { description: res.missing.slice(0, 5).join(", ") });
+    onSuccess: (res, vars) => {
+      setImportResult({ inserted: res.inserted, missing: res.missing, total: vars.rows.length });
       qc.invalidateQueries({ queryKey: ["enrollments"] });
       qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
+      qc.invalidateQueries({ queryKey: ["live-analytics"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -129,6 +131,7 @@ function EnrollmentPage() {
       toast.success("Enrollment removed");
       qc.invalidateQueries({ queryKey: ["enrollments"] });
       qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
+      qc.invalidateQueries({ queryKey: ["live-analytics"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -138,6 +141,8 @@ function EnrollmentPage() {
     onSuccess: () => {
       toast.success("Payment status updated");
       qc.invalidateQueries({ queryKey: ["enrollments"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
+      qc.invalidateQueries({ queryKey: ["live-analytics"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -246,6 +251,20 @@ function EnrollmentPage() {
       header: true,
       skipEmptyLines: true,
       complete: (res) => {
+        const headers = res.meta.fields ?? [];
+        const norm = headers.map((h) => h.trim());
+        const hasCdm = norm.includes("cdmId") || norm.includes("cdm_id");
+        if (!hasCdm) {
+          toast.error("CSV is missing required column: cdmId", {
+            description: `Found columns: ${norm.join(", ") || "(none)"} — download the sample CSV for the expected header row.`,
+          });
+          return;
+        }
+        if (!norm.includes("paymentRef") && !norm.includes("payment_ref")) {
+          toast.message("Heads up: no paymentRef column", {
+            description: "All rows will use the bulk payment reference you enter on the next step.",
+          });
+        }
         const rows: BulkEnrollRow[] = res.data
           .map((r) => ({
             cdmId: (r.cdmId || r.cdm_id || "").trim(),
@@ -253,7 +272,7 @@ function EnrollmentPage() {
           }))
           .filter((r) => r.cdmId);
         if (!rows.length) {
-          toast.error("No CDM IDs found in CSV");
+          toast.error("CSV has the right columns but no rows with a CDM No.");
           return;
         }
         setPendingRows(rows);
@@ -388,11 +407,11 @@ function EnrollmentPage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-44">
                           {row.paymentStatus === "approved" ? (
-                            <DropdownMenuItem onClick={() => statusMut.mutate({ id: row.id, status: "pending" })}>
+                            <DropdownMenuItem onClick={() => setStatusTarget({ id: row.id, name: row.name, nextStatus: "pending" })}>
                               <Clock className="mr-2 h-3.5 w-3.5" /> Mark pending
                             </DropdownMenuItem>
                           ) : (
-                            <DropdownMenuItem onClick={() => statusMut.mutate({ id: row.id, status: "paid" })}>
+                            <DropdownMenuItem onClick={() => setStatusTarget({ id: row.id, name: row.name, nextStatus: "paid" })}>
                               <BadgeCheck className="mr-2 h-3.5 w-3.5" /> Mark paid
                             </DropdownMenuItem>
                           )}
@@ -467,6 +486,55 @@ function EnrollmentPage() {
             >
               Remove
             </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={statusTarget !== null} onOpenChange={(o) => !o && setStatusTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {statusTarget?.nextStatus === "paid" ? "Mark as paid?" : "Mark as pending?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              The {new Date().getFullYear()} enrollment for <strong>{statusTarget?.name}</strong> will be set to{" "}
+              <strong>{statusTarget?.nextStatus}</strong>. Dashboard counts update immediately.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (statusTarget) statusMut.mutate({ id: statusTarget.id, status: statusTarget.nextStatus });
+                setStatusTarget(null);
+              }}
+            >
+              Confirm
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={importResult !== null} onOpenChange={(o) => !o && setImportResult(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Import results</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-[12px] text-text-1">
+                <div>
+                  Saved <strong>{importResult?.inserted ?? 0}</strong> of {importResult?.total ?? 0} enrollments.
+                </div>
+                {importResult && importResult.missing.length > 0 && (
+                  <div>
+                    <div className="font-semibold text-danger">{importResult.missing.length} CDM No(s) not found in Youth Records:</div>
+                    <div className="mt-1 max-h-40 overflow-y-auto rounded border border-border bg-bg-2 p-2 font-mono text-[10px]">
+                      {importResult.missing.join(", ")}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setImportResult(null)}>Close</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
