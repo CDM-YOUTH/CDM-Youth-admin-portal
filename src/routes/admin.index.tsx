@@ -644,6 +644,9 @@ function MissionTab({ chartDisplay }: { chartDisplay: ChartDisplay }) {
   return (
     <>
       <OrgFilterBar {...analytics} />
+      <div className="mb-3 rounded-lg border border-warn/40 bg-warn-soft px-3 py-2 text-[10px] text-text-1">
+        Mission Week metrics are illustrative only — backend tables for nominations, pairings, and reports are not yet provisioned.
+      </div>
 
       <div className="mb-3.5 grid grid-cols-1 gap-3 md:grid-cols-3">
         <Kpi label="Nominees" value={totals.missionNominees.toLocaleString()} trend="selected scope" tone="up" />
