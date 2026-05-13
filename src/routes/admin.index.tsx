@@ -22,7 +22,7 @@ import {
 import { Donut } from "@/components/admin/donut";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CUSA_INSTITUTIONS, buildCusaMembers, cusaGenderRows, cusaInstitutionRows, cusaMembersFor } from "@/lib/cusa-data";
-import { getDashboardCounts } from "@/lib/db/analytics";
+import { getDashboardCounts, getLiveAnalytics } from "@/lib/db/analytics";
 import { TablePagination, usePagination } from "@/components/admin/table-pagination";
 import {
   ACTIVITY_FEED,
@@ -97,24 +97,38 @@ function DashboardPage() {
 
 function useFilteredAnalytics() {
   const [filters, setFilters] = useState<FilterState>(emptyFilters);
+  const { data: live } = useQuery({
+    queryKey: ["live-analytics"],
+    queryFn: () => getLiveAnalytics(),
+    staleTime: 30_000,
+  });
+  const sourceUnits = live?.units ?? ANALYTICS_UNITS;
   const selectedDeanery = ORGANIZATION.find((d) => d.code === filters.deaneryCode);
   const selectedParish = selectedDeanery?.parishes.find((p) => p.id === filters.parishId);
   const units = useMemo(
     () =>
-      ANALYTICS_UNITS.filter((unit) => {
+      sourceUnits.filter((unit) => {
         if (filters.deaneryCode && unit.deaneryCode !== filters.deaneryCode) return false;
         if (filters.parishId && unit.parishId !== filters.parishId) return false;
         if (filters.churchId && unit.id !== filters.churchId) return false;
         return true;
       }),
-    [filters],
+    [filters, sourceUnits],
   );
 
   const scope = filters.churchId
     ? selectedParish?.churches.find((church) => church.id === filters.churchId)?.name
     : selectedParish?.name ?? selectedDeanery?.name ?? "Diocese-wide";
 
-  return { filters, setFilters, selectedDeanery, selectedParish, units, scope: scope ?? "Diocese-wide" };
+  return {
+    filters,
+    setFilters,
+    selectedDeanery,
+    selectedParish,
+    units,
+    scope: scope ?? "Diocese-wide",
+    upcomingEvents: live?.upcomingEvents ?? null,
+  };
 }
 
 function totalsFor(units: AnalyticsUnit[]) {
@@ -239,27 +253,21 @@ function enrollmentTrendRows(units: AnalyticsUnit[]) {
 
 function GeneralTab({ chartDisplay }: { chartDisplay: ChartDisplay }) {
   const analytics = useFilteredAnalytics();
-  const mockTotals = totalsFor(analytics.units);
-  const { data: liveCounts } = useQuery({
+  const totals = totalsFor(analytics.units);
+  // Keep dashboard-counts subscription alive so other pages' invalidations still
+  // bubble up; values mirror the live unit roll-up at the diocese level.
+  useQuery({
     queryKey: ["dashboard-counts"],
     queryFn: () => getDashboardCounts(),
     staleTime: 30_000,
   });
-  const isDioceseWide =
-    !analytics.filters.deaneryCode && !analytics.filters.parishId && !analytics.filters.churchId;
-  const totals = isDioceseWide && liveCounts
-    ? {
-        ...mockTotals,
-        youths: liveCounts.youths,
-        enrolled: liveCounts.enrolled,
-        cusaMembers: liveCounts.cusaMembers,
-        cusaActive: liveCounts.cusaActive,
-      }
-    : mockTotals;
   const enrollmentRows = rollupRows(analytics.units, analytics.filters, "enrolled", "youths");
   const topParishes = analytics.filters.deaneryCode
     ? rollupRows(analytics.units, analytics.filters, "enrolled", "youths").slice(0, 4)
     : TOP_PARISHES.slice(0, 4).map((p) => ({ label: p.name, value: p.enrolled, max: p.enrolled }));
+  const upcoming = analytics.upcomingEvents ?? UPCOMING_EVENTS.slice(0, 3).map((e) => ({
+    id: e.name, name: e.name, venue: "", parish: e.parish, day: e.day, month: e.month, registered: e.registered,
+  }));
 
   return (
     <>
@@ -321,15 +329,20 @@ function GeneralTab({ chartDisplay }: { chartDisplay: ChartDisplay }) {
           <Card>
             <CardHead title="Upcoming Events" action="View all →" />
             <CardBody className="space-y-2">
-              {UPCOMING_EVENTS.slice(0, 3).map((e) => (
-                <div key={e.name} className="flex items-center gap-3 rounded-lg border border-border bg-bg-2 p-2.5">
+              {upcoming.length === 0 && (
+                <div className="rounded-lg border border-dashed border-border bg-bg-2 p-3 text-center text-[10px] text-text-3">
+                  No upcoming events scheduled.
+                </div>
+              )}
+              {upcoming.slice(0, 3).map((e) => (
+                <div key={e.id} className="flex items-center gap-3 rounded-lg border border-border bg-bg-2 p-2.5">
                   <div className="min-w-[44px] shrink-0 rounded-md bg-bg-4 px-2 py-1.5 text-center">
                     <div className="text-[7px] font-bold uppercase tracking-wide text-gold">{e.month}</div>
                     <div className="text-[18px] font-black leading-none text-foreground">{e.day}</div>
                   </div>
                   <div className="flex-1 leading-tight">
                     <div className="text-[11px] font-semibold text-text-1">{e.name}</div>
-                    <div className="text-[9px] text-text-3">{e.parish}</div>
+                    <div className="text-[9px] text-text-3">{e.venue ? `${e.venue} · ${e.parish}` : e.parish}</div>
                   </div>
                   <Pill tone="success">{e.registered} RSVP</Pill>
                 </div>
