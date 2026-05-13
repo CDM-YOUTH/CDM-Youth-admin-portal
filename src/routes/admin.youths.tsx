@@ -128,6 +128,7 @@ function YouthsPage() {
       toast.success(`Youth registered${cdm ? ` · ${cdm}` : ""}`);
       invalidate();
       qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
+      qc.invalidateQueries({ queryKey: ["live-analytics"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -145,6 +146,7 @@ function YouthsPage() {
       toast.success("Youth deleted");
       invalidate();
       qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
+      qc.invalidateQueries({ queryKey: ["live-analytics"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -154,6 +156,7 @@ function YouthsPage() {
       toast.success("Enrollment saved");
       qc.invalidateQueries({ queryKey: ["enrollments"] });
       qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
+      qc.invalidateQueries({ queryKey: ["live-analytics"] });
       invalidate();
     },
     onError: (e: Error) => toast.error(e.message),
@@ -322,6 +325,7 @@ function YouthsPage() {
           });
           invalidate();
           qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
+      qc.invalidateQueries({ queryKey: ["live-analytics"] });
           qc.invalidateQueries({ queryKey: ["live-analytics"] });
         } catch (e) {
           toast.error((e as Error).message);
