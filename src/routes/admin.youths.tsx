@@ -581,6 +581,34 @@ function YouthsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <AlertDialog open={importResult !== null} onOpenChange={(o) => !o && setImportResult(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Import results</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-[12px] text-text-1">
+                <div>
+                  Saved <strong>{importResult?.inserted ?? 0}</strong> of {importResult?.total ?? 0} rows.
+                  {importResult && importResult.skipped > 0 && (
+                    <> {importResult.skipped} skipped (missing name or age).</>
+                  )}
+                </div>
+                {importResult && importResult.firstCdms.length > 0 && (
+                  <div>
+                    <div className="font-semibold">First assigned CDM No(s):</div>
+                    <div className="mt-1 max-h-40 overflow-y-auto rounded border border-border bg-bg-2 p-2 font-mono text-[10px]">
+                      {importResult.firstCdms.filter(Boolean).join(", ")}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setImportResult(null)}>Close</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
