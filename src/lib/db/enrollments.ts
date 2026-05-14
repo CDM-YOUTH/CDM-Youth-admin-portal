@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { logEnrollmentAudit } from "./audit";
 
 export type EnrollmentRow = {
   id: string;
@@ -64,6 +65,12 @@ export async function createEnrollment(input: EnrollInput) {
     .select()
     .single();
   if (error) throw error;
+  await logEnrollmentAudit({
+    enrollmentId: data.id,
+    youthId: youth.id,
+    action: "create",
+    after: { cdmId: input.cdmId, year, paymentRef: input.paymentRef ?? null, status: input.status ?? "paid" },
+  });
   return data;
 }
 
@@ -88,6 +95,10 @@ export async function bulkEnroll(cdmIds: string[], sharedRef: string | null, yea
       .from("enrollments")
       .upsert(rows, { onConflict: "youth_id,year" });
     if (insErr) throw insErr;
+    await logEnrollmentAudit({
+      action: "bulk_create",
+      after: { count: rows.length, year: y, sharedRef },
+    });
   }
   return { inserted: rows.length, missing };
 }
@@ -131,19 +142,38 @@ export async function bulkEnrollRows(
       .from("enrollments")
       .upsert(payload, { onConflict: "youth_id,year" });
     if (insErr) throw insErr;
+    await logEnrollmentAudit({
+      action: "bulk_create",
+      after: { count: payload.length, year: y, sharedRef },
+    });
   }
   return { inserted: payload.length, missing };
 }
 
 export async function deleteEnrollment(id: string) {
+  const { data: prev } = await supabase.from("enrollments").select("*").eq("id", id).maybeSingle();
   const { error } = await supabase.from("enrollments").delete().eq("id", id);
   if (error) throw error;
+  await logEnrollmentAudit({
+    enrollmentId: id,
+    youthId: prev?.youth_id ?? null,
+    action: "delete",
+    before: prev as Record<string, unknown> | null,
+  });
 }
 
 export async function updateEnrollmentStatus(
   id: string,
   status: "paid" | "pending" | "waived",
 ) {
+  const { data: prev } = await supabase.from("enrollments").select("status, youth_id").eq("id", id).maybeSingle();
   const { error } = await supabase.from("enrollments").update({ status }).eq("id", id);
   if (error) throw error;
+  await logEnrollmentAudit({
+    enrollmentId: id,
+    youthId: prev?.youth_id ?? null,
+    action: "status_change",
+    before: { status: prev?.status ?? null },
+    after: { status },
+  });
 }

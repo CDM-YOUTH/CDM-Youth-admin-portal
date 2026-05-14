@@ -283,8 +283,8 @@ function YouthsPage() {
       complete: async (res) => {
         try {
           const headers = (res.meta.fields ?? []).map((h) => h.trim());
-          const required = ["fullName", "gender", "age", "deanery", "parish", "outstation", "category"];
-          const aliases: Record<string, string[]> = { fullName: ["name"] };
+          const required = ["fullName", "gender", "age", "phone", "deanery", "parish", "outstation", "category"];
+          const aliases: Record<string, string[]> = { fullName: ["name"], phone: ["phoneNumber", "mobile"] };
           const missing = required.filter(
             (col) => !headers.includes(col) && !(aliases[col] ?? []).some((a) => headers.includes(a)),
           );
@@ -293,6 +293,17 @@ function YouthsPage() {
               description: `Found columns: ${headers.join(", ") || "(none)"} — download the sample CSV for the expected header row.`,
             });
             return;
+          }
+          const known = new Set([
+            ...required,
+            ...Object.values(aliases).flat(),
+            "altPhone", "email", "institution", "yearOfStudy", "notes",
+          ]);
+          const unknown = headers.filter((h) => !known.has(h));
+          if (unknown.length) {
+            toast.message(`Ignoring unknown columns: ${unknown.join(", ")}`, {
+              description: "Recognised optional columns: altPhone, email, institution, yearOfStudy, notes.",
+            });
           }
           const inputs: YouthInput[] = res.data
             .map((r) => ({
