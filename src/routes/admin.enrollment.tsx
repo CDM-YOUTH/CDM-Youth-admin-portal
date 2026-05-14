@@ -253,12 +253,22 @@ function EnrollmentPage() {
       complete: (res) => {
         const headers = res.meta.fields ?? [];
         const norm = headers.map((h) => h.trim());
-        const hasCdm = norm.includes("cdmId") || norm.includes("cdm_id");
-        if (!hasCdm) {
-          toast.error("CSV is missing required column: cdmId", {
+        const requiredAny: Array<[string, string[]]> = [
+          ["cdmId", ["cdmId", "cdm_id", "CDM No.", "cdm"]],
+        ];
+        const missing = requiredAny.filter(([, aliases]) => !aliases.some((a) => norm.includes(a)));
+        if (missing.length) {
+          toast.error(`CSV is missing required column${missing.length > 1 ? "s" : ""}: ${missing.map((m) => m[0]).join(", ")}`, {
             description: `Found columns: ${norm.join(", ") || "(none)"} — download the sample CSV for the expected header row.`,
           });
           return;
+        }
+        const optional = ["fullName", "paymentRef"];
+        const unknown = norm.filter((h) => !["cdmId", "cdm_id", "fullName", "name", "paymentRef", "payment_ref"].includes(h));
+        if (unknown.length) {
+          toast.message(`Ignoring unknown columns: ${unknown.join(", ")}`, {
+            description: `Recognised: cdmId, ${optional.join(", ")}.`,
+          });
         }
         if (!norm.includes("paymentRef") && !norm.includes("payment_ref")) {
           toast.message("Heads up: no paymentRef column", {
