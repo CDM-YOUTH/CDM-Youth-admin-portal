@@ -24,8 +24,8 @@ export async function logEnrollmentAudit(entry: {
     youth_id: entry.youthId ?? null,
     action: entry.action,
     actor: entry.actor ?? null,
-    before: entry.before ?? null,
-    after: entry.after ?? null,
+    before: (entry.before ?? null) as never,
+    after: (entry.after ?? null) as never,
   });
   if (error) console.warn("[audit] failed to log:", error.message);
 }
