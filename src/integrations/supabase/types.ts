@@ -73,6 +73,39 @@ export type Database = {
         }
         Relationships: []
       }
+      enrollment_audit_log: {
+        Row: {
+          action: string
+          actor: string | null
+          after: Json | null
+          before: Json | null
+          created_at: string
+          enrollment_id: string | null
+          id: string
+          youth_id: string | null
+        }
+        Insert: {
+          action: string
+          actor?: string | null
+          after?: Json | null
+          before?: Json | null
+          created_at?: string
+          enrollment_id?: string | null
+          id?: string
+          youth_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor?: string | null
+          after?: Json | null
+          before?: Json | null
+          created_at?: string
+          enrollment_id?: string | null
+          id?: string
+          youth_id?: string | null
+        }
+        Relationships: []
+      }
       enrollments: {
         Row: {
           amount: number | null
@@ -313,6 +346,47 @@ export type Database = {
           },
         ]
       }
+      event_registrations: {
+        Row: {
+          created_at: string
+          event_id: string
+          guest_email: string | null
+          guest_name: string | null
+          guest_phone: string | null
+          id: string
+          notes: string | null
+          youth_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          event_id: string
+          guest_email?: string | null
+          guest_name?: string | null
+          guest_phone?: string | null
+          id?: string
+          notes?: string | null
+          youth_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          guest_email?: string | null
+          guest_name?: string | null
+          guest_phone?: string | null
+          id?: string
+          notes?: string | null
+          youth_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_registrations_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       events: {
         Row: {
           created_at: string
@@ -382,6 +456,159 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      mission_nominees: {
+        Row: {
+          created_at: string
+          id: string
+          mission_week_id: string
+          source_parish_id: string | null
+          status: Database["public"]["Enums"]["mission_nominee_status"]
+          youth_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mission_week_id: string
+          source_parish_id?: string | null
+          status?: Database["public"]["Enums"]["mission_nominee_status"]
+          youth_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mission_week_id?: string
+          source_parish_id?: string | null
+          status?: Database["public"]["Enums"]["mission_nominee_status"]
+          youth_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mission_nominees_mission_week_id_fkey"
+            columns: ["mission_week_id"]
+            isOneToOne: false
+            referencedRelation: "mission_weeks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mission_pairings: {
+        Row: {
+          created_at: string
+          host_deanery_id: string | null
+          host_outstation_id: string | null
+          host_parish_id: string | null
+          id: string
+          mission_week_id: string
+          report_submitted_at: string | null
+          report_summary: string | null
+          status: Database["public"]["Enums"]["mission_pairing_status"]
+          youth_id: string
+        }
+        Insert: {
+          created_at?: string
+          host_deanery_id?: string | null
+          host_outstation_id?: string | null
+          host_parish_id?: string | null
+          id?: string
+          mission_week_id: string
+          report_submitted_at?: string | null
+          report_summary?: string | null
+          status?: Database["public"]["Enums"]["mission_pairing_status"]
+          youth_id: string
+        }
+        Update: {
+          created_at?: string
+          host_deanery_id?: string | null
+          host_outstation_id?: string | null
+          host_parish_id?: string | null
+          id?: string
+          mission_week_id?: string
+          report_submitted_at?: string | null
+          report_summary?: string | null
+          status?: Database["public"]["Enums"]["mission_pairing_status"]
+          youth_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mission_pairings_mission_week_id_fkey"
+            columns: ["mission_week_id"]
+            isOneToOne: false
+            referencedRelation: "mission_weeks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mission_phases: {
+        Row: {
+          created_at: string
+          id: string
+          mission_week_id: string
+          name: string
+          phase_date: string | null
+          position: number
+          status: Database["public"]["Enums"]["mission_phase_status"]
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mission_week_id: string
+          name: string
+          phase_date?: string | null
+          position?: number
+          status?: Database["public"]["Enums"]["mission_phase_status"]
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mission_week_id?: string
+          name?: string
+          phase_date?: string | null
+          position?: number
+          status?: Database["public"]["Enums"]["mission_phase_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mission_phases_mission_week_id_fkey"
+            columns: ["mission_week_id"]
+            isOneToOne: false
+            referencedRelation: "mission_weeks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mission_weeks: {
+        Row: {
+          created_at: string
+          end_date: string | null
+          id: string
+          start_date: string | null
+          status: Database["public"]["Enums"]["mission_week_status"]
+          theme: string | null
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["mission_week_status"]
+          theme?: string | null
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["mission_week_status"]
+          theme?: string | null
+          updated_at?: string
+          year?: number
+        }
+        Relationships: []
       }
       outstations: {
         Row: {
@@ -564,6 +791,15 @@ export type Database = {
       enrollment_status: "paid" | "pending" | "waived"
       event_org_level: "Diocese" | "Deanery" | "Parish" | "Outstation"
       gender: "Female" | "Male"
+      mission_nominee_status: "nominated" | "confirmed" | "withdrawn"
+      mission_pairing_status: "pending" | "sent" | "received" | "reported"
+      mission_phase_status: "upcoming" | "active" | "done"
+      mission_week_status:
+        | "planning"
+        | "nominations"
+        | "pairing"
+        | "execution"
+        | "closed"
       youth_category: "Primary" | "Secondary" | "Tertiary" | "Working"
       youth_status: "active" | "inactive"
     }
@@ -698,6 +934,16 @@ export const Constants = {
       enrollment_status: ["paid", "pending", "waived"],
       event_org_level: ["Diocese", "Deanery", "Parish", "Outstation"],
       gender: ["Female", "Male"],
+      mission_nominee_status: ["nominated", "confirmed", "withdrawn"],
+      mission_pairing_status: ["pending", "sent", "received", "reported"],
+      mission_phase_status: ["upcoming", "active", "done"],
+      mission_week_status: [
+        "planning",
+        "nominations",
+        "pairing",
+        "execution",
+        "closed",
+      ],
       youth_category: ["Primary", "Secondary", "Tertiary", "Working"],
       youth_status: ["active", "inactive"],
     },
