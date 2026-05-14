@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Download, MoreVertical, Trash2, BadgeCheck, Clock } from "lucide-react";
 import { Topbar } from "@/components/admin/topbar";
 import { Card, CardBody, PageHeader, Pill } from "@/components/admin/ui-bits";
+import { Card as Card2, CardBody as CardBody2, CardHead as CardHead2 } from "@/components/admin/ui-bits";
 import { TablePagination, usePagination } from "@/components/admin/table-pagination";
 import {
   ColumnFilter,
@@ -27,6 +28,7 @@ import {
   updateEnrollmentStatus,
   type BulkEnrollRow,
 } from "@/lib/db/enrollments";
+import { listEnrollmentAudit } from "@/lib/db/audit";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -103,6 +105,11 @@ function EnrollmentPage() {
   const { data: enrollments = [], isLoading } = useQuery({
     queryKey: ["enrollments"],
     queryFn: () => listEnrollments(),
+  });
+  const { data: auditLog = [] } = useQuery({
+    queryKey: ["enrollment-audit"],
+    queryFn: () => listEnrollmentAudit(50),
+    refetchInterval: 15_000,
   });
 
   const createMut = useMutation({
@@ -456,6 +463,22 @@ function EnrollmentPage() {
             />
           </CardBody>
         </Card>
+
+        <Card2 className="mt-3">
+          <CardHead2 title="Audit Log" subtitle="Last 50 enrollment changes (auto-refresh 15s)" />
+          <CardBody2 className="space-y-1.5 max-h-72 overflow-y-auto">
+            {auditLog.length === 0 && <div className="text-[11px] text-text-3">No audit entries yet.</div>}
+            {auditLog.map((a) => (
+              <div key={a.id} className="flex items-center gap-2 rounded-lg border border-border bg-bg-2 px-3 py-2 text-[11px]">
+                <Pill tone={a.action === "delete" ? "warn" : a.action === "status_change" ? "info" : "success"}>{a.action}</Pill>
+                <span className="font-mono text-[10px] text-text-3 flex-1 truncate">
+                  {JSON.stringify(a.after ?? a.before ?? {})}
+                </span>
+                <span className="text-text-3 text-[9px] shrink-0">{new Date(a.created_at).toLocaleString()}</span>
+              </div>
+            ))}
+          </CardBody2>
+        </Card2>
       </div>
       <RecordFormDialog
         open={addOpen}
