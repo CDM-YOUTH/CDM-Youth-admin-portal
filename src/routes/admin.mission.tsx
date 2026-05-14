@@ -93,8 +93,10 @@ function MissionPage() {
         title="Mission Week"
         action={
           <TopbarButton
-            onClick={() => weekId && reshuffleMut.mutate()}
-            disabled={!weekId || reshuffleMut.isPending || nominees.length === 0}
+            onClick={() => {
+              if (!weekId || reshuffleMut.isPending || nominees.length === 0) return;
+              reshuffleMut.mutate();
+            }}
           >
             {reshuffleMut.isPending ? "Reshuffling…" : "Run Reshuffle"}
           </TopbarButton>
