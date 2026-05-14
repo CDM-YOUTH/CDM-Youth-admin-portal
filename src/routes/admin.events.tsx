@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Topbar, TopbarButton } from "@/components/admin/topbar";
 import { Card, CardBody, CardHead, Kpi, PageHeader, Pill } from "@/components/admin/ui-bits";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Plus, Trash2 } from "lucide-react";
-import { DONE_EVENTS, EVENTS, UPCOMING_EVENTS } from "@/lib/mock-data";
 import { EventTabsForm } from "@/components/admin/event-tabs-form";
+import { createEvent, deleteEvent, getEventsAnalytics, listEvents, type EventRow } from "@/lib/db/events";
 
 type Row = Record<string, string>;
 const blankRow = (labels: string[]): Row => Object.fromEntries(labels.map((l) => [l, ""]));
@@ -32,59 +33,97 @@ export const Route = createFileRoute("/admin/events")({
 });
 
 function EventsPage() {
-  const doneAttendance = DONE_EVENTS.reduce((sum, event) => sum + event.attended, 0);
-  const expected = UPCOMING_EVENTS.reduce((sum, event) => sum + event.expected, 0);
-
+  const qc = useQueryClient();
+  const { data: events = [] } = useQuery({ queryKey: ["events"], queryFn: listEvents });
+  const { data: analytics } = useQuery({ queryKey: ["events-analytics"], queryFn: getEventsAnalytics });
+  const today = new Date().toISOString().slice(0, 10);
+  const upcoming = events.filter((e) => !e.event_date || e.event_date >= today);
+  const done = events.filter((e) => e.event_date && e.event_date < today);
+  const createMut = useMutation({
+    mutationFn: createEvent,
+    onSuccess: () => {
+      toast.success("Event created");
+      qc.invalidateQueries({ queryKey: ["events"] });
+      qc.invalidateQueries({ queryKey: ["events-analytics"] });
+      qc.invalidateQueries({ queryKey: ["live-analytics"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const deleteMut = useMutation({
+    mutationFn: deleteEvent,
+    onSuccess: () => {
+      toast.success("Event deleted");
+      qc.invalidateQueries({ queryKey: ["events"] });
+      qc.invalidateQueries({ queryKey: ["events-analytics"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
   return (
     <>
-      <Topbar title="Events" action={<CreateEventDialog />} />
+      <Topbar title="Events" action={<CreateEventDialog onCreate={(d) => createMut.mutate(d)} />} />
       <div className="flex-1 overflow-y-auto px-5 py-4">
         <PageHeader title="Events Calendar" description="Plan events, register participants, assign teams, and review post-event reports." />
         <div className="mb-4 grid grid-cols-1 gap-2.5 sm:grid-cols-4">
-          <Kpi label="Upcoming" value={String(UPCOMING_EVENTS.length)} trend={`${expected.toLocaleString()} expected`} tone="info" />
-          <Kpi label="Done" value={String(DONE_EVENTS.length)} trend={`${doneAttendance.toLocaleString()} attended`} tone="up" />
-          <Kpi label="Registered" value={EVENTS.reduce((sum, event) => sum + event.registered, 0).toLocaleString()} trend="member + guest lists" tone="up" />
-          <Kpi label="Avg Attendance" value="92%" trend="completed events" tone="up" />
+          <Kpi label="Upcoming" value={String(analytics?.upcoming ?? upcoming.length)} trend="future events" tone="info" />
+          <Kpi label="Done" value={String(analytics?.done ?? done.length)} trend="completed" tone="up" />
+          <Kpi label="Registered" value={(analytics?.registered ?? 0).toLocaleString()} trend="all events" tone="up" />
+          <Kpi label="Total" value={String(events.length)} trend="in calendar" tone="up" />
         </div>
 
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.1fr_0.9fr]">
-          <EventList title="Upcoming Events" events={UPCOMING_EVENTS} />
-          <EventList title="Done Events" events={DONE_EVENTS} />
+          <EventList title="Upcoming Events" events={upcoming} onDelete={(id) => deleteMut.mutate(id)} />
+          <EventList title="Done Events" events={done} onDelete={(id) => deleteMut.mutate(id)} />
         </div>
       </div>
     </>
   );
 }
 
-function EventList({ title, events }: { title: string; events: typeof EVENTS }) {
+const MONTHS = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+
+function EventList({ title, events, onDelete }: { title: string; events: EventRow[]; onDelete: (id: string) => void }) {
   return (
     <Card>
       <CardHead title={title} action="Calendar →" />
       <CardBody className="space-y-2">
-        {events.map((event) => (
+        {events.length === 0 && <div className="text-[11px] text-text-3">No events.</div>}
+        {events.map((event) => {
+          const d = event.event_date ? new Date(event.event_date) : null;
+          const day = d ? String(d.getDate()).padStart(2, "0") : "—";
+          const month = d ? MONTHS[d.getMonth()] : "—";
+          const today = new Date().toISOString().slice(0, 10);
+          const isDone = event.event_date && event.event_date < today;
+          return (
           <div key={event.id} className="flex items-center gap-3 rounded-lg border border-border bg-bg-2 p-3">
             <div className="min-w-[52px] shrink-0 rounded-lg bg-bg-4 px-2.5 py-2 text-center">
-              <div className="text-[8px] font-bold uppercase tracking-wide text-gold">{event.month}</div>
-              <div className="text-display text-[22px] font-black leading-none text-foreground">{event.day}</div>
+              <div className="text-[8px] font-bold uppercase tracking-wide text-gold">{month}</div>
+              <div className="text-display text-[22px] font-black leading-none text-foreground">{day}</div>
             </div>
             <div className="min-w-0 flex-1 leading-tight">
               <div className="truncate text-[12px] font-semibold text-text-1">{event.name}</div>
-              <div className="text-[10px] text-text-3">{event.venue} · {event.parish}</div>
+              <div className="text-[10px] text-text-3">{event.venue ?? "—"} · {event.parish?.name ?? event.deanery?.name ?? "Diocese-wide"}</div>
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              <Pill tone={event.status === "done" ? "success" : "info"}>{event.status === "done" ? `${event.attended} attended` : `${event.registered} RSVP`}</Pill>
+              <Pill tone={isDone ? "success" : "info"}>{isDone ? "done" : "upcoming"}</Pill>
               <Link to="/admin/event/$eventId" params={{ eventId: event.id }} className="rounded-md border border-border bg-bg-3 px-3 py-1.5 text-[10px] font-semibold text-text-1 hover:border-gold-3 hover:text-gold">
                 View / Edit
               </Link>
+              <button
+                onClick={() => { if (confirm(`Delete "${event.name}"?`)) onDelete(event.id); }}
+                className="rounded border border-border p-1.5 text-text-3 hover:border-danger/50 hover:text-danger"
+              >
+                <Trash2 className="h-3 w-3" />
+              </button>
             </div>
           </div>
-        ))}
+          );
+        })}
       </CardBody>
     </Card>
   );
 }
 
-function CreateEventDialog() {
+function CreateEventDialog({ onCreate }: { onCreate: (data: { name: string; eventDate?: string | null; venue?: string | null; description?: string | null; deaneryName?: string | null; parishName?: string | null; organizationLevel?: "Diocese"|"Deanery"|"Parish"|"Outstation"|null }) => void }) {
   const [open, setOpen] = useState(false);
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -102,7 +141,15 @@ function CreateEventDialog() {
           onCancel={() => setOpen(false)}
           submitLabel="Create event"
           onSave={(state) => {
-            toast.success(`Event “${state.details.name}” created`);
+            onCreate({
+              name: state.details.name,
+              eventDate: state.details.date || null,
+              venue: state.details.venue || null,
+              description: state.details.description || null,
+              deaneryName: state.details.deanery || null,
+              parishName: state.details.parish || null,
+              organizationLevel: (state.details.level || null) as "Diocese"|"Deanery"|"Parish"|"Outstation"|null,
+            });
             setOpen(false);
           }}
         />
