@@ -112,6 +112,7 @@ function YouthsPage() {
         institution: y.institution ?? "",
         yearOfStudy: y.year_of_study ?? "",
         notes: y.notes ?? "",
+        passportUrl: y.passport_url ?? "",
         status: y.status,
         enrolled: (y.enrollments?.length ?? 0) > 0,
         raw: y as YouthRow,
@@ -511,6 +512,7 @@ function YouthsPage() {
                                   institution: row.institution,
                                   yearOfStudy: row.yearOfStudy,
                                   notes: row.notes,
+                                  passportUrl: row.passportUrl,
                                 },
                               })
                             }
