@@ -21,6 +21,7 @@ export type YouthRow = {
   year_of_study: string | null;
   notes: string | null;
   status: "active" | "inactive";
+  passport_url: string | null;
   created_at: string;
   deanery?: { name: string } | null;
   parish?: { name: string } | null;
@@ -54,6 +55,7 @@ export type YouthInput = {
   institution?: string | null;
   yearOfStudy?: string | null;
   notes?: string | null;
+  passportUrl?: string | null;
 };
 
 function toRow(input: YouthInput, org: OrgTree) {
@@ -72,6 +74,7 @@ function toRow(input: YouthInput, org: OrgTree) {
     institution: input.institution || null,
     year_of_study: input.yearOfStudy || null,
     notes: input.notes || null,
+    passport_url: input.passportUrl || null,
   };
 }
 

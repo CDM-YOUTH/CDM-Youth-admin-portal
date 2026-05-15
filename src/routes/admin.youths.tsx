@@ -112,6 +112,7 @@ function YouthsPage() {
         institution: y.institution ?? "",
         yearOfStudy: y.year_of_study ?? "",
         notes: y.notes ?? "",
+        passportUrl: y.passport_url ?? "",
         status: y.status,
         enrolled: (y.enrollments?.length ?? 0) > 0,
         raw: y as YouthRow,
@@ -255,6 +256,7 @@ function YouthsPage() {
     { key: "institution", label: "Institution (if Tertiary)", placeholder: "e.g. Murang'a University" },
     { key: "yearOfStudy", label: "Year of study (if Tertiary)", placeholder: "e.g. Year 2" },
     { key: "notes", label: "Notes (optional)", type: "textarea", placeholder: "Anything worth recording" },
+    { key: "passportUrl", label: "Passport photo (optional)", type: "image", full: true, bucket: "passports" },
   ];
 
   const SAMPLE_HEADERS = [
@@ -510,6 +512,7 @@ function YouthsPage() {
                                   institution: row.institution,
                                   yearOfStudy: row.yearOfStudy,
                                   notes: row.notes,
+                                  passportUrl: row.passportUrl,
                                 },
                               })
                             }
@@ -643,5 +646,6 @@ function toYouthInput(values: Record<string, string>): YouthInput {
     institution: values.institution || null,
     yearOfStudy: values.yearOfStudy || null,
     notes: values.notes || null,
+    passportUrl: values.passportUrl || null,
   };
 }

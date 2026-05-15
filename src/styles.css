@@ -101,12 +101,12 @@
 :root {
   --radius: 0.625rem;
 
-  /* Dark forest surfaces */
-  --bg-0: oklch(0.16 0.025 150);
-  --bg-1: oklch(0.2 0.028 150);
-  --bg-2: oklch(0.23 0.03 150);
-  --bg-3: oklch(0.27 0.032 150);
-  --bg-4: oklch(0.32 0.04 148);
+  /* Forest surfaces — lifted for better readability */
+  --bg-0: oklch(0.22 0.022 150);
+  --bg-1: oklch(0.27 0.025 150);
+  --bg-2: oklch(0.31 0.028 150);
+  --bg-3: oklch(0.36 0.032 150);
+  --bg-4: oklch(0.42 0.038 148);
 
   /* Text scale (warm off-white → muted greens) */
   --text-0: oklch(0.96 0.012 145);
