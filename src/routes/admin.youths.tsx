@@ -255,6 +255,7 @@ function YouthsPage() {
     { key: "institution", label: "Institution (if Tertiary)", placeholder: "e.g. Murang'a University" },
     { key: "yearOfStudy", label: "Year of study (if Tertiary)", placeholder: "e.g. Year 2" },
     { key: "notes", label: "Notes (optional)", type: "textarea", placeholder: "Anything worth recording" },
+    { key: "passportUrl", label: "Passport photo (optional)", type: "image", full: true, bucket: "passports" },
   ];
 
   const SAMPLE_HEADERS = [
@@ -643,5 +644,6 @@ function toYouthInput(values: Record<string, string>): YouthInput {
     institution: values.institution || null,
     yearOfStudy: values.yearOfStudy || null,
     notes: values.notes || null,
+    passportUrl: values.passportUrl || null,
   };
 }
