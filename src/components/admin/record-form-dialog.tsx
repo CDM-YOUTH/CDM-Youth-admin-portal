@@ -4,11 +4,13 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { Upload, Loader2, X } from "lucide-react";
 
 export type FieldDef = {
   key: string;
   label: string;
-  type?: "text" | "number" | "email" | "tel" | "date" | "textarea" | "select";
+  type?: "text" | "number" | "email" | "tel" | "date" | "textarea" | "select" | "image";
   options?: string[];
   placeholder?: string;
   required?: boolean;
@@ -18,6 +20,8 @@ export type FieldDef = {
   dynamicOptions?: (values: Record<string, string>) => string[];
   /** Width hint */
   full?: boolean;
+  /** For type="image": storage bucket name */
+  bucket?: string;
 };
 
 export function RecordFormDialog({
@@ -137,6 +141,9 @@ function renderField(
   if (field.type === "textarea") {
     return <Textarea value={value} onChange={(e) => onChange(e.target.value)} placeholder={field.placeholder ?? field.label} />;
   }
+  if (field.type === "image") {
+    return <ImageUpload value={value} onChange={onChange} bucket={field.bucket ?? "passports"} />;
+  }
   if (field.type === "select") {
     return (
       <Select value={value} onValueChange={onChange}>
@@ -156,5 +163,65 @@ function renderField(
       onChange={(e) => onChange(e.target.value)}
       placeholder={field.placeholder ?? field.label}
     />
+  );
+}
+
+function ImageUpload({ value, onChange, bucket }: { value: string; onChange: (v: string) => void; bucket: string }) {
+  const [uploading, setUploading] = useState(false);
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image must be under 5 MB");
+      return;
+    }
+    setUploading(true);
+    try {
+      const ext = file.name.split(".").pop() || "jpg";
+      const path = `${crypto.randomUUID()}.${ext}`;
+      const { error } = await supabase.storage.from(bucket).upload(path, file, {
+        cacheControl: "3600",
+        upsert: false,
+        contentType: file.type,
+      });
+      if (error) throw error;
+      const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+      onChange(data.publicUrl);
+      toast.success("Photo uploaded");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-border bg-bg-2 p-2 normal-case tracking-normal">
+      {value ? (
+        <img src={value} alt="Passport" className="h-16 w-16 rounded-md border border-border object-cover" />
+      ) : (
+        <div className="flex h-16 w-16 items-center justify-center rounded-md border border-dashed border-border bg-bg-3 text-text-4">
+          <Upload className="h-5 w-5" />
+        </div>
+      )}
+      <div className="flex flex-1 flex-col gap-1.5">
+        <label className="inline-flex w-fit cursor-pointer items-center gap-1.5 rounded-md border border-border bg-bg-3 px-2.5 py-1.5 text-[11px] font-bold text-text-1 hover:bg-bg-4">
+          {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+          {uploading ? "Uploading…" : value ? "Replace photo" : "Choose passport photo"}
+          <input type="file" accept="image/*" className="hidden" onChange={handleUpload} disabled={uploading} />
+        </label>
+        {value && (
+          <button
+            type="button"
+            onClick={() => onChange("")}
+            className="inline-flex w-fit items-center gap-1 text-[10px] font-semibold text-text-3 hover:text-danger"
+          >
+            <X className="h-3 w-3" /> Remove
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
