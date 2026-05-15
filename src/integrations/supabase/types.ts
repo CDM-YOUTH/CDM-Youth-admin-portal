@@ -702,6 +702,7 @@ export type Database = {
           notes: string | null
           outstation_id: string | null
           parish_id: string | null
+          passport_url: string | null
           phone: string | null
           status: Database["public"]["Enums"]["youth_status"]
           updated_at: string
@@ -722,6 +723,7 @@ export type Database = {
           notes?: string | null
           outstation_id?: string | null
           parish_id?: string | null
+          passport_url?: string | null
           phone?: string | null
           status?: Database["public"]["Enums"]["youth_status"]
           updated_at?: string
@@ -742,6 +744,7 @@ export type Database = {
           notes?: string | null
           outstation_id?: string | null
           parish_id?: string | null
+          passport_url?: string | null
           phone?: string | null
           status?: Database["public"]["Enums"]["youth_status"]
           updated_at?: string
