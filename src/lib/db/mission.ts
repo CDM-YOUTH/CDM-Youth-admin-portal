@@ -24,7 +24,11 @@ export type MissionNominee = {
   youth_id: string;
   source_parish_id: string | null;
   status: "nominated" | "confirmed" | "withdrawn";
-  youth?: { full_name: string; cdm_id: string; parish: { name: string } | null } | null;
+  youth?: {
+    full_name: string;
+    cdm_id: string;
+    parish: { name: string; deanery: { name: string } | null } | null;
+  } | null;
 };
 
 export type MissionPairing = {
@@ -37,7 +41,7 @@ export type MissionPairing = {
   report_summary: string | null;
   report_submitted_at: string | null;
   youth?: { full_name: string; parish: { name: string } | null } | null;
-  host_parish?: { name: string } | null;
+  host_parish?: { name: string; deanery: { name: string } | null } | null;
 };
 
 export async function getOrCreateMissionWeek(year?: number): Promise<MissionWeek> {
@@ -77,7 +81,7 @@ export async function listMissionPhases(missionWeekId: string): Promise<MissionP
 export async function listMissionNominees(missionWeekId: string): Promise<MissionNominee[]> {
   const { data, error } = await supabase
     .from("mission_nominees")
-    .select("*, youth:youths(full_name, cdm_id, parish:parishes(name))")
+    .select("*, youth:youths(full_name, cdm_id, parish:parishes(name, deanery:deaneries(name)))")
     .eq("mission_week_id", missionWeekId)
     .limit(2000);
   if (error) throw error;
@@ -88,7 +92,7 @@ export async function listMissionPairings(missionWeekId: string): Promise<Missio
   const { data, error } = await supabase
     .from("mission_pairings")
     .select(
-      "*, youth:youths(full_name, parish:parishes(name)), host_parish:parishes!mission_pairings_host_parish_id_fkey(name)",
+      "*, youth:youths(full_name, parish:parishes(name)), host_parish:parishes!mission_pairings_host_parish_id_fkey(name, deanery:deaneries(name))",
     )
     .eq("mission_week_id", missionWeekId)
     .limit(2000);
@@ -96,7 +100,7 @@ export async function listMissionPairings(missionWeekId: string): Promise<Missio
     // Fallback without explicit fk hint (in case relationship name differs)
     const { data: data2 } = await supabase
       .from("mission_pairings")
-      .select("*, youth:youths(full_name, parish:parishes(name))")
+      .select("*, youth:youths(full_name, parish:parishes(name)), host_parish:parishes(name, deanery:deaneries(name))")
       .eq("mission_week_id", missionWeekId)
       .limit(2000);
     return (data2 ?? []) as unknown as MissionPairing[];
