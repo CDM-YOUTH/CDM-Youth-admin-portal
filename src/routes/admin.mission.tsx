@@ -75,10 +75,11 @@ function MissionPage() {
     qc.invalidateQueries({ queryKey: ["mission-pairings", weekId] });
     qc.invalidateQueries({ queryKey: ["mission-analytics", weekId] });
   };
-  const [cdm, setCdm] = useState("");
+  const [nominateOpen, setNominateOpen] = useState(false);
+  const [removeTarget, setRemoveTarget] = useState<{ id: string; name: string } | null>(null);
   const nominateMut = useMutation({
     mutationFn: (cdmId: string) => nominateYouth(weekId!, cdmId),
-    onSuccess: () => { toast.success("Nominee added"); setCdm(""); invalidate(); },
+    onSuccess: () => { toast.success("Nominee added"); setNominateOpen(false); invalidate(); },
     onError: (e: Error) => toast.error(e.message),
   });
   const removeMut = useMutation({
@@ -94,6 +95,31 @@ function MissionPage() {
   const phaseMut = useMutation({
     mutationFn: ({ id, status }: { id: string; status: MissionPhase["status"] }) => setPhaseStatus(id, status),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["mission-phases", weekId] }),
+  });
+
+  const nominateFields: FieldDef[] = [
+    { key: "cdmId", label: "CDM No.", placeholder: "CDM-2026-00001", required: true, full: true },
+  ];
+
+  const pairingByYouth = useMemo(() => {
+    const m = new Map<string, (typeof pairings)[number]>();
+    pairings.forEach((p) => m.set(p.youth_id, p));
+    return m;
+  }, [pairings]);
+
+  const rows = nominees.map((n) => {
+    const pair = pairingByYouth.get(n.youth_id);
+    return {
+      id: n.id,
+      name: n.youth?.full_name ?? "—",
+      cdmId: n.youth?.cdm_id ?? "—",
+      sourceParish: n.youth?.parish?.name ?? "—",
+      sourceDeanery: n.youth?.parish?.deanery?.name ?? "—",
+      hostParish: pair?.host_parish?.name ?? "—",
+      hostDeanery: pair?.host_parish?.deanery?.name ?? "—",
+      status: pair?.status ?? n.status,
+      paired: !!pair,
+    };
   });
 
   const daysToExecution = (() => {
@@ -171,62 +197,116 @@ function MissionPage() {
           </CardBody>
         </Card>
 
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-          <Card>
-            <CardHead title="Nominees" subtitle="Add by CDM No." />
-            <CardBody className="space-y-2">
-              <form
-                className="flex gap-2"
-                onSubmit={(e) => { e.preventDefault(); if (cdm.trim()) nominateMut.mutate(cdm.trim()); }}
+        <Card>
+          <CardHead
+            title="Missionaries"
+            subtitle={`${nominees.length} nominated · ${pairings.length} paired`}
+            action={
+              <button
+                type="button"
+                onClick={() => setNominateOpen(true)}
+                disabled={!weekId}
+                className="inline-flex h-7 items-center gap-1.5 rounded-md border border-border bg-gold px-2.5 text-[10px] font-bold text-bg-1 hover:opacity-90 disabled:opacity-50"
               >
-                <Input value={cdm} onChange={(e) => setCdm(e.target.value)} placeholder="CDM-2026-00001" />
-                <button
-                  type="submit"
-                  disabled={!weekId || nominateMut.isPending}
-                  className="rounded-lg border border-border bg-gold px-3 py-1.5 text-[11px] font-bold text-bg-1"
-                >
-                  Add
-                </button>
-              </form>
-              <div className="max-h-72 space-y-1.5 overflow-y-auto">
-                {nominees.length === 0 && <div className="text-[11px] text-text-3">No nominees yet.</div>}
-                {nominees.map((n) => (
-                  <div key={n.id} className="flex items-center gap-2 rounded-lg border border-border bg-bg-2 p-2 text-[11px]">
-                    <div className="flex-1 min-w-0">
-                      <div className="truncate font-semibold text-text-1">{n.youth?.full_name ?? "—"}</div>
-                      <div className="text-[9px] text-text-3">{n.youth?.cdm_id} · {n.youth?.parish?.name ?? "No parish"}</div>
-                    </div>
-                    <Pill tone="neutral">{n.status}</Pill>
-                    <button
-                      onClick={() => removeMut.mutate(n.id)}
-                      className="rounded border border-border p-1 text-text-3 hover:border-danger/50 hover:text-danger"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </button>
-                  </div>
+                + Nominate
+              </button>
+            }
+          />
+          <CardBody className="p-0">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">CDM No.</th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">Name</th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">Source Parish</th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">Source Deanery</th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">Sent To Parish</th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">Sent To Deanery</th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">Status</th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.id} className="border-b border-border/30 last:border-0 hover:bg-bg-3">
+                    <td className="px-3.5 py-2.5 font-mono text-[10px] font-bold text-gold">{r.cdmId}</td>
+                    <td className="px-3.5 py-2.5 text-[11px] font-semibold text-foreground">{r.name}</td>
+                    <td className="px-3.5 py-2.5 text-[11px] text-text-1">{r.sourceParish}</td>
+                    <td className="px-3.5 py-2.5 text-[11px] text-text-2">{r.sourceDeanery}</td>
+                    <td className="px-3.5 py-2.5 text-[11px] text-text-1">{r.hostParish}</td>
+                    <td className="px-3.5 py-2.5 text-[11px] text-text-2">{r.hostDeanery}</td>
+                    <td className="px-3.5 py-2.5">
+                      <Pill tone={r.paired ? "info" : "neutral"}>{r.status}</Pill>
+                    </td>
+                    <td className="px-3.5 py-2.5 text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            type="button"
+                            aria-label="Row actions"
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-bg-2 text-text-2 hover:border-gold-3 hover:text-gold"
+                          >
+                            <MoreVertical className="h-3.5 w-3.5" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-44">
+                          <DropdownMenuItem
+                            className="text-danger focus:text-danger"
+                            onClick={() => setRemoveTarget({ id: r.id, name: r.name })}
+                          >
+                            <Trash2 className="mr-2 h-3.5 w-3.5" /> Remove nominee
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </td>
+                  </tr>
                 ))}
-              </div>
-            </CardBody>
-          </Card>
-
-          <Card>
-            <CardHead title="Reshuffle Preview" subtitle={`${pairings.length} pairings`} />
-            <CardBody className="space-y-1.5 max-h-96 overflow-y-auto">
-              {pairings.length === 0 && (
-                <div className="text-[11px] text-text-3">No pairings yet — add nominees and click “Run Reshuffle”.</div>
-              )}
-              {pairings.map((p) => (
-                <div key={p.id} className="flex items-center gap-3 rounded-lg border border-border bg-bg-2 p-2.5 text-[11px]">
-                  <span className="font-semibold text-foreground flex-1 truncate">{p.youth?.full_name ?? "—"}</span>
-                  <span className="text-text-3 truncate">{p.youth?.parish?.name ?? "—"}</span>
-                  <span className="text-gold">→</span>
-                  <span className="font-semibold text-text-1 truncate">{p.host_parish?.name ?? "Host parish"}</span>
-                </div>
-              ))}
-            </CardBody>
-          </Card>
-        </div>
+                {rows.length === 0 && (
+                  <tr>
+                    <td colSpan={8} className="px-3.5 py-6 text-center text-[11px] text-text-3">
+                      No nominees yet. Click “Nominate” to add a missionary by CDM No.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </CardBody>
+        </Card>
       </div>
+      <RecordFormDialog
+        open={nominateOpen}
+        onOpenChange={setNominateOpen}
+        title="Nominate Missionary"
+        description="Enter the youth's CDM No. Their name, parish, and deanery will be fetched automatically."
+        fields={nominateFields}
+        submitLabel="Add Nominee"
+        onSubmit={(values) => {
+          const cdmId = values.cdmId?.trim();
+          if (!cdmId) { toast.error("CDM No. is required"); return; }
+          nominateMut.mutate(cdmId);
+        }}
+      />
+      <AlertDialog open={removeTarget !== null} onOpenChange={(o) => !o && setRemoveTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove nominee?</AlertDialogTitle>
+            <AlertDialogDescription>
+              <strong>{removeTarget?.name}</strong> will be removed from Mission Week. Their pairing (if any) is also cleared.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (removeTarget) removeMut.mutate(removeTarget.id);
+                setRemoveTarget(null);
+              }}
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
