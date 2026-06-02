@@ -47,11 +47,6 @@ function MissionPage() {
   const year = new Date().getFullYear();
   const { data: week } = useQuery({ queryKey: ["mission-week", year], queryFn: () => getOrCreateMissionWeek(year) });
   const weekId = week?.id;
-  const { data: phases = [] } = useQuery({
-    queryKey: ["mission-phases", weekId],
-    queryFn: () => listMissionPhases(weekId!),
-    enabled: !!weekId,
-  });
   const { data: nominees = [] } = useQuery({
     queryKey: ["mission-nominees", weekId],
     queryFn: () => listMissionNominees(weekId!),
@@ -74,6 +69,8 @@ function MissionPage() {
   };
   const [nominateOpen, setNominateOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<{ id: string; name: string } | null>(null);
+  const [reshuffleOpen, setReshuffleOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const nominateMut = useMutation({
     mutationFn: (cdmId: string) => nominateYouth(weekId!, cdmId),
     onSuccess: () => { toast.success("Nominee added"); setNominateOpen(false); invalidate(); },
@@ -86,12 +83,24 @@ function MissionPage() {
   });
   const reshuffleMut = useMutation({
     mutationFn: () => generatePairings(weekId!),
-    onSuccess: (n) => { toast.success(`Generated ${n} pairings`); invalidate(); },
+    onSuccess: (n) => { toast.success(`Generated ${n} pairings`); setReshuffleOpen(false); invalidate(); },
     onError: (e: Error) => toast.error(e.message),
   });
-  const phaseMut = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: MissionPhase["status"] }) => setPhaseStatus(id, status),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["mission-phases", weekId] }),
+  const importMut = useMutation({
+    mutationFn: async (cdmIds: string[]) => {
+      let ok = 0;
+      const errors: string[] = [];
+      for (const cdm of cdmIds) {
+        try { await nominateYouth(weekId!, cdm); ok++; } catch (e) { errors.push(`${cdm}: ${(e as Error).message}`); }
+      }
+      return { ok, errors };
+    },
+    onSuccess: ({ ok, errors }) => {
+      if (ok) toast.success(`Imported ${ok} nominee${ok === 1 ? "" : "s"}`);
+      if (errors.length) toast.error(`${errors.length} failed: ${errors.slice(0, 3).join("; ")}${errors.length > 3 ? "…" : ""}`);
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
   });
 
   const nominateFields: FieldDef[] = [
@@ -119,26 +128,90 @@ function MissionPage() {
     };
   });
 
-  const daysToExecution = (() => {
-    const exec = phases.find((p) => /execution/i.test(p.name));
-    if (!exec?.phase_date) return "—";
-    const m = exec.phase_date.match(/\d{2}\s+\w{3}/);
-    return m ? `Phase ${exec.position}` : "—";
-  })();
+  const handleExport = () => {
+    const headers = ["CDM No.", "Name", "Source Parish", "Source Deanery", "Sent To Parish", "Sent To Deanery", "Status"];
+    const escape = (v: string) => `"${v.replace(/"/g, '""')}"`;
+    const csv = [headers.join(",")]
+      .concat(rows.map((r) => [r.cdmId, r.name, r.sourceParish, r.sourceDeanery, r.hostParish, r.hostDeanery, r.status].map(escape).join(",")))
+      .join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `mission-week-${week?.year ?? year}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Export started");
+  };
+
+  const handleImportFile = async (file: File) => {
+    const text = await file.text();
+    const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    if (!lines.length) { toast.error("Empty file"); return; }
+    const header = lines[0].split(",").map((h) => h.trim().replace(/^"|"$/g, "").toLowerCase());
+    const cdmIdx = header.findIndex((h) => /cdm/.test(h));
+    if (cdmIdx === -1) { toast.error("CSV must include a 'CDM No.' column"); return; }
+    const cdmIds = lines.slice(1).map((l) => (l.split(",")[cdmIdx] ?? "").trim().replace(/^"|"$/g, "")).filter(Boolean);
+    if (!cdmIds.length) { toast.error("No CDM numbers found"); return; }
+    importMut.mutate(cdmIds);
+  };
 
   return (
     <>
       <Topbar
         title="Mission Week"
         action={
-          <TopbarButton
-            onClick={() => {
-              if (!weekId || reshuffleMut.isPending || nominees.length === 0) return;
-              reshuffleMut.mutate();
-            }}
-          >
-            {reshuffleMut.isPending ? "Reshuffling…" : "Run Reshuffle"}
-          </TopbarButton>
+          <div className="flex items-center gap-1.5">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv,text/csv"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleImportFile(f);
+                e.target.value = "";
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={!weekId || importMut.isPending}
+              className="inline-flex h-7 items-center gap-1 rounded-md border border-border bg-bg-2 px-2.5 text-[10px] font-semibold text-text-1 hover:border-gold-3 disabled:opacity-50"
+            >
+              <Upload className="h-3 w-3" /> Import
+            </button>
+            <button
+              type="button"
+              onClick={handleExport}
+              disabled={rows.length === 0}
+              className="inline-flex h-7 items-center gap-1 rounded-md border border-border bg-bg-2 px-2.5 text-[10px] font-semibold text-text-1 hover:border-gold-3 disabled:opacity-50"
+            >
+              <Download className="h-3 w-3" /> Export
+            </button>
+            <button
+              type="button"
+              onClick={() => setNominateOpen(true)}
+              disabled={!weekId}
+              className="inline-flex h-7 items-center gap-1 rounded-md border border-border bg-bg-2 px-2.5 text-[10px] font-semibold text-text-1 hover:border-gold-3 disabled:opacity-50"
+            >
+              <Plus className="h-3 w-3" /> Nominate
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!weekId || nominees.length === 0) {
+                  toast.error("Add nominees before running the reshuffle");
+                  return;
+                }
+                setReshuffleOpen(true);
+              }}
+              disabled={reshuffleMut.isPending}
+              className="inline-flex h-7 items-center gap-1 rounded-md bg-gold px-2.5 text-[10px] font-bold text-bg-1 hover:opacity-90 disabled:opacity-50"
+            >
+              <Shuffle className="h-3 w-3" /> {reshuffleMut.isPending ? "Reshuffling…" : "Run Reshuffle"}
+            </button>
+          </div>
         }
       />
       <div className="flex-1 overflow-y-auto px-5 py-4">
@@ -151,63 +224,13 @@ function MissionPage() {
           <Kpi label="Nominees" value={String(analytics?.nominees ?? 0)} trend={`${nominees.length} loaded`} tone="up" />
           <Kpi label="Parishes" value={String(analytics?.parishes ?? 0)} trend="diocese-wide" tone="up" />
           <Kpi label="Reshuffle Pairs" value={String(analytics?.pairs ?? 0)} trend={pairings.length ? "generated" : "run reshuffle"} tone="info" />
-          <Kpi label="Reports In" value={String(analytics?.reports ?? 0)} trend={daysToExecution} tone="warn" />
+          <Kpi label="Reports In" value={String(analytics?.reports ?? 0)} trend={`of ${pairings.length} pairs`} tone="warn" />
         </div>
-
-        <Card className="mb-4">
-          <CardHead title="Phase Tracker" subtitle="Click a phase to advance its status" />
-          <CardBody className="space-y-1.5">
-            {phases.length === 0 && (
-              <div className="text-[11px] text-text-3">Loading phases…</div>
-            )}
-            {phases.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => {
-                  const next: MissionPhase["status"] =
-                    p.status === "upcoming" ? "active" : p.status === "active" ? "done" : "upcoming";
-                  phaseMut.mutate({ id: p.id, status: next });
-                }}
-                className="flex w-full items-center gap-3 rounded-lg border border-border bg-bg-2 px-3 py-2.5 text-left hover:border-gold-3"
-              >
-                <span
-                  className="h-2.5 w-2.5 shrink-0 rounded-full"
-                  style={{
-                    background:
-                      p.status === "done"
-                        ? "var(--color-success)"
-                        : p.status === "active"
-                          ? "var(--color-gold)"
-                          : "var(--color-bg-4)",
-                  }}
-                />
-                <div className="flex-1">
-                  <div className="text-[11px] font-semibold text-text-1">Phase {p.position} — {p.name}</div>
-                  <div className="text-[9px] text-text-3">{p.phase_date ?? ""}</div>
-                </div>
-                <Pill tone={p.status === "done" ? "success" : p.status === "active" ? "gold" : "neutral"}>
-                  {p.status}
-                </Pill>
-              </button>
-            ))}
-          </CardBody>
-        </Card>
 
         <Card>
           <CardHead
             title="Missionaries"
             subtitle={`${nominees.length} nominated · ${pairings.length} paired`}
-            action={
-              <button
-                type="button"
-                onClick={() => setNominateOpen(true)}
-                disabled={!weekId}
-                className="inline-flex h-7 items-center gap-1.5 rounded-md border border-border bg-gold px-2.5 text-[10px] font-bold text-bg-1 hover:opacity-90 disabled:opacity-50"
-              >
-                + Nominate
-              </button>
-            }
           />
           <CardBody className="p-0">
             <table className="w-full">
