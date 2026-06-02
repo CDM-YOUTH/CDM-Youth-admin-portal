@@ -327,6 +327,28 @@ function MissionPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <AlertDialog open={reshuffleOpen} onOpenChange={setReshuffleOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Run reshuffle?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This clears any existing pairings for Mission Week {week?.year ?? year} and randomly assigns each of the {nominees.length} nominee{nominees.length === 1 ? "" : "s"} to a host parish outside their own. Are you sure?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={reshuffleMut.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={reshuffleMut.isPending}
+              onClick={(e) => {
+                e.preventDefault();
+                reshuffleMut.mutate();
+              }}
+            >
+              {reshuffleMut.isPending ? "Reshuffling…" : "Yes, run reshuffle"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
