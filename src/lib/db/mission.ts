@@ -146,12 +146,16 @@ export async function generatePairings(missionWeekId: string): Promise<number> {
   const [{ data: nominees }, { data: parishes }] = await Promise.all([
     supabase
       .from("mission_nominees")
-      .select("youth_id, source_parish_id, youths!inner(parish_id)")
+      .select("youth_id, source_parish_id")
       .eq("mission_week_id", missionWeekId),
     supabase.from("parishes").select("id, deanery_id"),
   ]);
   if (!nominees?.length || !parishes?.length) return 0;
-  await supabase.from("mission_pairings").delete().eq("mission_week_id", missionWeekId);
+  const { error: delErr } = await supabase
+    .from("mission_pairings")
+    .delete()
+    .eq("mission_week_id", missionWeekId);
+  if (delErr) throw delErr;
   const rows = nominees.map((n) => {
     const candidates = parishes.filter((p) => p.id !== n.source_parish_id);
     const host = candidates[Math.floor(Math.random() * candidates.length)] ?? parishes[0];
