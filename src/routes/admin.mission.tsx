@@ -62,10 +62,12 @@ function MissionPage() {
     queryFn: () => getMissionAnalytics(weekId!),
     enabled: !!weekId,
   });
-  const invalidate = () => {
-    qc.invalidateQueries({ queryKey: ["mission-nominees", weekId] });
-    qc.invalidateQueries({ queryKey: ["mission-pairings", weekId] });
-    qc.invalidateQueries({ queryKey: ["mission-analytics", weekId] });
+  const invalidate = async () => {
+    await Promise.all([
+      qc.refetchQueries({ queryKey: ["mission-nominees", weekId] }),
+      qc.refetchQueries({ queryKey: ["mission-pairings", weekId] }),
+      qc.refetchQueries({ queryKey: ["mission-analytics", weekId] }),
+    ]);
   };
   const [nominateOpen, setNominateOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<{ id: string; name: string } | null>(null);
