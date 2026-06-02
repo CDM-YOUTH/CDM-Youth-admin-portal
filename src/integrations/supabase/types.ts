@@ -490,6 +490,20 @@ export type Database = {
             referencedRelation: "mission_weeks"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "mission_nominees_source_parish_id_fkey"
+            columns: ["source_parish_id"]
+            isOneToOne: false
+            referencedRelation: "parishes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mission_nominees_youth_id_fkey"
+            columns: ["youth_id"]
+            isOneToOne: false
+            referencedRelation: "youths"
+            referencedColumns: ["id"]
+          },
         ]
       }
       mission_pairings: {
@@ -531,10 +545,38 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "mission_pairings_host_deanery_id_fkey"
+            columns: ["host_deanery_id"]
+            isOneToOne: false
+            referencedRelation: "deaneries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mission_pairings_host_outstation_id_fkey"
+            columns: ["host_outstation_id"]
+            isOneToOne: false
+            referencedRelation: "outstations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mission_pairings_host_parish_id_fkey"
+            columns: ["host_parish_id"]
+            isOneToOne: false
+            referencedRelation: "parishes"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "mission_pairings_mission_week_id_fkey"
             columns: ["mission_week_id"]
             isOneToOne: false
             referencedRelation: "mission_weeks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mission_pairings_youth_id_fkey"
+            columns: ["youth_id"]
+            isOneToOne: false
+            referencedRelation: "youths"
             referencedColumns: ["id"]
           },
         ]
