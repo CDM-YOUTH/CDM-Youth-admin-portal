@@ -44,7 +44,7 @@ export type EnrollInput = {
 export async function createEnrollment(input: EnrollInput) {
   const { data: youth, error: yErr } = await supabase
     .from("youths")
-    .select("id")
+    .select("id, category")
     .eq("cdm_id", input.cdmId)
     .maybeSingle();
   if (yErr) throw yErr;
@@ -56,6 +56,7 @@ export async function createEnrollment(input: EnrollInput) {
       {
         youth_id: youth.id,
         year,
+        category: youth.category,
         payment_ref: input.paymentRef || null,
         amount: input.amount ?? null,
         status: input.status ?? "paid",
@@ -78,7 +79,7 @@ export async function bulkEnroll(cdmIds: string[], sharedRef: string | null, yea
   if (!cdmIds.length) return { inserted: 0, missing: [] as string[] };
   const { data: youths, error } = await supabase
     .from("youths")
-    .select("id, cdm_id")
+    .select("id, cdm_id, category")
     .in("cdm_id", cdmIds);
   if (error) throw error;
   const found = new Set((youths ?? []).map((y) => y.cdm_id));
@@ -87,6 +88,7 @@ export async function bulkEnroll(cdmIds: string[], sharedRef: string | null, yea
   const rows = (youths ?? []).map((yo) => ({
     youth_id: yo.id,
     year: y,
+    category: yo.category,
     payment_ref: sharedRef,
     status: "paid" as const,
   }));
@@ -119,19 +121,20 @@ export async function bulkEnrollRows(
   const cdmIds = Array.from(new Set(rows.map((r) => r.cdmId.trim()).filter(Boolean)));
   const { data: youths, error } = await supabase
     .from("youths")
-    .select("id, cdm_id")
+    .select("id, cdm_id, category")
     .in("cdm_id", cdmIds);
   if (error) throw error;
-  const idByCdm = new Map((youths ?? []).map((y) => [y.cdm_id, y.id]));
-  const missing = cdmIds.filter((c) => !idByCdm.has(c));
+  const byCdm = new Map((youths ?? []).map((y) => [y.cdm_id, y] as const));
+  const missing = cdmIds.filter((c) => !byCdm.has(c));
   const y = year ?? new Date().getFullYear();
   const payload = rows
     .map((r) => {
-      const id = idByCdm.get(r.cdmId.trim());
-      if (!id) return null;
+      const yo = byCdm.get(r.cdmId.trim());
+      if (!yo) return null;
       return {
-        youth_id: id,
+        youth_id: yo.id,
         year: y,
+        category: yo.category,
         payment_ref: (r.paymentRef && r.paymentRef.trim()) || sharedRef,
         status: "paid" as const,
       };

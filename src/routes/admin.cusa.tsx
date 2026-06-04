@@ -80,7 +80,7 @@ function CusaPage() {
   const [editing, setEditing] = useState<null | { id: string; name: string; values: Record<string, string> }>(null);
   const [deleteTarget, setDeleteTarget] = useState<null | { id: string; name: string }>(null);
   const qc = useQueryClient();
-  const { data: cusa = [], isLoading } = useQuery({ queryKey: ["cusa"], queryFn: listCusa });
+  const { data: cusa = [], isLoading } = useQuery({ queryKey: ["cusa"], queryFn: () => listCusa() });
   const createMut = useMutation({
     mutationFn: (vals: Record<string, string>) =>
       createCusaMember({
