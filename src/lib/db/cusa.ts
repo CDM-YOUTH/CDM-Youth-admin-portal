@@ -5,6 +5,7 @@ import { createYouth } from "./youths";
 export type CusaRow = {
   id: string;
   youth_id: string;
+  year: number;
   institution: string;
   course: string | null;
   year_of_study: string | null;
@@ -19,12 +20,14 @@ export type CusaRow = {
   } | null;
 };
 
-export async function listCusa(): Promise<CusaRow[]> {
+export async function listCusa(year?: number): Promise<CusaRow[]> {
+  const y = year ?? new Date().getFullYear();
   const { data, error } = await supabase
     .from("cusa_members")
     .select(
       "*, youth:youths(cdm_id, full_name, gender, deanery:deaneries(name), parish:parishes(name))",
     )
+    .eq("year", y)
     .order("created_at", { ascending: false })
     .limit(2000);
   if (error) throw error;
@@ -47,6 +50,7 @@ export type CusaInput = {
   course?: string;
   yearOfStudy?: string;
   leadershipRole?: string;
+  year?: number;
 };
 
 export async function createCusaMember(input: CusaInput) {
@@ -79,17 +83,19 @@ export async function createCusaMember(input: CusaInput) {
     });
     youthId = (created as { id: string }).id;
   }
+  const y = input.year ?? new Date().getFullYear();
   const { data, error } = await supabase
     .from("cusa_members")
     .upsert(
       {
         youth_id: youthId,
+        year: y,
         institution: input.institution,
         course: input.course || null,
         year_of_study: input.yearOfStudy || null,
         leadership_role: input.leadershipRole || null,
       },
-      { onConflict: "youth_id" },
+      { onConflict: "youth_id,year" },
     )
     .select()
     .single();
