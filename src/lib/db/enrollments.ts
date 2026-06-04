@@ -125,7 +125,7 @@ export async function bulkEnrollRows(
     .in("cdm_id", cdmIds);
   if (error) throw error;
   const byCdm = new Map((youths ?? []).map((y) => [y.cdm_id, y] as const));
-  const missing = cdmIds.filter((c) => !idByCdm.has(c));
+  const missing = cdmIds.filter((c) => !byCdm.has(c));
   const y = year ?? new Date().getFullYear();
   const payload = rows
     .map((r) => {
