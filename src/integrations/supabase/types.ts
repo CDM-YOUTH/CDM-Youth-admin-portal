@@ -21,6 +21,7 @@ export type Database = {
           id: string
           institution: string
           leadership_role: string | null
+          year: number
           year_of_study: string | null
           youth_id: string
         }
@@ -30,6 +31,7 @@ export type Database = {
           id?: string
           institution: string
           leadership_role?: string | null
+          year?: number
           year_of_study?: string | null
           youth_id: string
         }
@@ -39,6 +41,7 @@ export type Database = {
           id?: string
           institution?: string
           leadership_role?: string | null
+          year?: number
           year_of_study?: string | null
           youth_id?: string
         }
@@ -46,7 +49,48 @@ export type Database = {
           {
             foreignKeyName: "cusa_members_youth_id_fkey"
             columns: ["youth_id"]
-            isOneToOne: true
+            isOneToOne: false
+            referencedRelation: "youths"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cusa_transitions: {
+        Row: {
+          created_at: string
+          effective_date: string
+          from_category: string | null
+          id: string
+          processed_by: string | null
+          reason: string | null
+          to_category: string
+          youth_id: string
+        }
+        Insert: {
+          created_at?: string
+          effective_date?: string
+          from_category?: string | null
+          id?: string
+          processed_by?: string | null
+          reason?: string | null
+          to_category: string
+          youth_id: string
+        }
+        Update: {
+          created_at?: string
+          effective_date?: string
+          from_category?: string | null
+          id?: string
+          processed_by?: string | null
+          reason?: string | null
+          to_category?: string
+          youth_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cusa_transitions_youth_id_fkey"
+            columns: ["youth_id"]
+            isOneToOne: false
             referencedRelation: "youths"
             referencedColumns: ["id"]
           },
@@ -109,6 +153,7 @@ export type Database = {
       enrollments: {
         Row: {
           amount: number | null
+          category: Database["public"]["Enums"]["youth_category"] | null
           created_at: string
           id: string
           notes: string | null
@@ -119,6 +164,7 @@ export type Database = {
         }
         Insert: {
           amount?: number | null
+          category?: Database["public"]["Enums"]["youth_category"] | null
           created_at?: string
           id?: string
           notes?: string | null
@@ -129,6 +175,7 @@ export type Database = {
         }
         Update: {
           amount?: number | null
+          category?: Database["public"]["Enums"]["youth_category"] | null
           created_at?: string
           id?: string
           notes?: string | null
