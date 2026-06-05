@@ -53,7 +53,7 @@ function Landing() {
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           <Link
             to="/admin"
-            className="rounded-lg bg-gold px-5 py-3 text-[13px] font-bold text-gold-foreground transition-opacity hover:opacity-90"
+            className="rounded-lg bg-primary px-5 py-3 text-[13px] font-bold text-primary-foreground transition-opacity hover:opacity-90"
           >
             Open Admin Portal →
           </Link>
