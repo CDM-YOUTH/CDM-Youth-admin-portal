@@ -287,7 +287,7 @@ function GeneralTab({ chartDisplay }: { chartDisplay: ChartDisplay }) {
               <CardHead title="Enrollment Analytics" subtitle="Changes with deanery, parish, and outstation filters" />
             <CardBody>
               {enrollmentRows.slice(0, 8).map((d) => (
-                <ProgressRow key={d.label} label={d.label} value={d.value} max={d.max} color="var(--color-gold)" display={chartDisplay} />
+                <ProgressRow key={d.label} label={d.label} value={d.value} max={d.max} color="var(--color-success)" display={chartDisplay} />
               ))}
             </CardBody>
           </Card>
@@ -309,7 +309,7 @@ function GeneralTab({ chartDisplay }: { chartDisplay: ChartDisplay }) {
                 {topParishes.map((p) => (
                   <div key={p.label} className="flex items-center justify-between border-b border-border/50 py-1 text-[10px] last:border-0">
                     <span className="text-text-1">{p.label}</span>
-                    <span className="font-bold text-gold">{p.value}</span>
+                    <span className="font-bold text-danger">{p.value}</span>
                   </div>
                 ))}
               </CardBody>
