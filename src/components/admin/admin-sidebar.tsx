@@ -194,12 +194,12 @@ export function AdminSidebar() {
                       : "gap-2.5 px-2.5 py-[7px]"
                   } ${
                     isActive
-                      ? "bg-accent font-bold text-gold"
+                      ? "bg-accent font-bold text-danger"
                       : "text-text-2 hover:bg-bg-3 hover:text-text-1"
                   }`}
                 >
                   {isActive && (
-                    <span className="absolute left-0 top-1/2 h-3.5 w-[3px] -translate-y-1/2 rounded-r bg-gold" />
+                    <span className="absolute left-0 top-1/2 h-3.5 w-[3px] -translate-y-1/2 rounded-r bg-danger" />
                   )}
                   <Icon className="h-3.5 w-3.5 shrink-0" />
                   {!collapsed && <span>{item.label}</span>}
