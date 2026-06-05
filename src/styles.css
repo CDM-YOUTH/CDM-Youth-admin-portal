@@ -179,8 +179,8 @@
   --card-foreground: var(--text-0);
   --popover: var(--bg-2);
   --popover-foreground: var(--text-0);
-  --primary: var(--gold);
-  --primary-foreground: var(--gold-foreground);
+  --primary: var(--danger);
+  --primary-foreground: oklch(0.995 0.004 70);
   --secondary: var(--bg-3);
   --secondary-foreground: var(--text-1);
   --muted: var(--bg-3);
@@ -188,9 +188,9 @@
   --accent: var(--bg-4);
   --accent-foreground: var(--gold);
   --destructive: var(--danger);
-  --destructive-foreground: var(--text-0);
-  --border: oklch(1 0 0 / 6%);
-  --input: oklch(1 0 0 / 8%);
+  --destructive-foreground: oklch(0.995 0.004 70);
+  --border: oklch(0.3 0.02 40 / 10%);
+  --input: oklch(0.3 0.02 40 / 8%);
   --ring: var(--gold-3);
 }
 
