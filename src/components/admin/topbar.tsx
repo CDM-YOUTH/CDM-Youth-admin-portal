@@ -62,7 +62,7 @@ export function TopbarButton({
   return (
     <button
       onClick={onClick}
-      className="rounded-lg bg-gold px-3.5 py-1.5 text-[11px] font-bold text-gold-foreground transition-opacity hover:opacity-90"
+      className="rounded-lg bg-primary px-3.5 py-1.5 text-[11px] font-bold text-primary-foreground shadow-sm transition-opacity hover:opacity-90"
     >
       {children}
     </button>
