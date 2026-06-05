@@ -208,7 +208,7 @@ function SearchTab({
                 className={`flex items-center gap-1 rounded-md px-3 py-1.5 text-[10px] font-bold ${
                   done
                     ? "border border-success/40 bg-success-soft text-success"
-                    : "bg-gold text-primary-foreground hover:opacity-90"
+                    : "bg-primary text-primary-foreground hover:opacity-90"
                 }`}
               >
                 {done ? <><Check className="h-3 w-3" /> Checked in</> : "Check in"}

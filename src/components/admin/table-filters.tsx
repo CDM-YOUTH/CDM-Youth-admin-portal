@@ -268,7 +268,7 @@ export function ColumnFilter({
         aria-label={`Filter ${label}`}
         className={`ml-1 inline-flex h-5 w-5 items-center justify-center rounded transition ${
           active
-            ? "bg-gold text-primary-foreground"
+            ? "bg-primary text-primary-foreground"
             : "text-text-4 hover:bg-bg-3 hover:text-text-1"
         }`}
       >
