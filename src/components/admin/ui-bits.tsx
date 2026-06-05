@@ -75,11 +75,19 @@ export function Kpi({
         : tone === "down"
           ? "text-danger"
           : "text-info";
+  const defaultAccent =
+    tone === "up"
+      ? "var(--color-success)"
+      : tone === "down"
+        ? "var(--color-danger)"
+        : tone === "info"
+          ? "var(--color-info)"
+          : "var(--color-gold)";
   return (
     <div className="relative overflow-hidden rounded-xl border border-border bg-card p-3.5">
       <div
         className="absolute inset-x-0 top-0 h-[3px]"
-        style={{ background: accent ?? "var(--color-gold)" }}
+        style={{ background: accent ?? defaultAccent }}
       />
       <div className="label-eyebrow mb-1.5">{label}</div>
       <div className="text-display mb-0.5 text-[22px] font-black leading-none text-foreground">
