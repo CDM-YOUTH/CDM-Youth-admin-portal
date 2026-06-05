@@ -101,39 +101,39 @@
 :root {
   --radius: 0.625rem;
 
-  /* Forest surfaces — lifted further for comfortable readability */
-  --bg-0: oklch(0.28 0.022 150);
-  --bg-1: oklch(0.33 0.024 150);
-  --bg-2: oklch(0.38 0.026 150);
-  --bg-3: oklch(0.43 0.03 150);
-  --bg-4: oklch(0.49 0.034 148);
+  /* Earthy / pastel surfaces — warm whites with terracotta + sage undertones */
+  --bg-0: oklch(0.995 0.004 70);
+  --bg-1: oklch(0.985 0.008 65);
+  --bg-2: oklch(0.965 0.012 60);
+  --bg-3: oklch(0.935 0.016 55);
+  --bg-4: oklch(0.895 0.022 50);
 
-  /* Text scale (warm off-white → muted greens) */
-  --text-0: oklch(0.98 0.01 145);
-  --text-1: oklch(0.9 0.02 145);
-  --text-2: oklch(0.78 0.025 148);
-  --text-3: oklch(0.66 0.028 150);
-  --text-4: oklch(0.54 0.025 150);
+  /* Text scale (deep clay → muted warm grey) */
+  --text-0: oklch(0.22 0.03 40);
+  --text-1: oklch(0.32 0.028 40);
+  --text-2: oklch(0.46 0.025 45);
+  --text-3: oklch(0.58 0.022 50);
+  --text-4: oklch(0.7 0.018 55);
 
-  /* Gold accent */
-  --gold: oklch(0.78 0.12 80);
-  --gold-2: oklch(0.84 0.115 82);
-  --gold-3: oklch(0.66 0.125 75);
-  --gold-foreground: oklch(0.16 0.025 150);
+  /* Gold accent — warm ochre */
+  --gold: oklch(0.74 0.13 75);
+  --gold-2: oklch(0.82 0.12 78);
+  --gold-3: oklch(0.6 0.14 70);
+  --gold-foreground: oklch(0.22 0.03 40);
 
-  /* Status palette */
-  --success: oklch(0.74 0.16 150);
-  --success-soft: oklch(0.32 0.06 150);
-  --warn: oklch(0.78 0.12 80);
-  --warn-soft: oklch(0.3 0.05 75);
-  --danger: oklch(0.66 0.2 25);
-  --danger-soft: oklch(0.3 0.08 25);
-  --info: oklch(0.7 0.1 230);
-  --info-soft: oklch(0.3 0.05 230);
-  --violet: oklch(0.7 0.13 290);
-  --violet-soft: oklch(0.3 0.06 290);
-  --pink: oklch(0.7 0.14 350);
-  --pink-soft: oklch(0.3 0.06 350);
+  /* Status palette — muted earthy variants */
+  --success: oklch(0.6 0.09 145);
+  --success-soft: oklch(0.93 0.04 145);
+  --warn: oklch(0.74 0.13 75);
+  --warn-soft: oklch(0.94 0.05 75);
+  --danger: oklch(0.58 0.17 25);
+  --danger-soft: oklch(0.93 0.05 25);
+  --info: oklch(0.6 0.09 230);
+  --info-soft: oklch(0.93 0.035 230);
+  --violet: oklch(0.6 0.1 290);
+  --violet-soft: oklch(0.93 0.04 290);
+  --pink: oklch(0.62 0.12 15);
+  --pink-soft: oklch(0.94 0.04 15);
 
   /* shadcn mapping → use forest surfaces by default (app is dark-only) */
   --background: var(--bg-1);
@@ -142,8 +142,8 @@
   --card-foreground: var(--text-0);
   --popover: var(--bg-2);
   --popover-foreground: var(--text-0);
-  --primary: var(--gold);
-  --primary-foreground: var(--gold-foreground);
+  --primary: var(--danger);
+  --primary-foreground: oklch(0.995 0.004 70);
   --secondary: var(--bg-3);
   --secondary-foreground: var(--text-1);
   --muted: var(--bg-3);
@@ -151,9 +151,9 @@
   --accent: var(--bg-4);
   --accent-foreground: var(--gold);
   --destructive: var(--danger);
-  --destructive-foreground: var(--text-0);
-  --border: oklch(1 0 0 / 6%);
-  --input: oklch(1 0 0 / 8%);
+  --destructive-foreground: oklch(0.995 0.004 70);
+  --border: oklch(0.3 0.02 40 / 10%);
+  --input: oklch(0.3 0.02 40 / 8%);
   --ring: var(--gold-3);
   --chart-1: var(--gold);
   --chart-2: var(--success);
@@ -179,8 +179,8 @@
   --card-foreground: var(--text-0);
   --popover: var(--bg-2);
   --popover-foreground: var(--text-0);
-  --primary: var(--gold);
-  --primary-foreground: var(--gold-foreground);
+  --primary: var(--danger);
+  --primary-foreground: oklch(0.995 0.004 70);
   --secondary: var(--bg-3);
   --secondary-foreground: var(--text-1);
   --muted: var(--bg-3);
@@ -188,9 +188,9 @@
   --accent: var(--bg-4);
   --accent-foreground: var(--gold);
   --destructive: var(--danger);
-  --destructive-foreground: var(--text-0);
-  --border: oklch(1 0 0 / 6%);
-  --input: oklch(1 0 0 / 8%);
+  --destructive-foreground: oklch(0.995 0.004 70);
+  --border: oklch(0.3 0.02 40 / 10%);
+  --input: oklch(0.3 0.02 40 / 8%);
   --ring: var(--gold-3);
 }
 
