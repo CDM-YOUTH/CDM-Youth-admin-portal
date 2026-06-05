@@ -107,7 +107,7 @@ export function EventCheckinPanel({ eventId, eventName }: { eventId: string; eve
         action={
           <button
             onClick={() => setWalkin("ask")}
-            className="flex items-center gap-1.5 rounded-md bg-gold px-3 py-1.5 text-[11px] font-bold text-gold-foreground"
+            className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-[11px] font-bold text-primary-foreground"
           >
             <UserPlus className="h-3.5 w-3.5" /> Add walk-in
           </button>
@@ -208,7 +208,7 @@ function SearchTab({
                 className={`flex items-center gap-1 rounded-md px-3 py-1.5 text-[10px] font-bold ${
                   done
                     ? "border border-success/40 bg-success-soft text-success"
-                    : "bg-gold text-gold-foreground hover:opacity-90"
+                    : "bg-gold text-primary-foreground hover:opacity-90"
                 }`}
               >
                 {done ? <><Check className="h-3 w-3" /> Checked in</> : "Check in"}
@@ -257,7 +257,7 @@ function QrTab({
             <div className="mb-2 text-[10px] text-text-3">Point at a youth's CDM QR code</div>
             <button
               onClick={simulateScan}
-              className="rounded-md bg-gold px-3 py-1.5 text-[10px] font-bold text-gold-foreground"
+              className="rounded-md bg-primary px-3 py-1.5 text-[10px] font-bold text-primary-foreground"
             >
               Simulate scan
             </button>
@@ -271,7 +271,7 @@ function QrTab({
         ) : (
           <button
             onClick={() => setScanning(true)}
-            className="rounded-md bg-gold px-3 py-2 text-[11px] font-bold text-gold-foreground"
+            className="rounded-md bg-primary px-3 py-2 text-[11px] font-bold text-primary-foreground"
           >
             Start camera
           </button>
@@ -298,7 +298,7 @@ function QrTab({
               tryCheckIn(manual);
               setManual("");
             }}
-            className="rounded-md bg-gold px-3 py-1.5 text-[11px] font-bold text-gold-foreground"
+            className="rounded-md bg-primary px-3 py-1.5 text-[11px] font-bold text-primary-foreground"
           >
             Check in
           </button>
@@ -380,7 +380,7 @@ function BulkTab({
           <button
             onClick={checkInSelected}
             disabled={picked.size === 0}
-            className="rounded-md bg-gold px-2.5 py-1 text-[10px] font-bold text-gold-foreground disabled:opacity-40"
+            className="rounded-md bg-primary px-2.5 py-1 text-[10px] font-bold text-primary-foreground disabled:opacity-40"
           >
             Check in {picked.size || ""}
           </button>
@@ -443,7 +443,7 @@ function KioskTab({ eventId, eventName }: { eventId: string; eventName: string }
           <code className="min-w-0 flex-1 truncate text-[11px] text-text-1">{url}</code>
           <button
             onClick={copy}
-            className="rounded-md bg-gold px-3 py-1.5 text-[10px] font-bold text-gold-foreground"
+            className="rounded-md bg-primary px-3 py-1.5 text-[10px] font-bold text-primary-foreground"
           >
             {copied ? "Copied" : "Copy"}
           </button>
@@ -612,7 +612,7 @@ function WalkInDialog({
               <button
                 disabled={!guest.name.trim()}
                 onClick={() => { onGuest(guest); setGuest({ name: "", phone: "", parish: "" }); }}
-                className="rounded-lg bg-gold px-3 py-1.5 text-[11px] font-bold text-gold-foreground disabled:opacity-40"
+                className="rounded-lg bg-primary px-3 py-1.5 text-[11px] font-bold text-primary-foreground disabled:opacity-40"
               >
                 Check in guest
               </button>
@@ -665,7 +665,7 @@ function WalkInDialog({
               <button
                 disabled={!enroll.name.trim() || !enroll.gender || !enroll.parish}
                 onClick={() => { onEnroll(enroll); setEnroll({ name: "", gender: "", parish: "", deanery: "", phone: "" }); }}
-                className="rounded-lg bg-gold px-3 py-1.5 text-[11px] font-bold text-gold-foreground disabled:opacity-40"
+                className="rounded-lg bg-primary px-3 py-1.5 text-[11px] font-bold text-primary-foreground disabled:opacity-40"
               >
                 Enroll & check in
               </button>
