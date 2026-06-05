@@ -209,7 +209,7 @@ function MissionPage() {
                 setReshuffleOpen(true);
               }}
               disabled={reshuffleMut.isPending}
-              className="inline-flex h-7 items-center gap-1 rounded-md bg-gold px-2.5 text-[10px] font-bold text-bg-1 hover:opacity-90 disabled:opacity-50"
+              className="inline-flex h-7 items-center gap-1 rounded-md bg-primary px-2.5 text-[10px] font-bold text-bg-1 hover:opacity-90 disabled:opacity-50"
             >
               <Shuffle className="h-3 w-3" /> {reshuffleMut.isPending ? "Reshuffling…" : "Run Reshuffle"}
             </button>

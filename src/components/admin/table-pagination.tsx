@@ -90,7 +90,7 @@ export function TablePagination({
               onClick={() => onPageChange(entry)}
               className={`h-6 min-w-[1.5rem] rounded px-1.5 text-[10px] font-bold transition ${
                 entry === page
-                  ? "bg-gold text-gold-foreground"
+                  ? "bg-primary text-primary-foreground"
                   : "border border-border bg-bg-3 text-text-2 hover:border-gold-3 hover:text-gold"
               }`}
             >

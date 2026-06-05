@@ -33,7 +33,7 @@ function ReportsPage() {
               <CardHead title={r.title} subtitle={r.desc} />
               <CardBody className="flex items-center justify-between">
                 <span className="rounded-md bg-bg-3 px-2 py-1 text-[10px] font-bold text-text-1">{r.kind}</span>
-                <button className="rounded-md bg-gold px-3 py-1.5 text-[11px] font-bold text-gold-foreground hover:opacity-90">
+                <button className="rounded-md bg-primary px-3 py-1.5 text-[11px] font-bold text-primary-foreground hover:opacity-90">
                   Generate
                 </button>
               </CardBody>

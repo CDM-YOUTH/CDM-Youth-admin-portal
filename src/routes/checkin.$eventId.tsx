@@ -59,7 +59,7 @@ function KioskPage() {
           />
           <button
             onClick={submit}
-            className="w-full rounded-lg bg-gold py-3 text-sm font-black text-gold-foreground"
+            className="w-full rounded-lg bg-primary py-3 text-sm font-black text-primary-foreground"
           >
             Check in
           </button>
