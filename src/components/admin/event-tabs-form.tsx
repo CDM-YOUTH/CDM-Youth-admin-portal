@@ -236,7 +236,7 @@ export function EventTabsForm({
             <button
               type="button"
               onClick={goNext}
-              className="rounded-lg bg-gold px-4 py-2 text-[11px] font-bold text-gold-foreground hover:opacity-90"
+              className="rounded-lg bg-primary px-4 py-2 text-[11px] font-bold text-primary-foreground hover:opacity-90"
             >
               Next →
             </button>
@@ -244,7 +244,7 @@ export function EventTabsForm({
             <button
               type="button"
               onClick={handleFinalSave}
-              className="rounded-lg bg-gold px-4 py-2 text-[11px] font-bold text-gold-foreground hover:opacity-90"
+              className="rounded-lg bg-primary px-4 py-2 text-[11px] font-bold text-primary-foreground hover:opacity-90"
             >
               {submitLabel}
             </button>
