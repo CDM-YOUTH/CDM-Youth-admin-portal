@@ -162,7 +162,7 @@ export function TableToolbar({
           <button
             type="button"
             onClick={onAdd}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-gold px-3 text-[11px] font-bold text-gold-foreground transition hover:opacity-90"
+            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-[11px] font-bold text-primary-foreground transition hover:opacity-90"
           >
             <Plus className="h-3.5 w-3.5" /> {addLabel}
           </button>
@@ -268,7 +268,7 @@ export function ColumnFilter({
         aria-label={`Filter ${label}`}
         className={`ml-1 inline-flex h-5 w-5 items-center justify-center rounded transition ${
           active
-            ? "bg-gold text-gold-foreground"
+            ? "bg-primary text-primary-foreground"
             : "text-text-4 hover:bg-bg-3 hover:text-text-1"
         }`}
       >
@@ -329,7 +329,7 @@ export function ColumnFilter({
             <button
               type="button"
               onClick={apply}
-              className="rounded-md bg-gold px-3 py-1 text-[10px] font-bold text-gold-foreground hover:opacity-90"
+              className="rounded-md bg-primary px-3 py-1 text-[10px] font-bold text-primary-foreground hover:opacity-90"
             >
               Apply
             </button>
