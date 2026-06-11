@@ -12,6 +12,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ORGANIZATION } from "@/lib/mock-data";
 import { toast } from "sonner";
+import { createEvent, updateEvent, saveEventProgram, saveEventDuties } from "@/lib/db/events";
 
 /* ---------- Types ---------- */
 
@@ -30,8 +31,8 @@ export type EventDetails = {
 export type ProgramActivity = { id: string; name: string };
 export type ProgramSlot = {
   id: string;
-  startTime: string; // "09:00"
-  endTime: string; // optional "10:30" — if empty, single time
+  startTime: string;
+  endTime: string;
   activities: ProgramActivity[];
 };
 
@@ -43,12 +44,12 @@ export type DutyAssignment = {
 };
 export type DutyItem = {
   id: string;
-  label: string; // e.g. "First reading"
+  label: string;
   assignments: DutyAssignment[];
 };
 export type DutyCategory = {
   id: string;
-  name: string; // "Readings"
+  name: string;
   duties: DutyItem[];
 };
 
@@ -124,12 +125,14 @@ export function emptyEventState(): EventFormState {
 
 export function EventTabsForm({
   initial,
+  initialEventId,
   onSave,
   onCancel,
   submitLabel = "Save event",
 }: {
   initial?: Partial<EventFormState>;
-  onSave: (state: EventFormState) => void;
+  initialEventId?: string;
+  onSave: (state: EventFormState, eventId: string | null) => void;
   onCancel?: () => void;
   submitLabel?: string;
 }) {
@@ -144,6 +147,8 @@ export function EventTabsForm({
 
   const [state, setState] = useState<EventFormState>(seed);
   const [tab, setTab] = useState<"details" | "program" | "duties">("details");
+  const [draftEventId, setDraftEventId] = useState<string | null>(initialEventId ?? null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setState(seed);
@@ -152,39 +157,131 @@ export function EventTabsForm({
   const setDetails = (patch: Partial<EventDetails>) =>
     setState((s) => ({ ...s, details: { ...s.details, ...patch } }));
 
-  const goNext = () => {
+  const detailsInput = () => ({
+    name: state.details.name,
+    eventDate: state.details.date || null,
+    venue: state.details.venue || null,
+    description: state.details.description || null,
+    organizationLevel: (state.details.level || null) as "Diocese" | "Deanery" | "Parish" | "Outstation" | null,
+    deaneryName: state.details.deanery || null,
+    parishName: state.details.parish || null,
+  });
+
+  const ensureEventSaved = async (): Promise<string> => {
+    const input = detailsInput();
+    if (!draftEventId) {
+      const ev = await createEvent(input);
+      setDraftEventId(ev.id);
+      return ev.id;
+    }
+    await updateEvent(draftEventId, input);
+    return draftEventId;
+  };
+
+  const goNext = async () => {
     if (tab === "details") {
-      if (!state.details.name.trim() || !state.details.date) {
-        toast.error("Event name and date are required");
+      if (!state.details.name.trim()) {
+        toast.error("Event name is required to save");
         return;
       }
-      toast.success("Details saved");
-      setTab("program");
+      setSaving(true);
+      try {
+        await ensureEventSaved();
+        toast.success("Details saved");
+        setTab("program");
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Save failed");
+      } finally {
+        setSaving(false);
+      }
     } else if (tab === "program") {
-      toast.success("Program saved");
-      setTab("duties");
+      setSaving(true);
+      try {
+        if (draftEventId) {
+          await saveEventProgram(draftEventId, state.program);
+        }
+        toast.success("Program saved");
+        setTab("duties");
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Save failed");
+      } finally {
+        setSaving(false);
+      }
     }
   };
 
-  const saveCurrent = () => {
-    toast.success(`${tab[0].toUpperCase()}${tab.slice(1)} saved`);
+  const saveCurrent = async () => {
+    setSaving(true);
+    try {
+      if (tab === "details") {
+        if (!state.details.name.trim()) {
+          toast.error("Event name is required");
+          return;
+        }
+        await ensureEventSaved();
+        toast.success("Details saved");
+      } else if (tab === "program") {
+        if (!draftEventId) {
+          toast.info("Go back and save Details first");
+          return;
+        }
+        await saveEventProgram(draftEventId, state.program);
+        toast.success("Program saved");
+      } else if (tab === "duties") {
+        if (!draftEventId) {
+          toast.info("Go back and save Details first");
+          return;
+        }
+        await saveEventDuties(draftEventId, state.duties);
+        toast.success("Duties saved");
+      }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleFinalSave = () => {
-    if (!state.details.name.trim() || !state.details.date) {
-      toast.error("Add at least the event name and date");
+  const handleFinalSave = async () => {
+    if (!state.details.name.trim()) {
+      toast.error("Add at least the event name");
       setTab("details");
       return;
     }
-    onSave(state);
+    setSaving(true);
+    try {
+      const eventId = await ensureEventSaved();
+      await saveEventProgram(eventId, state.program);
+      await saveEventDuties(eventId, state.duties);
+      onSave(state, eventId);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
     <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="w-full">
-      <TabsList className="grid w-full grid-cols-3">
-        <TabsTrigger value="details">1 · Event Details</TabsTrigger>
-        <TabsTrigger value="program">2 · Program</TabsTrigger>
-        <TabsTrigger value="duties">3 · Duties</TabsTrigger>
+      <TabsList className="grid w-full grid-cols-3 bg-white border border-gray-200 h-auto p-0.5 gap-0.5">
+        <TabsTrigger
+          value="details"
+          className="data-[state=active]:bg-danger data-[state=active]:text-white data-[state=active]:shadow-none rounded font-bold text-[11px]"
+        >
+          1 · Event Details
+        </TabsTrigger>
+        <TabsTrigger
+          value="program"
+          className="data-[state=active]:bg-danger data-[state=active]:text-white data-[state=active]:shadow-none rounded font-bold text-[11px]"
+        >
+          2 · Program
+        </TabsTrigger>
+        <TabsTrigger
+          value="duties"
+          className="data-[state=active]:bg-danger data-[state=active]:text-white data-[state=active]:shadow-none rounded font-bold text-[11px]"
+        >
+          3 · Duties
+        </TabsTrigger>
       </TabsList>
 
       <TabsContent value="details" className="mt-4">
@@ -209,7 +306,8 @@ export function EventTabsForm({
             <button
               type="button"
               onClick={onCancel}
-              className="rounded-lg border border-border bg-bg-3 px-3 py-2 text-[11px] font-bold text-text-2"
+              disabled={saving}
+              className="rounded-lg border border-border bg-white px-3 py-2 text-[11px] font-bold text-text-2 disabled:opacity-50"
             >
               Cancel
             </button>
@@ -217,9 +315,10 @@ export function EventTabsForm({
           <button
             type="button"
             onClick={saveCurrent}
-            className="rounded-lg border border-border bg-bg-3 px-3 py-2 text-[11px] font-bold text-text-1 hover:border-gold-3 hover:text-gold"
+            disabled={saving}
+            className="rounded-lg border border-gold-3 px-3 py-2 text-[11px] font-bold text-gold hover:bg-gold/10 disabled:opacity-50"
           >
-            Save this step
+            {saving ? "Saving…" : "Save this step"}
           </button>
         </div>
         <div className="flex gap-2">
@@ -227,26 +326,29 @@ export function EventTabsForm({
             <button
               type="button"
               onClick={() => setTab(tab === "duties" ? "program" : "details")}
-              className="rounded-lg border border-border bg-bg-3 px-3 py-2 text-[11px] font-bold text-text-2"
+              disabled={saving}
+              className="rounded-lg border border-border bg-white px-3 py-2 text-[11px] font-bold text-text-2 disabled:opacity-50"
             >
-              Back
+              ← Back
             </button>
           )}
           {tab !== "duties" ? (
             <button
               type="button"
               onClick={goNext}
-              className="rounded-lg bg-primary px-4 py-2 text-[11px] font-bold text-primary-foreground hover:opacity-90"
+              disabled={saving}
+              className="rounded-lg bg-danger px-4 py-2 text-[11px] font-bold text-white hover:opacity-90 disabled:opacity-50"
             >
-              Next →
+              {saving ? "Saving…" : "Next →"}
             </button>
           ) : (
             <button
               type="button"
               onClick={handleFinalSave}
-              className="rounded-lg bg-primary px-4 py-2 text-[11px] font-bold text-primary-foreground hover:opacity-90"
+              disabled={saving}
+              className="rounded-lg bg-danger px-4 py-2 text-[11px] font-bold text-white hover:opacity-90 disabled:opacity-50"
             >
-              {submitLabel}
+              {saving ? "Saving…" : submitLabel}
             </button>
           )}
         </div>
@@ -283,8 +385,8 @@ function DetailsTab({
             <Button
               variant="outline"
               className={cn(
-                "w-full justify-start text-left font-normal",
-                !dateValue && "text-muted-foreground",
+                "w-full justify-start bg-white text-left font-normal text-black",
+                !dateValue && "text-gray-300",
               )}
             >
               <CalendarIcon className="mr-2 h-4 w-4" />
@@ -447,15 +549,15 @@ function ProgramTab({
         block of the program.
       </p>
       {program.map((slot, idx) => (
-        <div key={slot.id} className="rounded-lg border border-border bg-bg-3 p-3">
+        <div key={slot.id} className="rounded-lg border border-border bg-white p-3">
           <div className="mb-2 flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wide text-text-3">
+            <span className="text-[10px] font-bold uppercase tracking-wide text-danger">
               Slot #{idx + 1}
             </span>
             <button
               type="button"
               onClick={() => removeSlot(slot.id)}
-              className="flex items-center gap-1 rounded-md border border-border bg-bg-2 px-2 py-1 text-[10px] font-bold text-text-2 hover:border-danger/50 hover:text-danger"
+              className="flex items-center gap-1 rounded-md border border-border bg-gray-50 px-2 py-1 text-[10px] font-bold text-text-2 hover:border-danger/50 hover:text-danger"
             >
               <Trash2 className="h-3 w-3" /> Remove slot
             </button>
@@ -488,7 +590,7 @@ function ProgramTab({
             </div>
           </div>
           <div className="space-y-2">
-            <span className="text-[10px] font-bold uppercase tracking-wide text-text-3">
+            <span className="text-[10px] font-bold uppercase tracking-wide text-gold-3">
               Activities
             </span>
             {slot.activities.map((a, i) => (
@@ -502,7 +604,7 @@ function ProgramTab({
                 <button
                   type="button"
                   onClick={() => removeActivity(slot.id, a.id)}
-                  className="rounded-md p-1 text-text-3 hover:bg-bg-2 hover:text-danger"
+                  className="rounded-md p-1 text-text-3 hover:bg-gray-100 hover:text-danger"
                   aria-label="Remove activity"
                 >
                   <X className="h-3.5 w-3.5" />
@@ -522,7 +624,7 @@ function ProgramTab({
       <button
         type="button"
         onClick={addSlot}
-        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border bg-bg-3 px-3 py-2 text-[11px] font-bold text-text-2 hover:border-gold-3 hover:text-gold"
+        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border bg-white px-3 py-2 text-[11px] font-bold text-text-2 hover:border-gold-3 hover:text-gold"
       >
         <Plus className="h-3.5 w-3.5" /> Add another time slot
       </button>
@@ -671,7 +773,10 @@ function DutiesTab({
         Each duty can have one or more people assigned, possibly from different parishes/deaneries.
       </p>
       {duties.map((cat) => (
-        <div key={cat.id} className="rounded-lg border border-border bg-bg-3 p-3">
+        <div key={cat.id} className="rounded-lg border border-border bg-white p-3">
+          <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-gold">
+            Category
+          </div>
           <div className="mb-3 flex items-center gap-2">
             <Input
               value={cat.name}
@@ -681,14 +786,17 @@ function DutiesTab({
             <button
               type="button"
               onClick={() => removeCategory(cat.id)}
-              className="flex items-center gap-1 rounded-md border border-border bg-bg-2 px-2 py-1 text-[10px] font-bold text-text-2 hover:border-danger/50 hover:text-danger"
+              className="flex items-center gap-1 rounded-md border border-border bg-gray-50 px-2 py-1 text-[10px] font-bold text-text-2 hover:border-danger/50 hover:text-danger"
             >
               <Trash2 className="h-3 w-3" /> Remove category
             </button>
           </div>
           <div className="space-y-3">
             {cat.duties.map((duty) => (
-              <div key={duty.id} className="rounded-md border border-border bg-bg-2 p-2.5">
+              <div key={duty.id} className="rounded-md border border-border bg-gray-50 p-2.5">
+                <div className="mb-1.5 text-[9px] font-bold uppercase tracking-wide text-danger">
+                  Duty
+                </div>
                 <div className="mb-2 flex items-center gap-2">
                   <Input
                     value={duty.label}
@@ -699,7 +807,7 @@ function DutiesTab({
                   <button
                     type="button"
                     onClick={() => removeDuty(cat.id, duty.id)}
-                    className="rounded-md p-1 text-text-3 hover:bg-bg-3 hover:text-danger"
+                    className="rounded-md p-1 text-text-3 hover:bg-white hover:text-danger"
                     aria-label="Remove duty"
                   >
                     <X className="h-3.5 w-3.5" />
@@ -714,10 +822,10 @@ function DutiesTab({
                     return (
                       <div
                         key={a.id}
-                        className="grid grid-cols-1 gap-2 rounded border border-border/50 bg-bg-3 p-2 md:grid-cols-[1fr_1fr_1.4fr_auto]"
+                        className="grid grid-cols-1 gap-2 rounded border border-border/50 bg-white p-2 md:grid-cols-[1fr_1fr_1.4fr_auto]"
                       >
                         <div>
-                          <span className="mb-0.5 block text-[9px] font-bold uppercase text-text-4">
+                          <span className="mb-0.5 block text-[9px] font-bold uppercase text-gold-3">
                             Deanery
                           </span>
                           <Select
@@ -739,7 +847,7 @@ function DutiesTab({
                           </Select>
                         </div>
                         <div>
-                          <span className="mb-0.5 block text-[9px] font-bold uppercase text-text-4">
+                          <span className="mb-0.5 block text-[9px] font-bold uppercase text-gold-3">
                             Parish
                           </span>
                           <Select
@@ -762,7 +870,7 @@ function DutiesTab({
                           </Select>
                         </div>
                         <div>
-                          <span className="mb-0.5 block text-[9px] font-bold uppercase text-text-4">
+                          <span className="mb-0.5 block text-[9px] font-bold uppercase text-gold-3">
                             Name {i > 0 ? `#${i + 1}` : ""}
                           </span>
                           <Input
@@ -777,7 +885,7 @@ function DutiesTab({
                           <button
                             type="button"
                             onClick={() => removeAssignment(cat.id, duty.id, a.id)}
-                            className="rounded-md p-2 text-text-3 hover:bg-bg-2 hover:text-danger"
+                            className="rounded-md p-2 text-text-3 hover:bg-gray-100 hover:text-danger"
                             aria-label="Remove person"
                           >
                             <X className="h-3.5 w-3.5" />
@@ -801,7 +909,7 @@ function DutiesTab({
               onClick={() => addDuty(cat.id)}
               className="inline-flex items-center gap-1 rounded-md border border-dashed border-border px-2 py-1 text-[11px] font-bold text-text-2 hover:border-gold-3 hover:text-gold"
             >
-              <Plus className="h-3 w-3" /> Add duty in “{cat.name}”
+              <Plus className="h-3 w-3" /> Add duty in "{cat.name}"
             </button>
           </div>
         </div>
@@ -809,7 +917,7 @@ function DutiesTab({
       <button
         type="button"
         onClick={addCategory}
-        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border bg-bg-3 px-3 py-2 text-[11px] font-bold text-text-2 hover:border-gold-3 hover:text-gold"
+        className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border bg-white px-3 py-2 text-[11px] font-bold text-text-2 hover:border-gold-3 hover:text-gold"
       >
         <Plus className="h-3.5 w-3.5" /> Add another category
       </button>

@@ -1,66 +1,144 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Topbar, TopbarButton } from "@/components/admin/topbar";
-import { Card, CardBody, CardHead, Kpi, PageHeader, Pill, ProgressRow } from "@/components/admin/ui-bits";
-import { EVENTS } from "@/lib/mock-data";
+import { Card, CardBody, CardHead, Kpi, PageHeader, Pill } from "@/components/admin/ui-bits";
 import { EventCheckinPanel } from "@/components/admin/event-checkin";
 import {
   EventTabsForm,
   emptyEventState,
   type EventFormState,
+  type ProgramSlot,
+  type DutyCategory,
 } from "@/components/admin/event-tabs-form";
+import {
+  getEventFull,
+  type EventFull,
+  type EventProgramItem,
+  type EventDutyCategory,
+} from "@/lib/db/events";
 
 export const Route = createFileRoute("/admin/event/$eventId")({
   head: () => ({
     meta: [
-      { title: "Event Report — CDM Youth Office" },
+      { title: "Event — CDM Youth Office" },
       { name: "description", content: "Event details, program, duties, attendance and reports." },
     ],
   }),
   component: EventDetailPage,
 });
 
+/* ---------- helpers: DB → form state ---------- */
+
+const uid = () => Math.random().toString(36).slice(2, 9);
+
+function programItemsToSlots(items: EventProgramItem[]): ProgramSlot[] {
+  if (!items.length) return emptyEventState().program;
+  const sorted = [...items].sort((a, b) => a.position - b.position);
+  const groups: Record<number, EventProgramItem[]> = {};
+  sorted.forEach((item) => {
+    const key = Math.floor(item.position / 100);
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(item);
+  });
+  return Object.values(groups).map((group) => ({
+    id: uid(),
+    startTime: group[0].start_time ?? "",
+    endTime: group[0].end_time ?? "",
+    activities: group.map((item) => ({ id: item.id, name: item.activity })),
+  }));
+}
+
+function dbCategoriesToDuties(categories: EventDutyCategory[]): DutyCategory[] {
+  if (!categories?.length) return emptyEventState().duties;
+  return [...categories]
+    .sort((a, b) => a.position - b.position)
+    .map((cat) => ({
+      id: cat.id,
+      name: cat.name,
+      duties: [...(cat.duties ?? [])]
+        .sort((a, b) => a.position - b.position)
+        .map((d) => ({
+          id: d.id,
+          label: d.title,
+          assignments: d.assignees?.length
+            ? d.assignees.map((a) => ({
+                id: a.id,
+                deanery: a.deanery?.name ?? "",
+                parish: a.parish?.name ?? "",
+                name: a.name,
+              }))
+            : [{ id: uid(), deanery: "", parish: "", name: "" }],
+        })),
+    }));
+}
+
+function eventToFormSeed(event: EventFull): EventFormState {
+  return {
+    details: {
+      name: event.name,
+      date: event.event_date ?? "",
+      time: "",
+      venue: event.venue ?? "",
+      expected: "",
+      level: (event.organization_level as EventFormState["details"]["level"]) ?? "",
+      deanery: event.deanery?.name ?? "",
+      parish: event.parish?.name ?? "",
+      description: event.description ?? "",
+    },
+    program: programItemsToSlots(event.program),
+    duties: dbCategoriesToDuties(event.duty_categories),
+  };
+}
+
+/* ---------- page ---------- */
+
 function EventDetailPage() {
   const { eventId } = Route.useParams();
-  const event = EVENTS.find((item) => item.id === eventId) ?? EVENTS[0];
-  const attendanceBase = event.status === "done" ? event.attended : event.registered;
-  const memberAttendance = Math.max(0, attendanceBase - event.guests);
+  const qc = useQueryClient();
+
+  const { data: event, isLoading, error } = useQuery({
+    queryKey: ["event-full", eventId],
+    queryFn: () => getEventFull(eventId),
+  });
 
   const [mode, setMode] = useState<"view" | "edit">("view");
-  const isEdit = mode === "edit";
 
-  // Seed the tabs form from the existing event mock data
-  const seed: EventFormState = useMemo(() => {
-    const base = emptyEventState();
-    return {
-      details: {
-        ...base.details,
-        name: event.name,
-        venue: event.venue,
-        expected: String(event.expected),
-        deanery: "",
-        parish: event.parish,
-        description: `${event.name} planning, attendance and reporting notes.`,
-      },
-      program: event.program.length
-        ? event.program.map((p, i) => ({
-            id: `seed-${i}`,
-            startTime: p.time,
-            endTime: "",
-            activities: [{ id: `seed-a-${i}`, name: p.activity }],
-          }))
-        : base.program,
-      duties: base.duties,
-    };
-  }, [event]);
+  if (isLoading) {
+    return (
+      <>
+        <Topbar title="Event" />
+        <div className="flex flex-1 items-center justify-center text-[12px] text-text-3">
+          Loading event…
+        </div>
+      </>
+    );
+  }
+
+  if (error || !event) {
+    return (
+      <>
+        <Topbar title="Event" />
+        <div className="flex flex-1 items-center justify-center text-[12px] text-danger">
+          Event not found or failed to load.
+        </div>
+      </>
+    );
+  }
+
+  const registrationCount = event.registrations.length;
+  const guestCount = event.registrations.filter((r) => !r.youth).length;
+  const memberCount = registrationCount - guestCount;
+
+  const seed = eventToFormSeed(event);
 
   return (
     <>
       <Topbar
-        title={isEdit ? "Edit Event" : "Event Detail"}
+        title={mode === "edit" ? "Edit Event" : "Event Detail"}
         action={
-          isEdit ? (
+          mode === "edit" ? (
             <button
               onClick={() => setMode("view")}
               className="rounded-lg border border-border bg-bg-3 px-3 py-1.5 text-[11px] font-bold text-text-2"
@@ -73,29 +151,39 @@ function EventDetailPage() {
         }
       />
       <div className="flex-1 overflow-y-auto px-5 py-4">
-        <PageHeader title={event.name} description={`${event.date} · ${event.venue} · ${event.parish}`} />
+        <PageHeader
+          title={event.name}
+          description={[event.event_date, event.venue, event.parish?.name ?? event.deanery?.name ?? "Diocese-wide"]
+            .filter(Boolean)
+            .join(" · ")}
+        />
 
         <div className="mb-4 grid grid-cols-1 gap-2.5 sm:grid-cols-4">
-          <Kpi label="Expected" value={event.expected.toLocaleString()} trend="planning target" tone="info" />
-          <Kpi label="Registered" value={event.registered.toLocaleString()} trend="system numbers generated" tone="up" />
-          <Kpi label="Attendance" value={attendanceBase.toLocaleString()} trend={event.status === "done" ? "final day count" : "expected check-in"} tone="up" />
-          <Kpi label="Guests" value={event.guests.toLocaleString()} trend="not in member system" tone="warn" />
+          <Kpi label="Registrations" value={String(registrationCount)} trend="total registered" tone="info" />
+          <Kpi label="Members" value={String(memberCount)} trend="CDM youth" tone="up" />
+          <Kpi label="Guests" value={String(guestCount)} trend="walk-in / external" tone="warn" />
+          <Kpi label="Check-ins" value={String(event.checkin_count)} trend="confirmed on day" tone="up" />
         </div>
 
-        {isEdit ? (
+        {mode === "edit" ? (
           <Card>
             <CardHead
               title="Edit event"
-              subtitle="Switch tabs anytime — your inputs persist between Details, Program and Duties."
-              action={<Pill tone={event.status === "done" ? "success" : "info"}>{event.status}</Pill>}
+              subtitle="Changes are saved to the database at each step."
+              action={<Pill tone="info">editing</Pill>}
             />
             <CardBody>
               <EventTabsForm
                 initial={seed}
+                initialEventId={eventId}
                 submitLabel="Save all changes"
                 onCancel={() => setMode("view")}
-                onSave={(state) => {
-                  toast.success(`Event “${state.details.name}” updated`);
+                onSave={(_state, savedId) => {
+                  toast.success(`Event "${event.name}" updated`);
+                  if (savedId) {
+                    qc.invalidateQueries({ queryKey: ["event-full", eventId] });
+                    qc.invalidateQueries({ queryKey: ["events"] });
+                  }
                   setMode("view");
                 }}
               />
@@ -103,82 +191,144 @@ function EventDetailPage() {
           </Card>
         ) : (
           <>
-            <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+              {/* Event details */}
               <Card>
-                <CardHead
-                  title="Event Details"
-                  subtitle="Read-only view"
-                  action={<Pill tone={event.status === "done" ? "success" : "info"}>{event.status}</Pill>}
-                />
+                <CardHead title="Event Details" subtitle="Saved information" />
                 <CardBody className="grid gap-2 md:grid-cols-2">
                   <ReadField label="Event name" value={event.name} />
-                  <ReadField label="Date" value={event.date} />
-                  <ReadField label="Venue" value={event.venue} />
-                  <ReadField label="Parish" value={event.parish} />
-                  <ReadField label="Expected" value={event.expected.toLocaleString()} />
-                  <ReadField label="Registered" value={event.registered.toLocaleString()} />
+                  <ReadField label="Date" value={event.event_date ?? "—"} />
+                  <ReadField label="Venue" value={event.venue ?? "—"} />
+                  <ReadField label="Level" value={event.organization_level ?? "—"} />
+                  <ReadField label="Deanery" value={event.deanery?.name ?? "—"} />
+                  <ReadField label="Parish" value={event.parish?.name ?? "—"} />
+                  {event.description && (
+                    <div className="md:col-span-2">
+                      <ReadField label="Description" value={event.description} />
+                    </div>
+                  )}
                 </CardBody>
               </Card>
 
-              <Card>
-                <CardHead title="Day Report & Analytics" subtitle="Members, guests, and attendance vs. target" />
-                <CardBody className="space-y-2">
-                  <ProgressRow label="Registered" value={event.registered} max={event.expected} color="var(--color-gold)" />
-                  <ProgressRow label="Members" value={memberAttendance} max={event.expected} color="var(--color-success)" />
-                  <ProgressRow label="Guests" value={event.guests} max={event.expected} color="var(--color-info)" />
-                </CardBody>
-              </Card>
-            </div>
-
-            <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
+              {/* Program */}
               <Card>
                 <CardHead title="Program" subtitle="Time slots and activities" />
                 <CardBody className="space-y-2">
-                  {event.program.map((p, i) => (
-                    <RowItem key={i} title={`${p.time} · ${p.activity}`} meta={p.facilitator} />
-                  ))}
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {event.topics.map((topic) => <Pill key={topic} tone="gold">{topic}</Pill>)}
-                  </div>
-                </CardBody>
-              </Card>
-              <Card>
-                <CardHead title="Duties" subtitle="Assigned roles and persons" />
-                <CardBody className="space-y-2">
-                  {event.assignments.map((a, i) => (
-                    <RowItem key={i} title={`${a.role} — ${a.person}`} meta={a.area} />
+                  {event.program.length === 0 && (
+                    <p className="text-[11px] text-text-3">No program saved yet.</p>
+                  )}
+                  {programItemsToSlots(event.program).map((slot, i) => (
+                    <div key={i} className="rounded-lg border border-border bg-bg-2 px-3 py-2">
+                      <div className="text-[10px] font-bold text-gold">
+                        {slot.startTime}
+                        {slot.endTime ? ` – ${slot.endTime}` : ""}
+                      </div>
+                      {slot.activities.map((a, j) => (
+                        <div key={j} className="mt-0.5 text-[11px] text-text-1">
+                          {j + 1}. {a.name}
+                        </div>
+                      ))}
+                    </div>
                   ))}
                 </CardBody>
               </Card>
             </div>
 
+            {/* Duties */}
+            {event.duty_categories.length > 0 && (
+              <Card className="mt-3">
+                <CardHead title="Duties" subtitle="Assigned roles and persons" />
+                <CardBody className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                  {[...event.duty_categories]
+                    .sort((a, b) => a.position - b.position)
+                    .map((cat) => (
+                      <div key={cat.id}>
+                        <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-gold">
+                          {cat.name}
+                        </div>
+                        <div className="space-y-1">
+                          {[...cat.duties]
+                            .sort((a, b) => a.position - b.position)
+                            .map((duty) => (
+                              <div key={duty.id} className="rounded-md border border-border bg-bg-2 px-2.5 py-1.5">
+                                <div className="text-[10px] font-semibold text-danger">{duty.title}</div>
+                                {duty.assignees.map((a) => (
+                                  <div key={a.id} className="mt-0.5 text-[10px] text-text-2">
+                                    {a.name}
+                                    {(a.parish?.name || a.deanery?.name) && (
+                                      <span className="text-text-4">
+                                        {" "}· {a.parish?.name ?? a.deanery?.name}
+                                      </span>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    ))}
+                </CardBody>
+              </Card>
+            )}
+
+            {/* Registrations */}
             <Card className="mt-3">
-              <CardHead title="Gallery" subtitle="Photos and evidence attached to this event" />
-              <CardBody className="grid grid-cols-2 gap-2 md:grid-cols-3">
-                {event.gallery.map((item) => (
-                  <div key={item} className="flex aspect-[4/3] items-end rounded-lg border border-border bg-gradient-to-br from-bg-4 to-bg-2 p-3 text-[11px] font-bold text-text-1">
-                    {item}
+              <CardHead
+                title="Registrations"
+                subtitle={`${registrationCount} registered · ${guestCount} guest${guestCount !== 1 ? "s" : ""}`}
+              />
+              <CardBody>
+                {registrationCount === 0 ? (
+                  <p className="text-[11px] text-text-3">No registrations yet.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-[11px]">
+                      <thead>
+                        <tr className="border-b border-border text-left text-[9px] font-bold uppercase tracking-wide text-text-3">
+                          <th className="pb-1.5 pr-3">CDM No.</th>
+                          <th className="pb-1.5 pr-3">Name</th>
+                          <th className="pb-1.5 pr-3">Parish</th>
+                          <th className="pb-1.5 pr-3">Phone</th>
+                          <th className="pb-1.5">Type</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {event.registrations.map((reg) => (
+                          <tr key={reg.id} className="text-text-1">
+                            <td className="py-1.5 pr-3 font-mono text-[10px] text-text-3">
+                              {reg.youth?.cdm_id ?? "—"}
+                            </td>
+                            <td className="py-1.5 pr-3 font-semibold">
+                              {reg.youth?.full_name ?? reg.guest_name ?? "—"}
+                            </td>
+                            <td className="py-1.5 pr-3 text-text-3">
+                              {reg.youth?.parish?.name ?? "—"}
+                            </td>
+                            <td className="py-1.5 pr-3 text-text-3">
+                              {reg.guest_phone ?? "—"}
+                            </td>
+                            <td className="py-1.5">
+                              <Pill tone={reg.youth ? "success" : "neutral"}>
+                                {reg.youth ? "member" : "guest"}
+                              </Pill>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                ))}
+                )}
               </CardBody>
             </Card>
 
+            {/* Check-in panel */}
             <div className="mt-3">
-              <EventCheckinPanel eventId={event.id} eventName={event.name} />
+              <EventCheckinPanel eventId={eventId} eventName={event.name} />
             </div>
           </>
         )}
       </div>
     </>
-  );
-}
-
-function RowItem({ title, meta }: { title: string; meta: string }) {
-  return (
-    <div className="rounded-lg border border-border bg-bg-2 px-3 py-2">
-      <div className="text-[11px] font-bold text-text-1">{title}</div>
-      <div className="text-[9px] text-text-3">{meta}</div>
-    </div>
   );
 }
 

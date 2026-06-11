@@ -90,9 +90,9 @@ export function RecordFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[88vh] max-w-2xl overflow-y-auto border-border bg-card text-foreground">
+      <DialogContent className="max-h-[88vh] max-w-2xl overflow-y-auto border-border bg-white text-foreground">
         <DialogHeader>
-          <DialogTitle className="text-display text-xl font-black">{title}</DialogTitle>
+          <DialogTitle className="text-display text-xl font-black text-gold">{title}</DialogTitle>
           {description && <DialogDescription className="text-[12px] text-text-3">{description}</DialogDescription>}
         </DialogHeader>
 

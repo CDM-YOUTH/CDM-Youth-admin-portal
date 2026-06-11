@@ -216,7 +216,7 @@ function ChartDisplayToggle({ value, onChange }: { value: ChartDisplay; onChange
           key={mode}
           onClick={() => onChange(mode)}
           className={`rounded px-2 py-0.5 text-[9px] font-bold transition ${
-            value === mode ? "bg-gold text-gold-foreground" : "text-text-3 hover:text-gold"
+            value === mode ? "bg-danger text-white" : "text-text-3 hover:text-danger"
           }`}
         >
           {mode === "count" ? "No." : "%"}
@@ -469,7 +469,7 @@ function EnrollmentTab({ chartDisplay }: { chartDisplay: ChartDisplay }) {
     <>
       <OrgFilterBar {...analytics} />
 
-      <div className="mb-3.5 flex flex-wrap items-start gap-3.5 rounded-xl border border-success/20 bg-gradient-to-br from-bg-2 to-bg-1 p-4">
+      <div className="mb-3.5 flex flex-wrap items-start gap-3.5 rounded-xl border border-danger/20 bg-gradient-to-r from-danger-soft via-white to-warn-soft p-4">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-success-soft text-[20px]">🌱</div>
         <div className="min-w-[180px] flex-1">
           <div className="text-[13px] font-bold text-foreground">Enrollment Window — Year 2026</div>

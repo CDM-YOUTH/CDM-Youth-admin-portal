@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { EventFormState } from "@/components/admin/event-tabs-form";
 import { Topbar, TopbarButton } from "@/components/admin/topbar";
 import { Card, CardBody, CardHead, Kpi, PageHeader, Pill } from "@/components/admin/ui-bits";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -125,33 +126,46 @@ function EventList({ title, events, onDelete }: { title: string; events: EventRo
 
 function CreateEventDialog({ onCreate }: { onCreate: (data: { name: string; eventDate?: string | null; venue?: string | null; description?: string | null; deaneryName?: string | null; parishName?: string | null; organizationLevel?: "Diocese"|"Deanery"|"Parish"|"Outstation"|null }) => void }) {
   const [open, setOpen] = useState(false);
+  const qc = useQueryClient();
+
+  const handleSave = (state: EventFormState, eventId: string | null) => {
+    if (eventId) {
+      // Event was already persisted step-by-step — just refresh the list
+      qc.invalidateQueries({ queryKey: ["events"] });
+      qc.invalidateQueries({ queryKey: ["events-analytics"] });
+      qc.invalidateQueries({ queryKey: ["live-analytics"] });
+      toast.success("Event created");
+    } else {
+      // Fallback: user skipped draft saves (shouldn't happen with new flow)
+      onCreate({
+        name: state.details.name,
+        eventDate: state.details.date || null,
+        venue: state.details.venue || null,
+        description: state.details.description || null,
+        deaneryName: state.details.deanery || null,
+        parishName: state.details.parish || null,
+        organizationLevel: (state.details.level || null) as "Diocese"|"Deanery"|"Parish"|"Outstation"|null,
+      });
+    }
+    setOpen(false);
+  };
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <TopbarButton>+ New Event</TopbarButton>
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto border-border bg-card text-foreground">
+      <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto border-border bg-white text-foreground">
         <DialogHeader>
-          <DialogTitle className="text-display text-xl font-black">Create Event</DialogTitle>
+          <DialogTitle className="text-display text-xl font-black text-gold">Create Event</DialogTitle>
           <DialogDescription className="text-[12px] text-text-3">
-            Save each step independently. Switch tabs anytime — your inputs are kept.
+            Save each step independently — your progress is kept even if you close the dialog.
           </DialogDescription>
         </DialogHeader>
         <EventTabsForm
           onCancel={() => setOpen(false)}
           submitLabel="Create event"
-          onSave={(state) => {
-            onCreate({
-              name: state.details.name,
-              eventDate: state.details.date || null,
-              venue: state.details.venue || null,
-              description: state.details.description || null,
-              deaneryName: state.details.deanery || null,
-              parishName: state.details.parish || null,
-              organizationLevel: (state.details.level || null) as "Diocese"|"Deanery"|"Parish"|"Outstation"|null,
-            });
-            setOpen(false);
-          }}
+          onSave={handleSave}
         />
       </DialogContent>
     </Dialog>
