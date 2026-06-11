@@ -297,12 +297,12 @@ function RolesTab() {
   const { data: permissions = [], isLoading } = useQuery({
     queryKey: ["role-permissions", selectedRole],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from("role_permissions")
         .select("*")
         .eq("role", selectedRole);
       if (error) throw error;
-      return (data ?? []) as RolePermission[];
+      return (data ?? []) as unknown as RolePermission[];
     },
   });
 
@@ -318,13 +318,13 @@ function RolesTab() {
     }) => {
       const existing = permissions.find((p) => p.module === module);
       if (existing) {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from("role_permissions")
           .update({ [action]: value })
           .eq("id", existing.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("role_permissions").insert({
+        const { error } = await (supabase as any).from("role_permissions").insert({
           role: selectedRole,
           module,
           [action]: value,
@@ -482,7 +482,7 @@ function ActivityTab() {
         .select("*, user_roles(role)")
         .order("updated_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as UserProfile[];
+      return (data ?? []) as unknown as UserProfile[];
     },
   });
 
