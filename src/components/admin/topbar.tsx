@@ -43,7 +43,7 @@ export function TopbarTab({
       onClick={onClick}
       className={`flex h-12 items-center whitespace-nowrap border-b-2 px-3.5 text-[11px] font-semibold transition-colors ${
         active
-          ? "border-gold text-gold"
+          ? "border-danger text-danger"
           : "border-transparent text-text-3 hover:text-text-1"
       }`}
     >

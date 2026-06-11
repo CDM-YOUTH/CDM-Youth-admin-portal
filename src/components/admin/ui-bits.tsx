@@ -30,7 +30,7 @@ export function CardHead({
   return (
     <div className="flex items-center justify-between gap-2 border-b border-border px-3.5 py-2.5">
       <div>
-        <div className="text-[11px] font-bold text-foreground">{title}</div>
+        <div className="text-[11px] font-bold text-gold">{title}</div>
         {subtitle && <div className="text-[9px] text-text-3">{subtitle}</div>}
       </div>
       {action && <div className="text-[9px] font-semibold text-gold">{action}</div>}
@@ -201,7 +201,7 @@ export function PageHeader({
   return (
     <div className="mb-5 flex items-end justify-between gap-4">
       <div>
-        <h1 className="text-display text-2xl font-extrabold text-foreground">{title}</h1>
+        <h1 className="text-display text-2xl font-extrabold text-danger">{title}</h1>
         {description && <p className="mt-1 text-[12px] text-text-3">{description}</p>}
       </div>
       {action}

@@ -11,6 +11,56 @@ export type EventRow = {
   parish: { name: string } | null;
 };
 
+export type EventProgramItem = {
+  id: string;
+  activity: string;
+  start_time: string | null;
+  end_time: string | null;
+  position: number;
+};
+
+export type EventDutyAssignee = {
+  id: string;
+  name: string;
+  deanery: { name: string } | null;
+  parish: { name: string } | null;
+};
+
+export type EventDuty = {
+  id: string;
+  title: string;
+  position: number;
+  assignees: EventDutyAssignee[];
+};
+
+export type EventDutyCategory = {
+  id: string;
+  name: string;
+  position: number;
+  duties: EventDuty[];
+};
+
+export type EventRegistration = {
+  id: string;
+  guest_name: string | null;
+  guest_phone: string | null;
+  guest_email: string | null;
+  notes: string | null;
+  created_at: string;
+  youth: {
+    cdm_id: string;
+    full_name: string;
+    parish: { name: string } | null;
+  } | null;
+};
+
+export type EventFull = EventRow & {
+  program: EventProgramItem[];
+  duty_categories: EventDutyCategory[];
+  registrations: EventRegistration[];
+  checkin_count: number;
+};
+
 export type EventInput = {
   name: string;
   eventDate?: string | null;
@@ -62,6 +112,176 @@ export async function createEvent(input: EventInput): Promise<EventRow> {
     .single();
   if (error) throw error;
   return data as unknown as EventRow;
+}
+
+export async function updateEvent(id: string, input: EventInput): Promise<EventRow> {
+  const { deanery_id, parish_id } = await resolveOrgIds(input.deaneryName, input.parishName);
+  const { data, error } = await supabase
+    .from("events")
+    .update({
+      name: input.name,
+      event_date: input.eventDate || null,
+      venue: input.venue || null,
+      description: input.description || null,
+      organization_level: input.organizationLevel || null,
+      deanery_id,
+      parish_id,
+    })
+    .eq("id", id)
+    .select("id, name, event_date, venue, description, organization_level, deanery:deaneries(name), parish:parishes(name)")
+    .single();
+  if (error) throw error;
+  return data as unknown as EventRow;
+}
+
+type ProgramSlotInput = { startTime: string; endTime: string; activities: { name: string }[] };
+
+export async function saveEventProgram(eventId: string, program: ProgramSlotInput[]): Promise<void> {
+  const { error: delErr } = await supabase.from("event_program_items").delete().eq("event_id", eventId);
+  if (delErr) throw delErr;
+  const items = program.flatMap((slot, si) =>
+    slot.activities
+      .filter((a) => a.name.trim())
+      .map((a, ai) => ({
+        event_id: eventId,
+        activity: a.name,
+        start_time: slot.startTime || null,
+        end_time: slot.endTime || null,
+        position: si * 100 + ai,
+      })),
+  );
+  if (items.length === 0) return;
+  const { error } = await supabase.from("event_program_items").insert(items);
+  if (error) throw error;
+}
+
+type DutyAssignmentInput = { deanery: string; parish: string; name: string };
+type DutyItemInput = { label: string; assignments: DutyAssignmentInput[] };
+type DutyCategoryInput = { name: string; duties: DutyItemInput[] };
+
+async function resolveOrgIdsBulk(deaneryNames: string[], parishNames: string[]) {
+  const [deaRes, parRes] = await Promise.all([
+    deaneryNames.length
+      ? supabase.from("deaneries").select("id, name").in("name", deaneryNames)
+      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+    parishNames.length
+      ? supabase.from("parishes").select("id, name").in("name", parishNames)
+      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+  ]);
+  const deaneryMap: Record<string, string> = {};
+  (deaRes.data ?? []).forEach((d) => { deaneryMap[d.name] = d.id; });
+  const parishMap: Record<string, string> = {};
+  (parRes.data ?? []).forEach((p) => { parishMap[p.name] = p.id; });
+  return { deaneryMap, parishMap };
+}
+
+export async function saveEventDuties(eventId: string, duties: DutyCategoryInput[]): Promise<void> {
+  const { data: existingCats } = await supabase
+    .from("event_duty_categories")
+    .select("id")
+    .eq("event_id", eventId);
+
+  if (existingCats && existingCats.length > 0) {
+    const catIds = existingCats.map((c) => c.id);
+    const { data: existingDuties } = await supabase
+      .from("event_duties")
+      .select("id")
+      .in("category_id", catIds);
+    if (existingDuties && existingDuties.length > 0) {
+      const dutyIds = existingDuties.map((d) => d.id);
+      await supabase.from("event_duty_assignees").delete().in("duty_id", dutyIds);
+    }
+    await supabase.from("event_duties").delete().in("category_id", catIds);
+    await supabase.from("event_duty_categories").delete().eq("event_id", eventId);
+  }
+
+  if (duties.length === 0) return;
+
+  const allDeaneries = [...new Set(
+    duties.flatMap((c) => c.duties.flatMap((d) => d.assignments.map((a) => a.deanery).filter(Boolean))),
+  )];
+  const allParishes = [...new Set(
+    duties.flatMap((c) => c.duties.flatMap((d) => d.assignments.map((a) => a.parish).filter(Boolean))),
+  )];
+  const { deaneryMap, parishMap } =
+    allDeaneries.length || allParishes.length
+      ? await resolveOrgIdsBulk(allDeaneries, allParishes)
+      : { deaneryMap: {} as Record<string, string>, parishMap: {} as Record<string, string> };
+
+  for (let ci = 0; ci < duties.length; ci++) {
+    const cat = duties[ci];
+    const { data: catRow, error: catErr } = await supabase
+      .from("event_duty_categories")
+      .insert({ event_id: eventId, name: cat.name, position: ci })
+      .select("id")
+      .single();
+    if (catErr) throw catErr;
+    if (!catRow) continue;
+
+    for (let di = 0; di < cat.duties.length; di++) {
+      const duty = cat.duties[di];
+      const { data: dutyRow, error: dutyErr } = await supabase
+        .from("event_duties")
+        .insert({ category_id: catRow.id, title: duty.label || "Duty", fields: {}, position: di })
+        .select("id")
+        .single();
+      if (dutyErr) throw dutyErr;
+      if (!dutyRow) continue;
+
+      const assignees = duty.assignments
+        .filter((a) => a.name.trim())
+        .map((a) => ({
+          duty_id: dutyRow.id,
+          name: a.name,
+          deanery_id: deaneryMap[a.deanery] ?? null,
+          parish_id: parishMap[a.parish] ?? null,
+        }));
+      if (assignees.length > 0) {
+        const { error: assErr } = await supabase.from("event_duty_assignees").insert(assignees);
+        if (assErr) throw assErr;
+      }
+    }
+  }
+}
+
+export async function getEventFull(eventId: string): Promise<EventFull> {
+  const [eventRes, programRes, categoriesRes, registrationsRes, checkinRes] = await Promise.all([
+    supabase
+      .from("events")
+      .select("id, name, event_date, venue, description, organization_level, deanery:deaneries(name), parish:parishes(name)")
+      .eq("id", eventId)
+      .single(),
+    supabase
+      .from("event_program_items")
+      .select("id, activity, start_time, end_time, position")
+      .eq("event_id", eventId)
+      .order("position"),
+    supabase
+      .from("event_duty_categories")
+      .select(`id, name, position, duties:event_duties(id, title, position, assignees:event_duty_assignees(id, name, deanery:deaneries(name), parish:parishes(name)))`)
+      .eq("event_id", eventId)
+      .order("position"),
+    supabase
+      .from("event_registrations")
+      .select("id, guest_name, guest_phone, guest_email, notes, created_at, youth:youths(cdm_id, full_name, parish:parishes(name))")
+      .eq("event_id", eventId)
+      .order("created_at", { ascending: false })
+      .limit(500),
+    supabase
+      .from("event_checkins")
+      .select("id", { count: "exact", head: true })
+      .eq("event_id", eventId),
+  ]);
+
+  if (eventRes.error) throw eventRes.error;
+
+  return {
+    ...(eventRes.data as unknown as EventRow),
+    program: (programRes.data ?? []) as EventProgramItem[],
+    duty_categories: (categoriesRes.data ?? []) as unknown as EventDutyCategory[],
+    registrations: (registrationsRes.data ?? []) as unknown as EventRegistration[],
+    checkin_count: checkinRes.count ?? 0,
+  };
 }
 
 export async function deleteEvent(id: string) {

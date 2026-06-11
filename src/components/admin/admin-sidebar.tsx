@@ -11,6 +11,7 @@ import {
   Shirt,
   BarChart3,
   Settings,
+  Shield,
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
@@ -34,13 +35,13 @@ const GROUPS: NavGroup[] = [
   {
     label: "Youth",
     items: [
+      { to: "/admin/youths", label: "Youth Records", icon: Users },
       {
         to: "/admin/enrollment",
         label: "Enrollment",
         icon: UserPlus,
         badge: { text: "23", tone: "danger" },
       },
-      { to: "/admin/youths", label: "Youth Records", icon: Users },
     ],
   },
   {
@@ -78,6 +79,7 @@ const GROUPS: NavGroup[] = [
     label: "Admin",
     items: [
       { to: "/admin/reports", label: "Reports", icon: BarChart3 },
+      { to: "/admin/users", label: "User Mgmt", icon: Shield },
       { to: "/admin/settings", label: "Settings", icon: Settings },
     ],
   },
@@ -188,14 +190,14 @@ export function AdminSidebar() {
                   key={item.to}
                   to={item.to}
                   title={collapsed ? item.label : undefined}
-                  className={`relative mb-[2px] flex items-center rounded-lg text-[12px] font-medium transition-colors ${
+                  className={`relative mb-[2px] flex items-center rounded-lg text-[12px] font-bold transition-colors ${
                     collapsed
                       ? "h-9 justify-center"
                       : "gap-2.5 px-2.5 py-[7px]"
                   } ${
                     isActive
                       ? "bg-accent font-bold text-danger"
-                      : "text-text-2 hover:bg-bg-3 hover:text-text-1"
+                      : "text-gold-3 hover:bg-bg-3 hover:text-gold-3"
                   }`}
                 >
                   {isActive && (
