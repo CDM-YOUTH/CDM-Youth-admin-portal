@@ -728,57 +728,6 @@ export type Database = {
           },
         ]
       }
-      profiles: {
-        Row: {
-          id: string
-          full_name: string | null
-          phone: string | null
-          position: string | null
-          deanery_id: string | null
-          parish_id: string | null
-          avatar_url: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id: string
-          full_name?: string | null
-          phone?: string | null
-          position?: string | null
-          deanery_id?: string | null
-          parish_id?: string | null
-          avatar_url?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          full_name?: string | null
-          phone?: string | null
-          position?: string | null
-          deanery_id?: string | null
-          parish_id?: string | null
-          avatar_url?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "profiles_deanery_id_fkey"
-            columns: ["deanery_id"]
-            isOneToOne: false
-            referencedRelation: "deaneries"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "profiles_parish_id_fkey"
-            columns: ["parish_id"]
-            isOneToOne: false
-            referencedRelation: "parishes"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       parishes: {
         Row: {
           created_at: string
@@ -808,6 +757,57 @@ export type Database = {
           },
         ]
       }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          deanery_id: string | null
+          full_name: string | null
+          id: string
+          parish_id: string | null
+          phone: string | null
+          position: string | null
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          deanery_id?: string | null
+          full_name?: string | null
+          id: string
+          parish_id?: string | null
+          phone?: string | null
+          position?: string | null
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          deanery_id?: string | null
+          full_name?: string | null
+          id?: string
+          parish_id?: string | null
+          phone?: string | null
+          position?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_deanery_id_fkey"
+            columns: ["deanery_id"]
+            isOneToOne: false
+            referencedRelation: "deaneries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_parish_id_fkey"
+            columns: ["parish_id"]
+            isOneToOne: false
+            referencedRelation: "parishes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           id: string
@@ -830,6 +830,7 @@ export type Database = {
         Row: {
           age: number
           alt_phone: string | null
+          auth_user_id: string | null
           category: Database["public"]["Enums"]["youth_category"]
           cdm_id: string
           created_at: string
@@ -851,6 +852,7 @@ export type Database = {
         Insert: {
           age: number
           alt_phone?: string | null
+          auth_user_id?: string | null
           category?: Database["public"]["Enums"]["youth_category"]
           cdm_id?: string
           created_at?: string
@@ -872,6 +874,7 @@ export type Database = {
         Update: {
           age?: number
           alt_phone?: string | null
+          auth_user_id?: string | null
           category?: Database["public"]["Enums"]["youth_category"]
           cdm_id?: string
           created_at?: string
@@ -929,7 +932,7 @@ export type Database = {
       next_cdm_id: { Args: never; Returns: string }
     }
     Enums: {
-      app_role: "admin" | "moderator" | "office" | "user"
+      app_role: "admin" | "moderator" | "user" | "office"
       checkin_method: "search" | "qr" | "bulk" | "kiosk" | "walkin"
       enrollment_status: "paid" | "pending" | "waived"
       event_org_level: "Diocese" | "Deanery" | "Parish" | "Outstation"
@@ -1072,7 +1075,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "moderator", "office", "user"],
+      app_role: ["admin", "moderator", "user", "office"],
       checkin_method: ["search", "qr", "bulk", "kiosk", "walkin"],
       enrollment_status: ["paid", "pending", "waived"],
       event_org_level: ["Diocese", "Deanery", "Parish", "Outstation"],
