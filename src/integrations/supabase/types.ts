@@ -830,6 +830,7 @@ export type Database = {
         Row: {
           age: number
           alt_phone: string | null
+          auth_user_id: string | null
           category: Database["public"]["Enums"]["youth_category"]
           cdm_id: string
           created_at: string
@@ -851,6 +852,7 @@ export type Database = {
         Insert: {
           age: number
           alt_phone?: string | null
+          auth_user_id?: string | null
           category?: Database["public"]["Enums"]["youth_category"]
           cdm_id?: string
           created_at?: string
@@ -872,6 +874,7 @@ export type Database = {
         Update: {
           age?: number
           alt_phone?: string | null
+          auth_user_id?: string | null
           category?: Database["public"]["Enums"]["youth_category"]
           cdm_id?: string
           created_at?: string
