@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import Papa from "papaparse";
+import { downloadXlsx } from "@/lib/export-xlsx";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
@@ -235,21 +236,14 @@ function EnrollmentPage() {
 
   const SAMPLE_HEADERS = ["cdmId", "fullName", "paymentRef"];
   const downloadSample = () => {
-    const rows = [
-      SAMPLE_HEADERS.join(","),
-      "CDM-2026-00001,Grace Wanjiku,BANK-2026-001",
-      "CDM-2026-00002,Peter Mwangi,BANK-2026-001",
-      "CDM-2026-00003,Mary Njeri,",
+    const sampleRows = [
+      ["CDM-2026-00001", "Grace Wanjiku", "BANK-2026-001"],
+      ["CDM-2026-00002", "Peter Mwangi", "BANK-2026-001"],
+      ["CDM-2026-00003", "Mary Njeri", ""],
     ];
-    const csv = rows.join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "enrollment-import-sample.csv";
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("Sample CSV downloaded");
+    downloadXlsx("enrollment-import-sample", "Enrollment Sample", SAMPLE_HEADERS, sampleRows)
+      .then(() => toast.success("Sample downloaded"))
+      .catch((e: Error) => toast.error(e.message));
   };
   const onPickFile = () => fileInputRef.current?.click();
   const handleImportFile = (file: File) => {
@@ -328,17 +322,21 @@ function EnrollmentPage() {
             onSearchChange={(value) => setFilter({ q: value })}
             searchPlaceholder="Search name, CDM No., parish, deanery, outstation…"
             onImport={onPickFile}
-            onExport={() => toast.success(`Exporting ${enrollmentRows.length} enrollments`)}
+            onExport={() => {
+              const headers = ["CDM No.", "Full Name", "Deanery", "Parish", "Category", "Fee", "Payment Status"];
+              const data: (string | number | null)[][] = enrollmentRows.map((r) => [r.cdmId, r.name, r.deaneryName, r.parishName, r.category, r.fee, r.paymentStatus]);
+              downloadXlsx("enrollment-export", "Enrollment 2026", headers, data).then(() => toast.success(`Exported ${enrollmentRows.length} enrollments`)).catch((e: Error) => toast.error(e.message));
+            }}
             onAdd={() => setAddOpen(true)}
             addLabel="Enroll Youth"
             extra={
               <button
                 type="button"
                 onClick={downloadSample}
-                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-bg-2 px-2.5 text-[11px] font-semibold text-text-1 transition hover:border-gold-3 hover:text-gold"
-                title="Download CSV sample for import"
+                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-danger/60 bg-bg-2 px-2.5 text-[11px] font-semibold text-danger transition hover:bg-danger-soft/40 hover:border-danger"
+                title="Download Excel sample for import"
               >
-                <Download className="h-3.5 w-3.5" /> Sample CSV
+                <Download className="h-3.5 w-3.5" /> Sample
               </button>
             }
           />
