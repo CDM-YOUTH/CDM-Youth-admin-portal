@@ -6,6 +6,7 @@ import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { toast } from "sonner";
 import { MoreVertical, Pencil, Trash2, BadgeCheck, Download } from "lucide-react";
+import { downloadXlsx } from "@/lib/export-xlsx";
 import { Topbar } from "@/components/admin/topbar";
 import { Card, CardBody, PageHeader, Pill } from "@/components/admin/ui-bits";
 import { TablePagination, usePagination } from "@/components/admin/table-pagination";
@@ -89,6 +90,7 @@ function YouthsPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [editing, setEditing] = useState<null | { id: string; values: Record<string, string> }>(null);
   const [deleteTarget, setDeleteTarget] = useState<null | { id: string; name: string; cdmId: string }>(null);
+  const [enrollTarget, setEnrollTarget] = useState<null | { cdmId: string; name: string }>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importResult, setImportResult] = useState<null | { inserted: number; skipped: number; total: number; firstCdms: string[] }>(null);
   const qc = useQueryClient();
@@ -152,7 +154,8 @@ function YouthsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
   const enrollMut = useMutation({
-    mutationFn: (cdmId: string) => createEnrollment({ cdmId }),
+    mutationFn: ({ cdmId, paymentRef }: { cdmId: string; paymentRef?: string }) =>
+      createEnrollment({ cdmId, paymentRef: paymentRef || null }),
     onSuccess: () => {
       toast.success("Enrollment saved");
       qc.invalidateQueries({ queryKey: ["enrollments"] });
@@ -259,24 +262,24 @@ function YouthsPage() {
     { key: "passportUrl", label: "Passport photo (optional)", type: "image", full: true, bucket: "passports" },
   ];
 
+  const enrollFields: FieldDef[] = [
+    { key: "cdmId", label: "CDM No.", required: true, placeholder: "CDM-2026-00001" },
+    { key: "fullName", label: "Full Name", placeholder: "Youth name" },
+    { key: "paymentRef", label: "Payment reference (optional)", placeholder: "Bank slip / transaction ref" },
+  ];
+
   const SAMPLE_HEADERS = [
     "fullName","gender","age","phone","altPhone","email",
     "deanery","parish","outstation","category","institution","yearOfStudy","notes",
   ];
   const downloadSample = () => {
-    const sampleRow = [
-      "Grace Wanjiku","Female","16","+254700000000","","grace@example.com",
-      "Murang’a Deanery","Cathedral","St. Mary Cathedral Outstation","Secondary","","","",
+    const sampleRows = [
+      ["Grace Wanjiku","Female","16","+254700000000","","grace@example.com","Murang’a Deanery","Cathedral","St. Mary Cathedral Outstation","Secondary","","",""],
+      ["Peter Mwangi","Male","20","+254711000000","","","Mwea Deanery","Mwea","Holy Family Mwea Outstation","Tertiary","Murang’a University","Year 2",""],
     ];
-    const csv = [SAMPLE_HEADERS.join(","), sampleRow.join(",")].join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "youths-import-sample.csv";
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("Sample CSV downloaded");
+    downloadXlsx("youths-import-sample", "Youth Import Sample", SAMPLE_HEADERS, sampleRows)
+      .then(() => toast.success("Sample downloaded"))
+      .catch((e: Error) => toast.error(e.message));
   };
   const handleImportFile = (file: File) => {
     Papa.parse<Record<string, string>>(file, {
@@ -377,17 +380,21 @@ function YouthsPage() {
             onSearchChange={(value) => setFilter({ q: value })}
             searchPlaceholder="Search name, CDM No., parish, deanery, outstation, institution…"
             onImport={() => fileInputRef.current?.click()}
-            onExport={() => toast.success(`Exporting ${filtered.length} youths`)}
+            onExport={() => {
+              const headers = ["CDM No.", "Full Name", "Gender", "Age", "Phone", "Alt Phone", "Email", "Deanery", "Parish", "Outstation", "Category", "Institution", "Year of Study", "Status"];
+              const data: (string | number | null)[][] = filtered.map((r) => [r.cdmId, r.name, r.gender, r.age, r.phone, r.altPhone, r.email, r.deaneryName, r.parishName, r.churchName, r.category, r.institution, r.yearOfStudy, r.status]);
+              downloadXlsx("youths-export", "Youth Records", headers, data).then(() => toast.success(`Exported ${filtered.length} youths`)).catch((e: Error) => toast.error(e.message));
+            }}
             onAdd={() => setAddOpen(true)}
             addLabel="Register Youth"
             extra={
               <button
                 type="button"
                 onClick={downloadSample}
-                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-bg-2 px-2.5 text-[11px] font-semibold text-text-1 transition hover:border-gold-3 hover:text-gold"
-                title="Download CSV sample for import"
+                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-danger/60 bg-bg-2 px-2.5 text-[11px] font-semibold text-danger transition hover:bg-danger-soft/40 hover:border-danger"
+                title="Download Excel sample for import"
               >
-                <Download className="h-3.5 w-3.5" /> Sample CSV
+                <Download className="h-3.5 w-3.5" /> Sample
               </button>
             }
           />
@@ -520,7 +527,7 @@ function YouthsPage() {
                             <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            onClick={() => enrollMut.mutate(row.cdmId)}
+                            onClick={() => setEnrollTarget({ cdmId: row.cdmId, name: row.name })}
                           >
                             <BadgeCheck className="mr-2 h-3.5 w-3.5" /> Enroll
                           </DropdownMenuItem>
@@ -576,6 +583,19 @@ function YouthsPage() {
         onSubmit={(values) => {
           if (editing) updateMut.mutate({ id: editing.id, input: toYouthInput(values) });
           setEditing(null);
+        }}
+      />
+      <RecordFormDialog
+        open={enrollTarget !== null}
+        onOpenChange={(o) => !o && setEnrollTarget(null)}
+        title="Confirm Enrollment · 2026"
+        description="Review details and add a payment reference before confirming enrollment."
+        fields={enrollFields}
+        initial={enrollTarget ? { cdmId: enrollTarget.cdmId, fullName: enrollTarget.name } : undefined}
+        submitLabel="Confirm Enrollment"
+        onSubmit={(values) => {
+          enrollMut.mutate({ cdmId: values.cdmId.trim(), paymentRef: values.paymentRef });
+          setEnrollTarget(null);
         }}
       />
       <AlertDialog open={deleteTarget !== null} onOpenChange={(o) => !o && setDeleteTarget(null)}>

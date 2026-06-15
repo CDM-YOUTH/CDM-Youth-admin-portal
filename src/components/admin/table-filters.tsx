@@ -125,7 +125,7 @@ export function TableToolbar({
           value={searchValue}
           onChange={(event) => onSearchChange(event.target.value)}
           placeholder={searchPlaceholder}
-          className="h-8 w-full rounded-md border border-border bg-bg-2 pl-8 pr-7 text-[12px] text-foreground outline-none focus:border-gold-3"
+          className="h-8 w-full rounded-md border border-danger/30 bg-bg-2 pl-8 pr-7 text-[12px] text-foreground outline-none hover:border-danger/50 focus:border-danger"
         />
         {searchValue && (
           <button
@@ -144,7 +144,7 @@ export function TableToolbar({
           <button
             type="button"
             onClick={onImport}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-bg-2 px-2.5 text-[11px] font-semibold text-text-1 transition hover:border-gold-3 hover:text-gold"
+            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-danger/60 bg-bg-2 px-2.5 text-[11px] font-semibold text-danger transition hover:bg-danger-soft/40 hover:border-danger"
           >
             <Upload className="h-3.5 w-3.5" /> Import
           </button>
@@ -153,7 +153,7 @@ export function TableToolbar({
           <button
             type="button"
             onClick={onExport}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-bg-2 px-2.5 text-[11px] font-semibold text-text-1 transition hover:border-gold-3 hover:text-gold"
+            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-danger/60 bg-bg-2 px-2.5 text-[11px] font-semibold text-danger transition hover:bg-danger-soft/40 hover:border-danger"
           >
             <Download className="h-3.5 w-3.5" /> Export
           </button>
@@ -162,7 +162,7 @@ export function TableToolbar({
           <button
             type="button"
             onClick={onAdd}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-[11px] font-bold text-primary-foreground transition hover:opacity-90"
+            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-danger px-3 text-[11px] font-bold text-primary-foreground transition hover:opacity-90"
           >
             <Plus className="h-3.5 w-3.5" /> {addLabel}
           </button>
