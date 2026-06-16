@@ -5,10 +5,12 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { toast } from "sonner";
-import { MoreVertical, Pencil, Trash2, BadgeCheck, Download } from "lucide-react";
+import { MoreVertical, Pencil, Trash2, BadgeCheck, Download, Plus } from "lucide-react";
 import { downloadXlsx } from "@/lib/export-xlsx";
+import { fetchOrg } from "@/lib/db/org";
+import { CUSA_INSTITUTIONS } from "@/lib/cusa-data";
 import { Topbar } from "@/components/admin/topbar";
-import { Card, CardBody, PageHeader, Pill } from "@/components/admin/ui-bits";
+import { Card, CardBody, Pill } from "@/components/admin/ui-bits";
 import { TablePagination, usePagination } from "@/components/admin/table-pagination";
 import {
   ColumnFilter,
@@ -269,17 +271,42 @@ function YouthsPage() {
   ];
 
   const SAMPLE_HEADERS = [
-    "fullName","gender","age","phone","altPhone","email",
-    "deanery","parish","outstation","category","institution","yearOfStudy","notes",
+    "FULL NAME","GENDER","AGE","PHONE","ALT PHONE","EMAIL",
+    "DEANERY","PARISH","OUTSTATION","CATEGORY","INSTITUTION","YEAR OF STUDY","NOTES",
   ];
-  const downloadSample = () => {
-    const sampleRows = [
+  const downloadSample = async () => {
+    const sampleRows: (string | number | null)[][] = [
       ["Grace Wanjiku","Female","16","+254700000000","","grace@example.com","Murang’a Deanery","Cathedral","St. Mary Cathedral Outstation","Secondary","","",""],
       ["Peter Mwangi","Male","20","+254711000000","","","Mwea Deanery","Mwea","Holy Family Mwea Outstation","Tertiary","Murang’a University","Year 2",""],
     ];
-    downloadXlsx("youths-import-sample", "Youth Import Sample", SAMPLE_HEADERS, sampleRows)
-      .then(() => toast.success("Sample downloaded"))
-      .catch((e: Error) => toast.error(e.message));
+    try {
+      const org = await fetchOrg();
+      const deaneryNames = org.deaneries.map((d) => d.name);
+      const parishByDeanery: Record<string, string[]> = {};
+      for (const [deaneryName, parishes] of org.parishesByDeaneryName) {
+        parishByDeanery[deaneryName] = parishes.map((p) => p.name);
+      }
+      const outstationByParish: Record<string, string[]> = {};
+      for (const [parishName, outstations] of org.outstationsByParishName) {
+        outstationByParish[parishName] = outstations.map((o) => o.name);
+      }
+      await downloadXlsx("youths-import-sample", "Youth Import Sample", SAMPLE_HEADERS, sampleRows, {
+        flat: {
+          "GENDER": ["Female", "Male"],
+          "DEANERY": deaneryNames,
+          "CATEGORY": ["Primary", "Secondary", "Tertiary", "Working"],
+          "INSTITUTION": [...CUSA_INSTITUTIONS],
+          "YEAR OF STUDY": ["Year 1", "Year 2", "Year 3", "Year 4", "Postgraduate", "Alumni"],
+        },
+        cascade: {
+          "PARISH": { parent: "DEANERY", map: parishByDeanery },
+          "OUTSTATION": { parent: "PARISH", map: outstationByParish },
+        },
+      }, { headerTextColor: "FFAAAA" });
+      toast.success("Import sample downloaded");
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
   };
   const handleImportFile = (file: File) => {
     Papa.parse<Record<string, string>>(file, {
@@ -287,44 +314,48 @@ function YouthsPage() {
       skipEmptyLines: true,
       complete: async (res) => {
         try {
-          const headers = (res.meta.fields ?? []).map((h) => h.trim());
-          const required = ["fullName", "gender", "age", "phone", "deanery", "parish", "outstation", "category"];
-          const aliases: Record<string, string[]> = { fullName: ["name"], phone: ["phoneNumber", "mobile"] };
+          const rawFields = res.meta.fields ?? [];
+          // Normalize: lowercase, strip spaces/underscores/dots for flexible matching
+          const nk = (h: string) => h.trim().toLowerCase().replace(/[\s_.-]+/g, "");
+          const fieldMap: Record<string, string> = {};
+          rawFields.forEach(h => { fieldMap[nk(h)] = h; });
+          const normHeaders = rawFields.map(nk);
+          const get = (r: Record<string, string>, ...keys: string[]) =>
+            keys.map(k => r[fieldMap[nk(k)]] ?? "").find(v => v) ?? "";
+
+          const required = ["fullname", "gender", "age", "phone", "deanery", "parish", "outstation", "category"];
+          const aliases: Record<string, string[]> = { fullname: ["name"], phone: ["phonenumber", "mobile"] };
           const missing = required.filter(
-            (col) => !headers.includes(col) && !(aliases[col] ?? []).some((a) => headers.includes(a)),
+            (col) => !normHeaders.includes(col) && !(aliases[col] ?? []).some((a) => normHeaders.includes(a)),
           );
           if (missing.length) {
             toast.error(`CSV is missing required column${missing.length > 1 ? "s" : ""}: ${missing.join(", ")}`, {
-              description: `Found columns: ${headers.join(", ") || "(none)"} — download the sample CSV for the expected header row.`,
+              description: `Found columns: ${rawFields.join(", ") || "(none)"} — download the sample for the expected header row.`,
             });
             return;
           }
-          const known = new Set([
-            ...required,
-            ...Object.values(aliases).flat(),
-            "altPhone", "email", "institution", "yearOfStudy", "notes",
-          ]);
-          const unknown = headers.filter((h) => !known.has(h));
+          const known = new Set(["fullname", "name", "gender", "age", "phone", "phonenumber", "mobile", "altphone", "email", "deanery", "parish", "outstation", "category", "institution", "yearofstudy", "notes"]);
+          const unknown = rawFields.filter((h) => !known.has(nk(h)));
           if (unknown.length) {
             toast.message(`Ignoring unknown columns: ${unknown.join(", ")}`, {
-              description: "Recognised optional columns: altPhone, email, institution, yearOfStudy, notes.",
+              description: "Recognised optional columns: alt phone, email, institution, year of study, notes.",
             });
           }
           const inputs: YouthInput[] = res.data
             .map((r) => ({
-              fullName: (r.fullName || r.name || "").trim(),
-              gender: ((r.gender || "Female").trim() as "Female" | "Male"),
-              age: parseInt(r.age || "0", 10) || 0,
-              phone: r.phone || null,
-              altPhone: r.altPhone || null,
-              email: r.email || null,
-              deaneryName: r.deanery || null,
-              parishName: r.parish || null,
-              outstationName: r.outstation || null,
-              category: ((r.category || "Secondary").trim() as YouthCategory),
-              institution: r.institution || null,
-              yearOfStudy: r.yearOfStudy || null,
-              notes: r.notes || null,
+              fullName: get(r, "FULL NAME", "fullName", "name").trim(),
+              gender: ((get(r, "gender") || "Female").trim() as "Female" | "Male"),
+              age: parseInt(get(r, "age") || "0", 10) || 0,
+              phone: get(r, "phone") || null,
+              altPhone: get(r, "ALT PHONE", "altPhone") || null,
+              email: get(r, "email") || null,
+              deaneryName: get(r, "deanery") || null,
+              parishName: get(r, "parish") || null,
+              outstationName: get(r, "outstation") || null,
+              category: ((get(r, "category") || "Secondary").trim() as YouthCategory),
+              institution: get(r, "institution") || null,
+              yearOfStudy: get(r, "YEAR OF STUDY", "yearOfStudy") || null,
+              notes: get(r, "notes") || null,
             }))
             .filter((r) => r.fullName && r.age > 0);
           const total = res.data.length;
@@ -363,17 +394,20 @@ function YouthsPage() {
 
   return (
     <>
-      <Topbar title="Youth Records" />
+      <Topbar
+        title="Youth Directory"
+        description={isLoading ? "Loading youths…" : `${filtered.length.toLocaleString()} of ${rows.length.toLocaleString()} youths · share this URL to share the same view.`}
+        action={
+          <button
+            type="button"
+            onClick={() => setAddOpen(true)}
+            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-danger px-3 text-[11px] font-bold text-white transition hover:opacity-90"
+          >
+            <Plus className="h-3.5 w-3.5" /> Register Youth
+          </button>
+        }
+      />
       <div className="flex-1 overflow-y-auto px-5 py-4">
-        <PageHeader
-          title="Youth Directory"
-          description={
-            isLoading
-              ? "Loading youths…"
-              : `${filtered.length.toLocaleString()} of ${rows.length.toLocaleString()} youths · share this URL to share the same view.`
-          }
-        />
-
         <Card>
           <TableToolbar
             searchValue={search.q}
@@ -385,16 +419,14 @@ function YouthsPage() {
               const data: (string | number | null)[][] = filtered.map((r) => [r.cdmId, r.name, r.gender, r.age, r.phone, r.altPhone, r.email, r.deaneryName, r.parishName, r.churchName, r.category, r.institution, r.yearOfStudy, r.status]);
               downloadXlsx("youths-export", "Youth Records", headers, data).then(() => toast.success(`Exported ${filtered.length} youths`)).catch((e: Error) => toast.error(e.message));
             }}
-            onAdd={() => setAddOpen(true)}
-            addLabel="Register Youth"
             extra={
               <button
                 type="button"
                 onClick={downloadSample}
-                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-danger/60 bg-bg-2 px-2.5 text-[11px] font-semibold text-danger transition hover:bg-danger-soft/40 hover:border-danger"
-                title="Download Excel sample for import"
+                className="inline-flex h-8 items-center gap-1.5 rounded-md bg-danger px-2.5 text-[11px] font-bold text-white transition hover:opacity-90"
+                title="Download Excel import sample"
               >
-                <Download className="h-3.5 w-3.5" /> Sample
+                <Download className="h-3.5 w-3.5" /> Import Sample
               </button>
             }
           />

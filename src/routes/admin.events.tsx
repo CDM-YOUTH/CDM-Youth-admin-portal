@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { EventFormState } from "@/components/admin/event-tabs-form";
 import { Topbar, TopbarButton } from "@/components/admin/topbar";
-import { Card, CardBody, CardHead, Kpi, PageHeader, Pill } from "@/components/admin/ui-bits";
+import { Card, CardBody, CardHead, Kpi, Pill } from "@/components/admin/ui-bits";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Plus, Trash2 } from "lucide-react";
@@ -61,9 +61,12 @@ function EventsPage() {
   });
   return (
     <>
-      <Topbar title="Events" action={<CreateEventDialog onCreate={(d) => createMut.mutate(d)} />} />
+      <Topbar
+        title="Events Calendar"
+        description="Plan events, register participants, assign teams, and review post-event reports."
+        action={<CreateEventDialog onCreate={(d) => createMut.mutate(d)} />}
+      />
       <div className="flex-1 overflow-y-auto px-5 py-4">
-        <PageHeader title="Events Calendar" description="Plan events, register participants, assign teams, and review post-event reports." />
         <div className="mb-4 grid grid-cols-1 gap-2.5 sm:grid-cols-4">
           <Kpi label="Upcoming" value={String(analytics?.upcoming ?? upcoming.length)} trend="future events" tone="info" />
           <Kpi label="Done" value={String(analytics?.done ?? done.length)} trend="completed" tone="up" />

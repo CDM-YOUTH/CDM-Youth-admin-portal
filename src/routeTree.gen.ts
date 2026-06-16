@@ -25,7 +25,9 @@ import { Route as AdminFormationRouteImport } from './routes/admin.formation'
 import { Route as AdminEventsRouteImport } from './routes/admin.events'
 import { Route as AdminEnrollmentRouteImport } from './routes/admin.enrollment'
 import { Route as AdminCusaRouteImport } from './routes/admin.cusa'
+import { Route as AdminAuditRouteImport } from './routes/admin.audit'
 import { Route as AdminEventEventIdRouteImport } from './routes/admin.event.$eventId'
+import { Route as AdminEventCheckinEventIdRouteImport } from './routes/admin.event-checkin.$eventId'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -107,16 +109,28 @@ const AdminCusaRoute = AdminCusaRouteImport.update({
   path: '/cusa',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminAuditRoute = AdminAuditRouteImport.update({
+  id: '/audit',
+  path: '/audit',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminEventEventIdRoute = AdminEventEventIdRouteImport.update({
   id: '/event/$eventId',
   path: '/event/$eventId',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminEventCheckinEventIdRoute =
+  AdminEventCheckinEventIdRouteImport.update({
+    id: '/event-checkin/$eventId',
+    path: '/event-checkin/$eventId',
+    getParentRoute: () => AdminRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/login': typeof LoginRoute
+  '/admin/audit': typeof AdminAuditRoute
   '/admin/cusa': typeof AdminCusaRoute
   '/admin/enrollment': typeof AdminEnrollmentRoute
   '/admin/events': typeof AdminEventsRoute
@@ -130,11 +144,13 @@ export interface FileRoutesByFullPath {
   '/admin/youths': typeof AdminYouthsRoute
   '/checkin/$eventId': typeof CheckinEventIdRoute
   '/admin/': typeof AdminIndexRoute
+  '/admin/event-checkin/$eventId': typeof AdminEventCheckinEventIdRoute
   '/admin/event/$eventId': typeof AdminEventEventIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/admin/audit': typeof AdminAuditRoute
   '/admin/cusa': typeof AdminCusaRoute
   '/admin/enrollment': typeof AdminEnrollmentRoute
   '/admin/events': typeof AdminEventsRoute
@@ -148,6 +164,7 @@ export interface FileRoutesByTo {
   '/admin/youths': typeof AdminYouthsRoute
   '/checkin/$eventId': typeof CheckinEventIdRoute
   '/admin': typeof AdminIndexRoute
+  '/admin/event-checkin/$eventId': typeof AdminEventCheckinEventIdRoute
   '/admin/event/$eventId': typeof AdminEventEventIdRoute
 }
 export interface FileRoutesById {
@@ -155,6 +172,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/login': typeof LoginRoute
+  '/admin/audit': typeof AdminAuditRoute
   '/admin/cusa': typeof AdminCusaRoute
   '/admin/enrollment': typeof AdminEnrollmentRoute
   '/admin/events': typeof AdminEventsRoute
@@ -168,6 +186,7 @@ export interface FileRoutesById {
   '/admin/youths': typeof AdminYouthsRoute
   '/checkin/$eventId': typeof CheckinEventIdRoute
   '/admin/': typeof AdminIndexRoute
+  '/admin/event-checkin/$eventId': typeof AdminEventCheckinEventIdRoute
   '/admin/event/$eventId': typeof AdminEventEventIdRoute
 }
 export interface FileRouteTypes {
@@ -176,6 +195,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/login'
+    | '/admin/audit'
     | '/admin/cusa'
     | '/admin/enrollment'
     | '/admin/events'
@@ -189,11 +209,13 @@ export interface FileRouteTypes {
     | '/admin/youths'
     | '/checkin/$eventId'
     | '/admin/'
+    | '/admin/event-checkin/$eventId'
     | '/admin/event/$eventId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/login'
+    | '/admin/audit'
     | '/admin/cusa'
     | '/admin/enrollment'
     | '/admin/events'
@@ -207,12 +229,14 @@ export interface FileRouteTypes {
     | '/admin/youths'
     | '/checkin/$eventId'
     | '/admin'
+    | '/admin/event-checkin/$eventId'
     | '/admin/event/$eventId'
   id:
     | '__root__'
     | '/'
     | '/admin'
     | '/login'
+    | '/admin/audit'
     | '/admin/cusa'
     | '/admin/enrollment'
     | '/admin/events'
@@ -226,6 +250,7 @@ export interface FileRouteTypes {
     | '/admin/youths'
     | '/checkin/$eventId'
     | '/admin/'
+    | '/admin/event-checkin/$eventId'
     | '/admin/event/$eventId'
   fileRoutesById: FileRoutesById
 }
@@ -350,6 +375,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminCusaRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/audit': {
+      id: '/admin/audit'
+      path: '/audit'
+      fullPath: '/admin/audit'
+      preLoaderRoute: typeof AdminAuditRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/event/$eventId': {
       id: '/admin/event/$eventId'
       path: '/event/$eventId'
@@ -357,10 +389,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminEventEventIdRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/event-checkin/$eventId': {
+      id: '/admin/event-checkin/$eventId'
+      path: '/event-checkin/$eventId'
+      fullPath: '/admin/event-checkin/$eventId'
+      preLoaderRoute: typeof AdminEventCheckinEventIdRouteImport
+      parentRoute: typeof AdminRoute
+    }
   }
 }
 
 interface AdminRouteChildren {
+  AdminAuditRoute: typeof AdminAuditRoute
   AdminCusaRoute: typeof AdminCusaRoute
   AdminEnrollmentRoute: typeof AdminEnrollmentRoute
   AdminEventsRoute: typeof AdminEventsRoute
@@ -373,10 +413,12 @@ interface AdminRouteChildren {
   AdminWelfareRoute: typeof AdminWelfareRoute
   AdminYouthsRoute: typeof AdminYouthsRoute
   AdminIndexRoute: typeof AdminIndexRoute
+  AdminEventCheckinEventIdRoute: typeof AdminEventCheckinEventIdRoute
   AdminEventEventIdRoute: typeof AdminEventEventIdRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
+  AdminAuditRoute: AdminAuditRoute,
   AdminCusaRoute: AdminCusaRoute,
   AdminEnrollmentRoute: AdminEnrollmentRoute,
   AdminEventsRoute: AdminEventsRoute,
@@ -389,6 +431,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminWelfareRoute: AdminWelfareRoute,
   AdminYouthsRoute: AdminYouthsRoute,
   AdminIndexRoute: AdminIndexRoute,
+  AdminEventCheckinEventIdRoute: AdminEventCheckinEventIdRoute,
   AdminEventEventIdRoute: AdminEventEventIdRoute,
 }
 

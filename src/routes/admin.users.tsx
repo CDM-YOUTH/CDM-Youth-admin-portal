@@ -6,7 +6,6 @@ import { Shield, Check, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Topbar, TopbarTab } from "@/components/admin/topbar";
 import {
-  PageHeader,
   Card,
   CardHead,
   CardBody,
@@ -169,30 +168,27 @@ function UsersTab() {
 
   return (
     <div>
-      <PageHeader
-        title="Users"
-        description="All admin and staff accounts"
-        action={
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              placeholder="Search…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="h-8 w-44 rounded-lg border border-gold-3 bg-white px-3 text-[11px] text-black placeholder:text-gray-300 focus:outline-none focus:ring-1 focus:ring-gold-3"
-            />
-            <a
-              href="https://supabase.com/dashboard/project/otatghgorvqmankxnzrf/auth/users"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 rounded-lg bg-danger px-3 py-1.5 text-[11px] font-bold text-white transition-opacity hover:opacity-90"
-            >
-              <ExternalLink className="h-3 w-3" />
-              Add User
-            </a>
-          </div>
-        }
-      />
+      <div className="mb-5 flex items-center justify-between gap-4">
+        <p className="text-[12px] text-text-3">All admin and staff accounts</p>
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            placeholder="Search…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="h-8 w-44 rounded-lg border border-black/20 bg-white px-3 text-[11px] text-black/70 placeholder:text-gray-400 placeholder:font-normal outline-none transition-colors hover:border-gold-3/50 hover:text-black focus:border-gold-3 focus:ring-1 focus:ring-gold-3/20 focus:text-black"
+          />
+          <a
+            href="https://supabase.com/dashboard/project/otatghgorvqmankxnzrf/auth/users"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 rounded-lg bg-danger px-3 py-1.5 text-[11px] font-bold text-white transition-opacity hover:opacity-90"
+          >
+            <ExternalLink className="h-3 w-3" />
+            Add User
+          </a>
+        </div>
+      </div>
 
       <Card>
         <div className="overflow-x-auto">
@@ -343,10 +339,7 @@ function RolesTab() {
 
   return (
     <div>
-      <PageHeader
-        title="Roles & Permissions"
-        description="Define what each role can access across every module"
-      />
+      <p className="mb-5 text-[12px] text-text-3">Define what each role can access across every module</p>
 
       {/* Role selector */}
       <div className="mb-4 flex flex-wrap gap-2">
@@ -488,10 +481,7 @@ function ActivityTab() {
 
   return (
     <div>
-      <PageHeader
-        title="User Activity"
-        description="Account creation and last update timestamps"
-      />
+      <p className="mb-5 text-[12px] text-text-3">Account creation and last update timestamps</p>
 
       <Card>
         <div className="overflow-x-auto">

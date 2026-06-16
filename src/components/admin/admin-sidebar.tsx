@@ -1,4 +1,5 @@
 import { Link, useRouterState } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import {
   LayoutDashboard,
   UserPlus,
@@ -12,11 +13,14 @@ import {
   BarChart3,
   Settings,
   Shield,
+  ClipboardList,
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useSidebar } from "./sidebar-context";
+import { supabase } from "@/integrations/supabase/client";
+import { getMyProfile } from "@/lib/db/profiles";
 
 type NavItem = {
   to: string;
@@ -80,6 +84,7 @@ const GROUPS: NavGroup[] = [
     items: [
       { to: "/admin/reports", label: "Reports", icon: BarChart3 },
       { to: "/admin/users", label: "User Mgmt", icon: Shield },
+      { to: "/admin/audit", label: "Audit Log", icon: ClipboardList },
       { to: "/admin/settings", label: "Settings", icon: Settings },
     ],
   },
@@ -120,59 +125,63 @@ function Badge({
   );
 }
 
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0]! + parts[parts.length - 1][0]!).toUpperCase();
+  if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
+  return "?";
+}
+
 export function AdminSidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { collapsed, toggle } = useSidebar();
+
+  const { data: me } = useQuery({
+    queryKey: ["current-user"],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+      const profile = await getMyProfile().catch(() => null);
+      const name = profile?.full_name || user.email || "";
+      return { email: user.email ?? "", name, position: profile?.position ?? null };
+    },
+    staleTime: 5 * 60_000,
+  });
+
+  const initials = me?.name ? getInitials(me.name) : "?";
+  const displayName = me?.name || "—";
+  const subtitle = me?.position || me?.email || "";
   const width = collapsed ? "w-[60px]" : "w-[220px]";
 
   return (
     <aside
-      className={`flex h-screen ${width} shrink-0 flex-col border-r border-border bg-card transition-[width] duration-200`}
+      className={`flex h-full ${width} shrink-0 flex-col border-r border-border bg-card transition-[width] duration-200`}
     >
-      {/* Brand / toggle */}
-      <div
-        className={`flex items-center gap-2.5 border-b border-border py-4 ${
-          collapsed ? "justify-center px-2" : "px-3.5"
-        }`}
-      >
-        <button
-          type="button"
-          onClick={toggle}
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-gold text-[11px] font-black text-gold-foreground transition-opacity hover:opacity-90"
-        >
-          CDM
-        </button>
-        {!collapsed && (
-          <>
-            <div className="leading-tight">
-              <div className="text-[11px] font-bold text-foreground">Youth Office</div>
-              <div className="text-[9px] text-text-3">Diocese of Murang'a</div>
-            </div>
-            <button
-              type="button"
-              onClick={toggle}
-              aria-label="Collapse sidebar"
-              className="ml-auto flex h-6 w-6 items-center justify-center rounded-md text-text-3 hover:bg-bg-3 hover:text-text-1"
-            >
-              <PanelLeftClose className="h-3.5 w-3.5" />
-            </button>
-          </>
-        )}
-      </div>
-
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto p-2">
-        {collapsed && (
+        <div
+          className={`mb-2 flex items-center border-b border-border pb-2 ${
+            collapsed ? "justify-center" : "justify-between px-1"
+          }`}
+        >
+          {!collapsed && (
+            <span className="text-[9px] font-bold uppercase tracking-widest text-text-4">
+              Powered by CDM
+            </span>
+          )}
           <button
             type="button"
             onClick={toggle}
-            aria-label="Expand sidebar"
-            className="mb-2 flex w-full items-center justify-center rounded-md py-1.5 text-text-3 hover:bg-bg-3 hover:text-text-1"
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            className="flex items-center justify-center rounded-md p-1 text-text-3 hover:bg-bg-3 hover:text-text-1"
           >
-            <PanelLeftOpen className="h-3.5 w-3.5" />
+            {collapsed ? (
+              <PanelLeftOpen className="h-3.5 w-3.5" />
+            ) : (
+              <PanelLeftClose className="h-3.5 w-3.5" />
+            )}
           </button>
-        )}
+        </div>
         {GROUPS.map((group) => (
           <div key={group.label} className="mb-1">
             {!collapsed && (
@@ -219,16 +228,18 @@ export function AdminSidebar() {
           collapsed ? "justify-center px-2" : "px-3"
         }`}
       >
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 border-gold-3 bg-bg-4 text-[9px] font-bold text-gold">
-          JM
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-danger text-[9px] font-bold text-white ring-2 ring-danger/20">
+          {initials}
         </div>
         {!collapsed && (
           <>
-            <div className="leading-tight">
-              <div className="text-[10px] font-semibold text-text-1">John Mwangi</div>
-              <div className="text-[9px] text-text-3">Diocese Admin</div>
+            <div className="min-w-0 flex-1 leading-tight">
+              <div className="truncate text-[10px] font-semibold text-text-1">{displayName}</div>
+              {subtitle && (
+                <div className="truncate text-[9px] text-text-3">{subtitle}</div>
+              )}
             </div>
-            <span className="ml-auto h-1.5 w-1.5 rounded-full bg-success" />
+            <span className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-success" />
           </>
         )}
       </div>

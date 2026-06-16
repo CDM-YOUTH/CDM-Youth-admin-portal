@@ -1,12 +1,12 @@
 import { useMemo, useState } from "react";
-import { MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { MoreVertical, Pencil, Trash2, Plus } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { toast } from "sonner";
 import { Topbar } from "@/components/admin/topbar";
-import { Card, CardBody, PageHeader, Pill } from "@/components/admin/ui-bits";
+import { Card, CardBody, Pill } from "@/components/admin/ui-bits";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CUSA_INSTITUTIONS } from "@/lib/cusa-data";
 import { ORGANIZATION } from "@/lib/mock-data";
@@ -257,17 +257,20 @@ function CusaPage() {
 
   return (
     <>
-      <Topbar title="CUSA" />
+      <Topbar
+        title="Catholic University Students Association"
+        description={isLoading ? "Loading CUSA members…" : `${filteredMembers.length.toLocaleString()} of ${allMembers.length.toLocaleString()} members shown — share this URL to share the same view.`}
+        action={
+          <button
+            type="button"
+            onClick={() => setAddOpen(true)}
+            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-danger px-3 text-[11px] font-bold text-white transition hover:opacity-90"
+          >
+            <Plus className="h-3.5 w-3.5" /> Add Member
+          </button>
+        }
+      />
       <div className="flex-1 overflow-y-auto px-5 py-4">
-        <PageHeader
-          title="Catholic University Students Association"
-          description={
-            isLoading
-              ? "Loading CUSA members…"
-              : `${filteredMembers.length.toLocaleString()} of ${allMembers.length.toLocaleString()} members shown — share this URL to share the same view.`
-          }
-        />
-
         <Card>
           <TableToolbar
             searchValue={search.q}
@@ -275,8 +278,6 @@ function CusaPage() {
             searchPlaceholder="Search name, CDM No., institution, parish…"
             onImport={() => toast.info("Import CUSA members — bring CSV soon")}
             onExport={() => toast.success(`Exporting ${filteredMembers.length} CUSA members`)}
-            onAdd={() => setAddOpen(true)}
-            addLabel="Add Member"
           />
           <CardBody className="p-0">
             <Table>

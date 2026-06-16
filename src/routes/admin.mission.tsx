@@ -1,9 +1,17 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { zodValidator, fallback } from "@tanstack/zod-adapter";
+import { z } from "zod";
 import { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Topbar } from "@/components/admin/topbar";
-import { Card, CardBody, CardHead, Kpi, PageHeader, Pill } from "@/components/admin/ui-bits";
+import { Card, CardBody, Kpi, Pill } from "@/components/admin/ui-bits";
+import {
+  ColumnFilter,
+  ColumnHeader,
+  applyColumnFilter,
+  type ColumnFilterValue,
+} from "@/components/admin/table-filters";
 import { RecordFormDialog, type FieldDef } from "@/components/admin/record-form-dialog";
 import {
   AlertDialog,
@@ -15,7 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { MoreVertical, Trash2, Upload, Download, Plus, Shuffle } from "lucide-react";
+import { MoreVertical, Trash2, Upload, Download, Plus, Shuffle, Search, X } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,6 +40,13 @@ import {
   removeNominee,
 } from "@/lib/db/mission";
 
+const CURRENT_YEAR = new Date().getFullYear();
+const AVAILABLE_YEARS = Array.from({ length: CURRENT_YEAR - 2022 }, (_, i) => CURRENT_YEAR - i);
+
+const missionSearchSchema = z.object({
+  year: fallback(z.number(), CURRENT_YEAR).default(CURRENT_YEAR),
+});
+
 export const Route = createFileRoute("/admin/mission")({
   head: () => ({
     meta: [
@@ -39,12 +54,16 @@ export const Route = createFileRoute("/admin/mission")({
       { name: "description", content: "Annual cross-parish youth reshuffle: nominations, automated pairing, and execution tracking." },
     ],
   }),
+  validateSearch: zodValidator(missionSearchSchema),
   component: MissionPage,
 });
 
 function MissionPage() {
   const qc = useQueryClient();
-  const year = new Date().getFullYear();
+  const { year } = Route.useSearch();
+  const navigate = useNavigate({ from: Route.fullPath });
+  const setYear = (y: number) =>
+    navigate({ search: () => ({ year: y }), replace: true });
   const { data: week } = useQuery({ queryKey: ["mission-week", year], queryFn: () => getOrCreateMissionWeek(year) });
   const weekId = week?.id;
   const { data: nominees = [] } = useQuery({
@@ -73,6 +92,12 @@ function MissionPage() {
   const [removeTarget, setRemoveTarget] = useState<{ id: string; name: string } | null>(null);
   const [reshuffleOpen, setReshuffleOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [search, setSearch] = useState("");
+  const [fName, setFName] = useState<ColumnFilterValue | undefined>();
+  const [fSourceParish, setFSourceParish] = useState<ColumnFilterValue | undefined>();
+  const [fSourceDeanery, setFSourceDeanery] = useState<ColumnFilterValue | undefined>();
+  const [fHostParish, setFHostParish] = useState<ColumnFilterValue | undefined>();
+  const [fStatus, setFStatus] = useState<ColumnFilterValue | undefined>();
   const nominateMut = useMutation({
     mutationFn: (cdmId: string) => nominateYouth(weekId!, cdmId),
     onSuccess: () => { toast.success("Nominee added"); setNominateOpen(false); invalidate(); },
@@ -130,6 +155,26 @@ function MissionPage() {
     };
   });
 
+  const filteredRows = useMemo(() => {
+    return rows.filter((r) => {
+      if (search) {
+        const q = search.toLowerCase();
+        if (
+          !r.name.toLowerCase().includes(q) &&
+          !r.cdmId.toLowerCase().includes(q) &&
+          !r.sourceParish.toLowerCase().includes(q) &&
+          !r.hostParish.toLowerCase().includes(q)
+        ) return false;
+      }
+      if (!applyColumnFilter(r.name, fName)) return false;
+      if (!applyColumnFilter(r.sourceParish, fSourceParish)) return false;
+      if (!applyColumnFilter(r.sourceDeanery, fSourceDeanery)) return false;
+      if (!applyColumnFilter(r.hostParish, fHostParish)) return false;
+      if (!applyColumnFilter(r.status, fStatus)) return false;
+      return true;
+    });
+  }, [rows, search, fName, fSourceParish, fSourceDeanery, fHostParish, fStatus]);
+
   const handleExport = () => {
     const headers = ["CDM No.", "Name", "Source Parish", "Source Deanery", "Sent To Parish", "Sent To Deanery", "Status"];
     const escape = (v: string) => `"${v.replace(/"/g, '""')}"`;
@@ -161,9 +206,68 @@ function MissionPage() {
   return (
     <>
       <Topbar
-        title="Mission Week"
+        title={`Mission Week ${week?.year ?? year}`}
+        description={week?.theme ?? "Annual cross-parish youth exchange. Add nominees, then run the reshuffle to auto-pair them with host parishes."}
         action={
-          <div className="flex items-center gap-1.5">
+          <>
+            <select
+              value={year}
+              onChange={(e) => setYear(Number(e.target.value))}
+              aria-label="Select mission week year"
+              className="h-8 rounded-md border border-border bg-bg-2 px-2.5 text-[11px] font-semibold text-text-1 outline-none transition hover:border-gold-3 focus:border-gold-3"
+            >
+              {AVAILABLE_YEARS.map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => {
+                if (!weekId || nominees.length === 0) {
+                  toast.error("Add nominees before running the reshuffle");
+                  return;
+                }
+                setReshuffleOpen(true);
+              }}
+              disabled={reshuffleMut.isPending}
+              className="inline-flex h-8 items-center gap-1.5 rounded-md bg-danger px-3 text-[11px] font-bold text-white transition hover:opacity-90 disabled:opacity-50"
+            >
+              <Shuffle className="h-3.5 w-3.5" /> {reshuffleMut.isPending ? "Reshuffling…" : "Run Reshuffle"}
+            </button>
+          </>
+        }
+      />
+      <div className="flex-1 overflow-y-auto px-5 py-4">
+
+        <div className="mb-4 grid grid-cols-1 gap-2.5 sm:grid-cols-4">
+          <Kpi label="Nominees" value={String(analytics?.nominees ?? 0)} trend={`${nominees.length} loaded`} tone="up" />
+          <Kpi label="Parishes" value={String(analytics?.parishes ?? 0)} trend="diocese-wide" tone="up" />
+          <Kpi label="Reshuffle Pairs" value={String(analytics?.pairs ?? 0)} trend={pairings.length ? "generated" : "run reshuffle"} tone="info" />
+          <Kpi label="Reports In" value={String(analytics?.reports ?? 0)} trend={`of ${pairings.length} pairs`} tone="warn" />
+        </div>
+
+        <Card>
+          {/* Toolbar — search + action buttons */}
+          <div className="flex flex-wrap items-center gap-2 border-b border-border bg-card px-3.5 py-2.5">
+            <div className="relative max-w-sm flex-1">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-4" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search name, CDM No., parish…"
+                className="h-8 w-full rounded-md border border-black/20 bg-white pl-8 pr-7 text-[12px] text-black/70 placeholder:text-gray-400 placeholder:font-normal outline-none transition-colors hover:border-gold-3/50 hover:text-black focus:border-gold-3 focus:text-black"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch("")}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-text-3 hover:bg-bg-3 hover:text-foreground"
+                  aria-label="Clear search"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </div>
             <input
               ref={fileInputRef}
               type="file"
@@ -175,81 +279,57 @@ function MissionPage() {
                 e.target.value = "";
               }}
             />
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={!weekId || importMut.isPending}
-              className="inline-flex h-7 items-center gap-1 rounded-md border border-border bg-bg-2 px-2.5 text-[10px] font-semibold text-text-1 hover:border-gold-3 disabled:opacity-50"
-            >
-              <Upload className="h-3 w-3" /> Import
-            </button>
-            <button
-              type="button"
-              onClick={handleExport}
-              disabled={rows.length === 0}
-              className="inline-flex h-7 items-center gap-1 rounded-md border border-border bg-bg-2 px-2.5 text-[10px] font-semibold text-text-1 hover:border-gold-3 disabled:opacity-50"
-            >
-              <Download className="h-3 w-3" /> Export
-            </button>
-            <button
-              type="button"
-              onClick={() => setNominateOpen(true)}
-              disabled={!weekId}
-              className="inline-flex h-7 items-center gap-1 rounded-md border border-border bg-bg-2 px-2.5 text-[10px] font-semibold text-text-1 hover:border-gold-3 disabled:opacity-50"
-            >
-              <Plus className="h-3 w-3" /> Nominate
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (!weekId || nominees.length === 0) {
-                  toast.error("Add nominees before running the reshuffle");
-                  return;
-                }
-                setReshuffleOpen(true);
-              }}
-              disabled={reshuffleMut.isPending}
-              className="inline-flex h-7 items-center gap-1 rounded-md bg-primary px-2.5 text-[10px] font-bold text-bg-1 hover:opacity-90 disabled:opacity-50"
-            >
-              <Shuffle className="h-3 w-3" /> {reshuffleMut.isPending ? "Reshuffling…" : "Run Reshuffle"}
-            </button>
+            <div className="ml-auto flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setNominateOpen(true)}
+                className="inline-flex h-8 items-center gap-1.5 rounded-md bg-danger px-2.5 text-[11px] font-bold text-white transition hover:opacity-90"
+              >
+                <Plus className="h-3.5 w-3.5" /> Nominate
+              </button>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="inline-flex h-8 items-center gap-1.5 rounded-md bg-danger px-2.5 text-[11px] font-bold text-white transition hover:opacity-90"
+              >
+                <Upload className="h-3.5 w-3.5" /> Import
+              </button>
+              <button
+                type="button"
+                onClick={handleExport}
+                className="inline-flex h-8 items-center gap-1.5 rounded-md bg-danger px-2.5 text-[11px] font-bold text-white transition hover:opacity-90"
+              >
+                <Download className="h-3.5 w-3.5" /> Export
+              </button>
+            </div>
           </div>
-        }
-      />
-      <div className="flex-1 overflow-y-auto px-5 py-4">
-        <PageHeader
-          title={`Mission Week ${week?.year ?? year}`}
-          description={week?.theme ?? "Annual cross-parish youth exchange. Add nominees, then run the reshuffle to auto-pair them with host parishes."}
-        />
 
-        <div className="mb-4 grid grid-cols-1 gap-2.5 sm:grid-cols-4">
-          <Kpi label="Nominees" value={String(analytics?.nominees ?? 0)} trend={`${nominees.length} loaded`} tone="up" />
-          <Kpi label="Parishes" value={String(analytics?.parishes ?? 0)} trend="diocese-wide" tone="up" />
-          <Kpi label="Reshuffle Pairs" value={String(analytics?.pairs ?? 0)} trend={pairings.length ? "generated" : "run reshuffle"} tone="info" />
-          <Kpi label="Reports In" value={String(analytics?.reports ?? 0)} trend={`of ${pairings.length} pairs`} tone="warn" />
-        </div>
-
-        <Card>
-          <CardHead
-            title="Missionaries"
-            subtitle={`${nominees.length} nominated · ${pairings.length} paired`}
-          />
           <CardBody className="p-0">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-border">
                   <th className="label-eyebrow px-3.5 py-2.5 text-left">CDM No.</th>
-                  <th className="label-eyebrow px-3.5 py-2.5 text-left">Name</th>
-                  <th className="label-eyebrow px-3.5 py-2.5 text-left">Source Parish</th>
-                  <th className="label-eyebrow px-3.5 py-2.5 text-left">Source Deanery</th>
-                  <th className="label-eyebrow px-3.5 py-2.5 text-left">Sent To Parish</th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
+                    <ColumnHeader label="Name" filter={<ColumnFilter label="Name" value={fName} onChange={setFName} />} />
+                  </th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
+                    <ColumnHeader label="Source Parish" filter={<ColumnFilter label="Source Parish" value={fSourceParish} onChange={setFSourceParish} />} />
+                  </th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
+                    <ColumnHeader label="Source Deanery" filter={<ColumnFilter label="Source Deanery" value={fSourceDeanery} onChange={setFSourceDeanery} />} />
+                  </th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
+                    <ColumnHeader label="Sent To Parish" filter={<ColumnFilter label="Sent To Parish" value={fHostParish} onChange={setFHostParish} />} />
+                  </th>
                   <th className="label-eyebrow px-3.5 py-2.5 text-left">Sent To Deanery</th>
-                  <th className="label-eyebrow px-3.5 py-2.5 text-left">Status</th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
+                    <ColumnHeader label="Status" filter={<ColumnFilter label="Status" value={fStatus} onChange={setFStatus} />} />
+                  </th>
                   <th className="label-eyebrow px-3.5 py-2.5 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r) => (
+                {filteredRows.map((r) => (
                   <tr key={r.id} className="border-b border-border/30 last:border-0 hover:bg-bg-3">
                     <td className="px-3.5 py-2.5 font-mono text-[10px] font-bold text-gold">{r.cdmId}</td>
                     <td className="px-3.5 py-2.5 text-[11px] font-semibold text-foreground">{r.name}</td>
@@ -283,10 +363,12 @@ function MissionPage() {
                     </td>
                   </tr>
                 ))}
-                {rows.length === 0 && (
+                {filteredRows.length === 0 && (
                   <tr>
                     <td colSpan={8} className="px-3.5 py-6 text-center text-[11px] text-text-3">
-                      No nominees yet. Click “Nominate” to add a missionary by CDM No.
+                      {rows.length === 0
+                        ? `No nominees yet. Click "Nominate" to add a missionary by CDM No.`
+                        : "No results match the current filters."}
                     </td>
                   </tr>
                 )}
