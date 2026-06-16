@@ -25,7 +25,7 @@ export function FilterSearch({
       value={value}
       onChange={(event) => onChange(event.target.value)}
       placeholder={placeholder}
-      className="min-w-[220px] flex-1 rounded-md border border-border bg-bg-3 px-3 py-1.5 text-[12px] text-foreground outline-none focus:border-gold-3"
+      className="min-w-[220px] flex-1 rounded-md border border-black/20 bg-white px-3 py-1.5 text-[12px] text-black/70 placeholder:text-gray-400 placeholder:font-normal outline-none transition-colors hover:border-gold-3/50 hover:text-black focus:border-gold-3 focus:text-black"
     />
   );
 }
@@ -47,23 +47,23 @@ export function FilterSelect({
   accent?: "border" | "gold" | "violet" | "info" | "pink";
   disabled?: boolean;
 }) {
-  const accentClass =
+  const borderClass =
     accent === "gold"
-      ? "border-gold-3 text-gold"
+      ? "border-gold-3"
       : accent === "violet"
-        ? "border-violet text-violet"
+        ? "border-violet"
         : accent === "info"
-          ? "border-info text-info"
+          ? "border-info"
           : accent === "pink"
-            ? "border-pink text-pink"
-            : "border-border text-text-2";
+            ? "border-pink"
+            : "border-border";
   return (
     <select
       value={value}
       onChange={(event) => onChange(event.target.value)}
       disabled={disabled}
       aria-label={label}
-      className={`min-w-[128px] rounded-md bg-bg-3 px-2.5 py-1.5 text-[11px] font-semibold outline-none disabled:opacity-40 ${accentClass}`}
+      className="min-w-[128px] rounded-md border border-black/20 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-black/70 outline-none transition-colors disabled:opacity-40 hover:border-gold-3/50 hover:text-black focus:border-gold-3 focus:text-black"
     >
       <option value="">{label}</option>
       {options.map((option) => (
@@ -125,7 +125,7 @@ export function TableToolbar({
           value={searchValue}
           onChange={(event) => onSearchChange(event.target.value)}
           placeholder={searchPlaceholder}
-          className="h-8 w-full rounded-md border border-danger/30 bg-bg-2 pl-8 pr-7 text-[12px] text-foreground outline-none hover:border-danger/50 focus:border-danger"
+          className="h-8 w-full rounded-md border border-black/20 bg-white pl-8 pr-7 text-[12px] text-black/70 placeholder:text-gray-400 placeholder:font-normal outline-none transition-colors hover:border-gold-3/50 hover:text-black focus:border-gold-3 focus:text-black"
         />
         {searchValue && (
           <button
@@ -138,13 +138,13 @@ export function TableToolbar({
           </button>
         )}
       </div>
-      {extra}
       <div className="ml-auto flex items-center gap-1.5">
+        {extra}
         {onImport && (
           <button
             type="button"
             onClick={onImport}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-danger/60 bg-bg-2 px-2.5 text-[11px] font-semibold text-danger transition hover:bg-danger-soft/40 hover:border-danger"
+            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-danger px-2.5 text-[11px] font-bold text-white transition hover:opacity-90"
           >
             <Upload className="h-3.5 w-3.5" /> Import
           </button>
@@ -153,7 +153,7 @@ export function TableToolbar({
           <button
             type="button"
             onClick={onExport}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-danger/60 bg-bg-2 px-2.5 text-[11px] font-semibold text-danger transition hover:bg-danger-soft/40 hover:border-danger"
+            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-danger px-2.5 text-[11px] font-bold text-white transition hover:opacity-90"
           >
             <Download className="h-3.5 w-3.5" /> Export
           </button>
@@ -284,7 +284,7 @@ export function ColumnFilter({
             onChange={(event) =>
               setDraft((prev) => ({ ...prev, operator: event.target.value as ColumnFilterOperator }))
             }
-            className="mb-1.5 w-full rounded-md border border-border bg-bg-2 px-2 py-1 text-[11px] text-foreground outline-none"
+            className="mb-1.5 w-full rounded-md border border-black/20 bg-white px-2 py-1 text-[11px] text-black/70 outline-none transition-colors hover:border-gold-3/50 hover:text-black focus:border-gold-3 focus:text-black"
           >
             {operators.map((op) => (
               <option key={op.value} value={op.value}>
@@ -296,7 +296,7 @@ export function ColumnFilter({
             <select
               value={draft.value}
               onChange={(event) => setDraft((prev) => ({ ...prev, value: event.target.value }))}
-              className="mb-2 w-full rounded-md border border-border bg-bg-2 px-2 py-1 text-[11px] text-foreground outline-none"
+              className="mb-2 w-full rounded-md border border-black/20 bg-white px-2 py-1 text-[11px] text-black/70 outline-none transition-colors hover:border-gold-3/50 hover:text-black focus:border-gold-3 focus:text-black"
             >
               <option value="">Select…</option>
               {options?.map((opt) => (
@@ -315,7 +315,7 @@ export function ColumnFilter({
                 if (event.key === "Escape") setOpen(false);
               }}
               placeholder="Value…"
-              className="mb-2 w-full rounded-md border border-border bg-bg-2 px-2 py-1 text-[11px] text-foreground outline-none focus:border-gold-3"
+              className="mb-2 w-full rounded-md border border-black/20 bg-white px-2 py-1 text-[11px] text-black/70 placeholder:text-gray-400 placeholder:font-normal outline-none transition-colors hover:border-gold-3/50 hover:text-black focus:border-gold-3 focus:text-black"
             />
           )}
           <div className="flex items-center justify-between gap-1.5">

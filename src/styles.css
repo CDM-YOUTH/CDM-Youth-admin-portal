@@ -140,20 +140,22 @@
   --foreground: var(--text-0);
   --card: var(--bg-0);
   --card-foreground: var(--text-0);
-  --popover: var(--bg-2);
-  --popover-foreground: var(--text-0);
+  /* Popovers, select panels, command palettes, dropdown menus: pure white + near-black */
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.1 0 0);
   --primary: var(--danger);
   --primary-foreground: oklch(0.995 0.004 70);
   --secondary: var(--bg-3);
   --secondary-foreground: var(--text-1);
   --muted: var(--bg-3);
   --muted-foreground: var(--text-2);
-  --accent: var(--bg-4);
-  --accent-foreground: var(--gold);
+  /* Hover/focus rows in all listboxes: neutral gray bg, black text (not gold) */
+  --accent: oklch(0.93 0 0);
+  --accent-foreground: oklch(0.1 0 0);
   --destructive: var(--danger);
   --destructive-foreground: oklch(0.995 0.004 70);
   --border: oklch(0.3 0.02 40 / 10%);
-  --input: oklch(0.3 0.02 40 / 8%);
+  --input: oklch(1 0 0);
   --ring: var(--gold-3);
   --chart-1: var(--gold);
   --chart-2: var(--success);
@@ -177,20 +179,20 @@
   --foreground: var(--text-0);
   --card: var(--bg-0);
   --card-foreground: var(--text-0);
-  --popover: var(--bg-2);
-  --popover-foreground: var(--text-0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.1 0 0);
   --primary: var(--danger);
   --primary-foreground: oklch(0.995 0.004 70);
   --secondary: var(--bg-3);
   --secondary-foreground: var(--text-1);
   --muted: var(--bg-3);
   --muted-foreground: var(--text-2);
-  --accent: var(--bg-4);
-  --accent-foreground: var(--gold);
+  --accent: oklch(0.93 0 0);
+  --accent-foreground: oklch(0.1 0 0);
   --destructive: var(--danger);
   --destructive-foreground: oklch(0.995 0.004 70);
   --border: oklch(0.3 0.02 40 / 10%);
-  --input: oklch(0.3 0.02 40 / 8%);
+  --input: oklch(1 0 0);
   --ring: var(--gold-3);
 }
 

@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { MoreVertical, Eye, Pencil, Trash2 } from "lucide-react";
 import { Topbar, TopbarButton } from "@/components/admin/topbar";
-import { Card, CardBody, CardHead, PageHeader, Pill } from "@/components/admin/ui-bits";
+import { Card, CardBody, CardHead, Pill } from "@/components/admin/ui-bits";
 import { RecordFormDialog, type FieldDef } from "@/components/admin/record-form-dialog";
 import { ViewRecordDialog } from "@/components/admin/view-record-dialog";
 import {
@@ -158,16 +158,12 @@ function WelfarePage() {
 
   return (
     <>
-      <Topbar title="Welfare" action={<TopbarButton onClick={() => setAddOpen(true)}>+ New Case</TopbarButton>} />
+      <Topbar
+        title="Welfare Cases"
+        description={isLoading ? "Loading cases…" : "Confidential case management — Diocese, Deanery and Parish admins see only what their role permits."}
+        action={<TopbarButton onClick={() => setAddOpen(true)}>+ New Case</TopbarButton>}
+      />
       <div className="flex-1 overflow-y-auto px-5 py-4">
-        <PageHeader
-          title="Welfare Cases"
-          description={
-            isLoading
-              ? "Loading cases…"
-              : "Confidential case management — Diocese, Deanery and Parish admins see only what their role permits."
-          }
-        />
 
         <div className="mb-4 grid grid-cols-1 gap-2.5 sm:grid-cols-4">
           <MiniStat label="Open"           value={String(openCases   || 5)}  tone="danger"  />

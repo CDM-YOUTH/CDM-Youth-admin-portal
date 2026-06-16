@@ -1,10 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
+import { ChevronRight } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Topbar, TopbarButton } from "@/components/admin/topbar";
 import { Card, CardBody, CardHead, Kpi, PageHeader, Pill } from "@/components/admin/ui-bits";
-import { EventCheckinPanel } from "@/components/admin/event-checkin";
 import {
   EventTabsForm,
   emptyEventState,
@@ -271,60 +271,38 @@ function EventDetailPage() {
               </Card>
             )}
 
-            {/* Registrations */}
-            <Card className="mt-3">
-              <CardHead
-                title="Registrations"
-                subtitle={`${registrationCount} registered · ${guestCount} guest${guestCount !== 1 ? "s" : ""}`}
-              />
-              <CardBody>
-                {registrationCount === 0 ? (
-                  <p className="text-[11px] text-text-3">No registrations yet.</p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-[11px]">
-                      <thead>
-                        <tr className="border-b border-border text-left text-[9px] font-bold uppercase tracking-wide text-text-3">
-                          <th className="pb-1.5 pr-3">CDM No.</th>
-                          <th className="pb-1.5 pr-3">Name</th>
-                          <th className="pb-1.5 pr-3">Parish</th>
-                          <th className="pb-1.5 pr-3">Phone</th>
-                          <th className="pb-1.5">Type</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border">
-                        {event.registrations.map((reg) => (
-                          <tr key={reg.id} className="text-text-1">
-                            <td className="py-1.5 pr-3 font-mono text-[10px] text-text-3">
-                              {reg.youth?.cdm_id ?? "—"}
-                            </td>
-                            <td className="py-1.5 pr-3 font-semibold">
-                              {reg.youth?.full_name ?? reg.guest_name ?? "—"}
-                            </td>
-                            <td className="py-1.5 pr-3 text-text-3">
-                              {reg.youth?.parish?.name ?? "—"}
-                            </td>
-                            <td className="py-1.5 pr-3 text-text-3">
-                              {reg.guest_phone ?? "—"}
-                            </td>
-                            <td className="py-1.5">
-                              <Pill tone={reg.youth ? "success" : "neutral"}>
-                                {reg.youth ? "member" : "guest"}
-                              </Pill>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+            {/* Registrations & Check-in — click to open management page */}
+            <Link
+              to="/admin/event-checkin/$eventId"
+              params={{ eventId }}
+              className="mt-3 block"
+            >
+              <Card className="cursor-pointer transition-all hover:border-gold-3/60 hover:shadow-sm">
+                <CardHead
+                  title="Registrations & Check-in"
+                  subtitle={`${registrationCount} registered · ${guestCount} guest${guestCount !== 1 ? "s" : ""} · ${event.checkin_count} checked in`}
+                  action={
+                    <span className="inline-flex items-center gap-1 rounded-md bg-danger px-2.5 py-1 text-[11px] font-bold text-white">
+                      Open <ChevronRight className="h-3 w-3" />
+                    </span>
+                  }
+                />
+                <CardBody>
+                  <div className="flex flex-wrap gap-6">
+                    <div>
+                      <div className="text-[9px] font-bold uppercase tracking-wide text-text-3">Registrations</div>
+                      <div className="text-[20px] font-black text-text-1">{registrationCount}</div>
+                      <div className="text-[10px] text-text-3">{memberCount} member{memberCount !== 1 ? "s" : ""} · {guestCount} guest{guestCount !== 1 ? "s" : ""}</div>
+                    </div>
+                    <div className="border-l border-border pl-6">
+                      <div className="text-[9px] font-bold uppercase tracking-wide text-text-3">Day-of Check-in</div>
+                      <div className="text-[20px] font-black text-text-1">{event.checkin_count}</div>
+                      <div className="text-[10px] text-text-3">confirmed on the day</div>
+                    </div>
                   </div>
-                )}
-              </CardBody>
-            </Card>
-
-            {/* Check-in panel */}
-            <div className="mt-3">
-              <EventCheckinPanel eventId={eventId} eventName={event.name} />
-            </div>
+                </CardBody>
+              </Card>
+            </Link>
           </>
         )}
       </div>

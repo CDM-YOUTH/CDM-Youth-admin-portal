@@ -6,10 +6,9 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Download, MoreVertical, Trash2, BadgeCheck, Clock } from "lucide-react";
+import { Download, MoreVertical, Trash2, BadgeCheck, Clock, Plus } from "lucide-react";
 import { Topbar } from "@/components/admin/topbar";
-import { Card, CardBody, PageHeader, Pill } from "@/components/admin/ui-bits";
-import { Card as Card2, CardBody as CardBody2, CardHead as CardHead2 } from "@/components/admin/ui-bits";
+import { Card, CardBody, Pill } from "@/components/admin/ui-bits";
 import { TablePagination, usePagination } from "@/components/admin/table-pagination";
 import {
   ColumnFilter,
@@ -29,7 +28,6 @@ import {
   updateEnrollmentStatus,
   type BulkEnrollRow,
 } from "@/lib/db/enrollments";
-import { listEnrollmentAudit } from "@/lib/db/audit";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -48,6 +46,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+const CURRENT_YEAR = new Date().getFullYear();
+const AVAILABLE_YEARS = Array.from({ length: CURRENT_YEAR - 2022 }, (_, i) => CURRENT_YEAR - i);
+
 const filterValueSchema = fallback(
   z
     .object({
@@ -59,6 +60,7 @@ const filterValueSchema = fallback(
 );
 
 const enrollmentSearchSchema = z.object({
+  year: fallback(z.number(), CURRENT_YEAR).default(CURRENT_YEAR),
   q: fallback(z.string(), "").default(""),
   f_cdm: filterValueSchema,
   f_name: filterValueSchema,
@@ -104,18 +106,12 @@ function EnrollmentPage() {
   const [importResult, setImportResult] = useState<null | { inserted: number; missing: string[]; total: number }>(null);
   const qc = useQueryClient();
   const { data: enrollments = [], isLoading } = useQuery({
-    queryKey: ["enrollments"],
-    queryFn: () => listEnrollments(),
+    queryKey: ["enrollments", search.year],
+    queryFn: () => listEnrollments(search.year),
   });
-  const { data: auditLog = [] } = useQuery({
-    queryKey: ["enrollment-audit"],
-    queryFn: () => listEnrollmentAudit(50),
-    refetchInterval: 15_000,
-  });
-
   const createMut = useMutation({
     mutationFn: (vals: { cdmId: string; paymentRef?: string }) =>
-      createEnrollment({ cdmId: vals.cdmId, paymentRef: vals.paymentRef || null }),
+      createEnrollment({ cdmId: vals.cdmId, paymentRef: vals.paymentRef || null, year: search.year }),
     onSuccess: () => {
       toast.success("Enrollment saved");
       qc.invalidateQueries({ queryKey: ["enrollments"] });
@@ -124,7 +120,7 @@ function EnrollmentPage() {
   });
   const bulkMut = useMutation({
     mutationFn: ({ rows, ref }: { rows: BulkEnrollRow[]; ref: string | null }) =>
-      bulkEnrollRows(rows, ref),
+      bulkEnrollRows(rows, ref, search.year),
     onSuccess: (res, vars) => {
       setImportResult({ inserted: res.inserted, missing: res.missing, total: vars.rows.length });
       qc.invalidateQueries({ queryKey: ["enrollments"] });
@@ -234,15 +230,15 @@ function EnrollmentPage() {
     { key: "notes", label: "Notes", type: "textarea", placeholder: "Anything about this batch" },
   ];
 
-  const SAMPLE_HEADERS = ["cdmId", "fullName", "paymentRef"];
+  const SAMPLE_HEADERS = ["CDM NO.", "FULL NAME", "PAYMENT REF"];
   const downloadSample = () => {
     const sampleRows = [
       ["CDM-2026-00001", "Grace Wanjiku", "BANK-2026-001"],
       ["CDM-2026-00002", "Peter Mwangi", "BANK-2026-001"],
       ["CDM-2026-00003", "Mary Njeri", ""],
     ];
-    downloadXlsx("enrollment-import-sample", "Enrollment Sample", SAMPLE_HEADERS, sampleRows)
-      .then(() => toast.success("Sample downloaded"))
+    downloadXlsx("enrollment-import-sample", "Enrollment Sample", SAMPLE_HEADERS, sampleRows, undefined, { headerTextColor: "FFAAAA" })
+      .then(() => toast.success("Import sample downloaded"))
       .catch((e: Error) => toast.error(e.message));
   };
   const onPickFile = () => fileInputRef.current?.click();
@@ -252,34 +248,39 @@ function EnrollmentPage() {
       header: true,
       skipEmptyLines: true,
       complete: (res) => {
-        const headers = res.meta.fields ?? [];
-        const norm = headers.map((h) => h.trim());
-        const requiredAny: Array<[string, string[]]> = [
-          ["cdmId", ["cdmId", "cdm_id", "CDM No.", "cdm"]],
-        ];
-        const missing = requiredAny.filter(([, aliases]) => !aliases.some((a) => norm.includes(a)));
-        if (missing.length) {
-          toast.error(`CSV is missing required column${missing.length > 1 ? "s" : ""}: ${missing.map((m) => m[0]).join(", ")}`, {
-            description: `Found columns: ${norm.join(", ") || "(none)"} — download the sample CSV for the expected header row.`,
+        const rawFields = res.meta.fields ?? [];
+        // Normalize: lowercase, strip spaces/underscores/dots for flexible matching
+        const nk = (h: string) => h.trim().toLowerCase().replace(/[\s_.-]+/g, "");
+        const fieldMap: Record<string, string> = {};
+        rawFields.forEach(h => { fieldMap[nk(h)] = h; });
+        const normHeaders = rawFields.map(nk);
+        const get = (r: Record<string, string>, ...keys: string[]) =>
+          keys.map(k => r[fieldMap[nk(k)]] ?? "").find(v => v) ?? "";
+
+        // CDM column: "CDM NO.", "cdmId", "cdm_id", "CDM No.", "cdm" all normalize to "cdmno" or "cdmid"/"cdm"
+        const hasCdm = normHeaders.some(h => h === "cdmno" || h === "cdmid" || h === "cdm");
+        if (!hasCdm) {
+          toast.error("CSV is missing required column: CDM NO.", {
+            description: `Found columns: ${rawFields.join(", ") || "(none)"} — download the sample for the expected header row.`,
           });
           return;
         }
-        const optional = ["fullName", "paymentRef"];
-        const unknown = norm.filter((h) => !["cdmId", "cdm_id", "fullName", "name", "paymentRef", "payment_ref"].includes(h));
+        const knownNorm = new Set(["cdmno", "cdmid", "cdm", "fullname", "name", "paymentref"]);
+        const unknown = rawFields.filter(h => !knownNorm.has(nk(h)));
         if (unknown.length) {
           toast.message(`Ignoring unknown columns: ${unknown.join(", ")}`, {
-            description: `Recognised: cdmId, ${optional.join(", ")}.`,
+            description: "Recognised: CDM NO., FULL NAME, PAYMENT REF.",
           });
         }
-        if (!norm.includes("paymentRef") && !norm.includes("payment_ref")) {
-          toast.message("Heads up: no paymentRef column", {
+        if (!normHeaders.some(h => h === "paymentref")) {
+          toast.message("Heads up: no payment ref column", {
             description: "All rows will use the bulk payment reference you enter on the next step.",
           });
         }
         const rows: BulkEnrollRow[] = res.data
           .map((r) => ({
-            cdmId: (r.cdmId || r.cdm_id || "").trim(),
-            paymentRef: (r.paymentRef || r.payment_ref || "").trim() || null,
+            cdmId: get(r, "CDM NO.", "cdmId", "cdm_id", "CDM No.", "cdm").trim(),
+            paymentRef: get(r, "PAYMENT REF", "paymentRef", "payment_ref").trim() || null,
           }))
           .filter((r) => r.cdmId);
         if (!rows.length) {
@@ -305,17 +306,32 @@ function EnrollmentPage() {
 
   return (
     <>
-      <Topbar title="Enrollment" />
+      <Topbar
+        title={`Annual Enrollment ${search.year}`}
+        description={isLoading ? "Loading enrollments…" : `${enrollmentRows.length.toLocaleString()} matching enrollments. A youth must be registered (CDM No.) before being enrolled.`}
+        action={
+          <>
+            <select
+              value={search.year}
+              onChange={(e) => setFilter({ year: Number(e.target.value) })}
+              aria-label="Select enrollment year"
+              className="h-8 rounded-md border border-border bg-bg-2 px-2.5 text-[11px] font-semibold text-text-1 outline-none transition hover:border-gold-3 focus:border-gold-3"
+            >
+              {AVAILABLE_YEARS.map((y) => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => setAddOpen(true)}
+              className="inline-flex h-8 items-center gap-1.5 rounded-md bg-danger px-3 text-[11px] font-bold text-white transition hover:opacity-90"
+            >
+              <Plus className="h-3.5 w-3.5" /> Enroll Youth
+            </button>
+          </>
+        }
+      />
       <div className="flex-1 overflow-y-auto px-5 py-4">
-        <PageHeader
-          title="Annual Enrollment 2026"
-          description={
-            isLoading
-              ? "Loading enrollments…"
-              : `${enrollmentRows.length.toLocaleString()} matching enrollments. A youth must be registered (CDM No.) before being enrolled.`
-          }
-        />
-
         <Card>
           <TableToolbar
             searchValue={search.q}
@@ -327,16 +343,14 @@ function EnrollmentPage() {
               const data: (string | number | null)[][] = enrollmentRows.map((r) => [r.cdmId, r.name, r.deaneryName, r.parishName, r.category, r.fee, r.paymentStatus]);
               downloadXlsx("enrollment-export", "Enrollment 2026", headers, data).then(() => toast.success(`Exported ${enrollmentRows.length} enrollments`)).catch((e: Error) => toast.error(e.message));
             }}
-            onAdd={() => setAddOpen(true)}
-            addLabel="Enroll Youth"
             extra={
               <button
                 type="button"
                 onClick={downloadSample}
-                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-danger/60 bg-bg-2 px-2.5 text-[11px] font-semibold text-danger transition hover:bg-danger-soft/40 hover:border-danger"
-                title="Download Excel sample for import"
+                className="inline-flex h-8 items-center gap-1.5 rounded-md bg-danger px-2.5 text-[11px] font-bold text-white transition hover:opacity-90"
+                title="Download Excel import sample"
               >
-                <Download className="h-3.5 w-3.5" /> Sample
+                <Download className="h-3.5 w-3.5" /> Import Sample
               </button>
             }
           />
@@ -462,21 +476,6 @@ function EnrollmentPage() {
           </CardBody>
         </Card>
 
-        <Card2 className="mt-3">
-          <CardHead2 title="Audit Log" subtitle="Last 50 enrollment changes (auto-refresh 15s)" />
-          <CardBody2 className="space-y-1.5 max-h-72 overflow-y-auto">
-            {auditLog.length === 0 && <div className="text-[11px] text-text-3">No audit entries yet.</div>}
-            {auditLog.map((a) => (
-              <div key={a.id} className="flex items-center gap-2 rounded-lg border border-border bg-bg-2 px-3 py-2 text-[11px]">
-                <Pill tone={a.action === "delete" ? "danger" : a.action === "status_change" ? "info" : "success"}>{a.action}</Pill>
-                <span className="font-mono text-[10px] text-text-3 flex-1 truncate">
-                  {JSON.stringify(a.after ?? a.before ?? {})}
-                </span>
-                <span className="text-text-3 text-[9px] shrink-0">{new Date(a.created_at).toLocaleString()}</span>
-              </div>
-            ))}
-          </CardBody2>
-        </Card2>
       </div>
       <RecordFormDialog
         open={addOpen}

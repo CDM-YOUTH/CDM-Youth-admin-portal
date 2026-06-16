@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { MoreVertical, Eye, Pencil, Trash2 } from "lucide-react";
 import { Topbar, TopbarButton } from "@/components/admin/topbar";
-import { Card, CardBody, CardHead, Kpi, PageHeader, Pill } from "@/components/admin/ui-bits";
+import { Card, CardBody, CardHead, Kpi, Pill } from "@/components/admin/ui-bits";
 import { RecordFormDialog, type FieldDef } from "@/components/admin/record-form-dialog";
 import { ViewRecordDialog } from "@/components/admin/view-record-dialog";
 import {
@@ -188,9 +188,12 @@ function UniformsPage() {
 
   return (
     <>
-      <Topbar title="Uniforms" action={<TopbarButton onClick={() => setOrderOpen(true)}>+ New Order</TopbarButton>} />
+      <Topbar
+        title="Uniforms & Procurement"
+        description="Track stock levels, deanery distributions, and youth payments."
+        action={<TopbarButton onClick={() => setOrderOpen(true)}>+ New Order</TopbarButton>}
+      />
       <div className="flex-1 overflow-y-auto px-5 py-4">
-        <PageHeader title="Uniforms & Procurement" description="Track stock levels, deanery distributions, and youth payments." />
 
         <div className="mb-4 grid grid-cols-1 gap-2.5 sm:grid-cols-4">
           <Kpi label="In Stock"             value={totalStock.toLocaleString()} trend={`across ${displaySkus.length} SKUs`} tone="up" />

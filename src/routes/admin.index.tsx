@@ -47,6 +47,9 @@ export const Route = createFileRoute("/admin/")({
   component: DashboardPage,
 });
 
+const CURRENT_YEAR = new Date().getFullYear();
+const AVAILABLE_YEARS = Array.from({ length: CURRENT_YEAR - 2022 }, (_, i) => CURRENT_YEAR - i);
+
 type Tab = "general" | "enrollment" | "cusa" | "mission";
 type FilterState = { deaneryCode: string; parishId: string; churchId: string };
 type ChartDisplay = "count" | "percent";
@@ -95,11 +98,11 @@ function DashboardPage() {
   );
 }
 
-function useFilteredAnalytics() {
+function useFilteredAnalytics(year?: number) {
   const [filters, setFilters] = useState<FilterState>(emptyFilters);
   const { data: live } = useQuery({
-    queryKey: ["live-analytics"],
-    queryFn: () => getLiveAnalytics(),
+    queryKey: ["live-analytics", year ?? CURRENT_YEAR],
+    queryFn: () => getLiveAnalytics(year),
     staleTime: 30_000,
   });
   const sourceUnits = live?.units ?? ANALYTICS_UNITS;
@@ -128,6 +131,7 @@ function useFilteredAnalytics() {
     units,
     scope: scope ?? "Diocese-wide",
     upcomingEvents: live?.upcomingEvents ?? null,
+    pendingEnrollments: live?.pendingEnrollments ?? 0,
   };
 }
 
@@ -363,15 +367,37 @@ function OrgFilterBar({
   scope,
   institution,
   onInstitutionChange,
-}: ReturnType<typeof useFilteredAnalytics> & { institution?: string; onInstitutionChange?: (value: string) => void }) {
+  year,
+  onYearChange,
+}: ReturnType<typeof useFilteredAnalytics> & {
+  institution?: string;
+  onInstitutionChange?: (value: string) => void;
+  year?: number;
+  onYearChange?: (year: number) => void;
+}) {
   return (
     <FilterBar>
       <FilterLabel>Filter by</FilterLabel>
       <FilterDivider />
+      {onYearChange !== undefined && (
+        <>
+          <select
+            value={year ?? CURRENT_YEAR}
+            onChange={(e) => onYearChange(Number(e.target.value))}
+            aria-label="Select year"
+            className="min-w-[80px] rounded-md border border-black/20 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-black/70 outline-none transition-colors hover:border-gold-3/50 hover:text-black focus:border-gold-3 focus:text-black"
+          >
+            {AVAILABLE_YEARS.map((y) => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
+          <span className="text-text-4">›</span>
+        </>
+      )}
       <select
         value={filters.deaneryCode}
         onChange={(event) => setFilters({ deaneryCode: event.target.value, parishId: "", churchId: "" })}
-        className="min-w-[148px] rounded-md border border-gold-3 bg-bg-3 px-2.5 py-1.5 text-[11px] font-semibold text-gold outline-none"
+        className="min-w-[148px] rounded-md border border-black/20 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-black/70 outline-none transition-colors hover:border-gold-3/50 hover:text-black focus:border-gold-3 focus:text-black"
       >
         <option value="">All Deaneries</option>
         {ORGANIZATION.map((d) => (
@@ -383,7 +409,7 @@ function OrgFilterBar({
         value={filters.parishId}
         disabled={!selectedDeanery}
         onChange={(event) => setFilters({ ...filters, parishId: event.target.value, churchId: "" })}
-        className="min-w-[148px] rounded-md border border-border bg-bg-3 px-2.5 py-1.5 text-[11px] font-semibold text-text-2 outline-none disabled:opacity-40"
+        className="min-w-[148px] rounded-md border border-black/20 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-black/70 outline-none transition-colors disabled:opacity-40 hover:border-gold-3/50 hover:text-black focus:border-gold-3 focus:text-black"
       >
         <option value="">All Parishes</option>
         {selectedDeanery?.parishes.map((parish) => (
@@ -395,7 +421,7 @@ function OrgFilterBar({
         value={filters.churchId}
         disabled={!selectedParish}
         onChange={(event) => setFilters({ ...filters, churchId: event.target.value })}
-        className="min-w-[148px] rounded-md border border-border bg-bg-3 px-2.5 py-1.5 text-[11px] font-semibold text-text-2 outline-none disabled:opacity-40"
+        className="min-w-[148px] rounded-md border border-black/20 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-black/70 outline-none transition-colors disabled:opacity-40 hover:border-gold-3/50 hover:text-black focus:border-gold-3 focus:text-black"
       >
         <option value="">All Outstations</option>
         {selectedParish?.churches.map((church) => (
@@ -408,7 +434,7 @@ function OrgFilterBar({
           <select
             value={institution ?? ""}
             onChange={(event) => onInstitutionChange(event.target.value)}
-            className="min-w-[168px] rounded-md border border-violet bg-bg-3 px-2.5 py-1.5 text-[11px] font-semibold text-violet outline-none"
+            className="min-w-[168px] rounded-md border border-black/20 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-black/70 outline-none transition-colors hover:border-gold-3/50 hover:text-black focus:border-gold-3 focus:text-black"
           >
             <option value="">All Institutions</option>
             {CUSA_INSTITUTIONS.map((name) => <option key={name} value={name}>{name}</option>)}
@@ -456,8 +482,10 @@ function FeedItem({ kind, title, who, where, time }: { kind: string; title: stri
 /* ---------- TAB: Enrollment ---------- */
 
 function EnrollmentTab({ chartDisplay }: { chartDisplay: ChartDisplay }) {
-  const analytics = useFilteredAnalytics();
+  const [year, setYear] = useState(CURRENT_YEAR);
+  const analytics = useFilteredAnalytics(year);
   const totals = totalsFor(analytics.units);
+  const completionPct = pct(totals.enrolled, totals.youths);
   const rows = rollupRows(analytics.units, analytics.filters, "enrolled", "youths");
   const trendRows = enrollmentTrendRows(analytics.units).map((row) => ({
     ...row,
@@ -467,27 +495,27 @@ function EnrollmentTab({ chartDisplay }: { chartDisplay: ChartDisplay }) {
 
   return (
     <>
-      <OrgFilterBar {...analytics} />
+      <OrgFilterBar {...analytics} year={year} onYearChange={setYear} />
 
       <div className="mb-3.5 flex flex-wrap items-start gap-3.5 rounded-xl border border-danger/20 bg-gradient-to-r from-danger-soft via-white to-warn-soft p-4">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-success-soft text-[20px]">🌱</div>
         <div className="min-w-[180px] flex-1">
-          <div className="text-[13px] font-bold text-foreground">Enrollment Window — Year 2026</div>
-          <div className="text-[10px] text-text-3">Open since 01 Jan 2026 · Closes 30 Apr 2026 · 41 days remaining</div>
+          <div className="text-[13px] font-bold text-foreground">Enrollment Window — Year {year}</div>
+          <div className="text-[10px] text-text-3">Showing data for {year} · {totals.enrolled.toLocaleString()} enrolled of {totals.youths.toLocaleString()} registered</div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Stat value={`${pct(totals.enrolled, totals.youths)}%`} label="of target" />
+          <Stat value={`${completionPct}%`} label="completion" />
           <Stat value={totals.enrolled.toLocaleString()} label="enrolled" />
           <Stat value={Math.max(0, totals.youths - totals.enrolled).toLocaleString()} label="remaining" tone="warn" />
         </div>
       </div>
 
       <div className="mb-3.5 grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-5">
-        <Kpi label="Enrolled 2026" value={totals.enrolled.toLocaleString()} trend={`${pct(totals.enrolled, totals.youths)}% of target`} tone="up" sub={`of ${totals.youths.toLocaleString()}`} />
+        <Kpi label={`Enrolled ${year}`} value={totals.enrolled.toLocaleString()} trend={`${completionPct}% of registered`} tone="up" sub={`of ${totals.youths.toLocaleString()}`} />
         <Kpi label="Pending Payment" value={Math.round(totals.enrolled * 0.05).toLocaleString()} trend={`KES ${(Math.round(totals.enrolled * 0.05) * 500).toLocaleString()}`} tone="warn" sub="outstanding" />
         <Kpi label="Self-Registered" value={Math.round(totals.enrolled * 0.39).toLocaleString()} trend="39% of total" tone="info" sub="via Youth Portal" />
-        <Kpi label="Awaiting Approval" value={Math.max(3, Math.round(totals.enrolled * 0.01)).toLocaleString()} trend="parish review" tone="warn" sub="queue" />
-        <Kpi label="Completion Rate" value={`${pct(totals.enrolled, totals.youths)}%`} trend="live filter" tone="up" sub={analytics.scope} />
+        <Kpi label="Pending Payment" value={analytics.pendingEnrollments.toLocaleString()} trend="awaiting confirmation" tone="warn" sub="this year" />
+        <Kpi label="Completion Rate" value={`${completionPct}%`} trend="enrolled ÷ registered" tone="up" sub={analytics.scope} />
       </div>
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.25fr_1fr]">

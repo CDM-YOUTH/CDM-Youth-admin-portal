@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Topbar } from "@/components/admin/topbar";
-import { Card, CardBody, CardHead, PageHeader } from "@/components/admin/ui-bits";
+import { Card, CardBody, CardHead } from "@/components/admin/ui-bits";
 
 export const Route = createFileRoute("/admin/settings")({
   head: () => ({
@@ -39,9 +39,11 @@ const ROWS = [
 function SettingsPage() {
   return (
     <>
-      <Topbar title="Settings" />
+      <Topbar
+        title="System Settings"
+        description="Diocese-level configuration. Changes apply across all parishes."
+      />
       <div className="flex-1 overflow-y-auto px-5 py-4">
-        <PageHeader title="System Settings" description="Diocese-level configuration. Changes apply across all parishes." />
 
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           <Card>

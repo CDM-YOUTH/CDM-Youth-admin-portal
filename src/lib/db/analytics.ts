@@ -30,6 +30,7 @@ export async function getDashboardCounts(year?: number): Promise<DashboardCounts
 export type LiveAnalytics = {
   units: AnalyticsUnit[];
   upcomingEvents: { id: string; name: string; venue: string; parish: string; day: string; month: string; registered: number }[];
+  pendingEnrollments: number;
 };
 
 /**
@@ -48,7 +49,7 @@ export async function getLiveAnalytics(year?: number): Promise<LiveAnalytics> {
       .limit(10000),
     supabase
       .from("enrollments")
-      .select("id, youth:youths(id, gender, deanery:deaneries(name), parish:parishes(name), outstation:outstations(name))")
+      .select("id, status, youth:youths(id, gender, deanery:deaneries(name), parish:parishes(name), outstation:outstations(name))")
       .eq("year", y)
       .limit(10000),
     supabase
@@ -106,7 +107,11 @@ export async function getLiveAnalytics(year?: number): Promise<LiveAnalytics> {
     const cat = (y.category ?? "Secondary").toLowerCase() as "primary" | "secondary" | "tertiary" | "working";
     bump(key, { youths: 1, [cat]: 1 } as Partial<Counts>);
   }
-  for (const e of (enrolledRes.data ?? []) as Array<{ youth: YouthBucket | null }>) {
+  const pendingEnrollments = (enrolledRes.data ?? []).filter(
+    (e: { status: string }) => e.status === "pending",
+  ).length;
+
+  for (const e of (enrolledRes.data ?? []) as Array<{ status: string; youth: YouthBucket | null }>) {
     const yo = e.youth;
     if (!yo) continue;
     bump(k(yo.deanery?.name, yo.parish?.name, yo.outstation?.name), { enrolled: 1 });
@@ -185,5 +190,5 @@ export async function getLiveAnalytics(year?: number): Promise<LiveAnalytics> {
     };
   });
 
-  return { units, upcomingEvents };
+  return { units, upcomingEvents, pendingEnrollments };
 }

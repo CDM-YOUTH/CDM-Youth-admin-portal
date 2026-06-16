@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { MoreVertical, Eye, Pencil, Trash2 } from "lucide-react";
 import { Topbar, TopbarButton } from "@/components/admin/topbar";
-import { Card, CardBody, CardHead, Kpi, PageHeader, Pill } from "@/components/admin/ui-bits";
+import { Card, CardBody, CardHead, Kpi, Pill } from "@/components/admin/ui-bits";
 import { RecordFormDialog, type FieldDef } from "@/components/admin/record-form-dialog";
 import { ViewRecordDialog } from "@/components/admin/view-record-dialog";
 import {
@@ -124,12 +124,12 @@ function FormationPage() {
 
   return (
     <>
-      <Topbar title="Formation" action={<TopbarButton onClick={() => setUploadOpen(true)}>+ Upload Content</TopbarButton>} />
+      <Topbar
+        title="Formation Library"
+        description={isLoading ? "Loading…" : "Catechesis, reflections, prayer guides, and youth Bible study materials."}
+        action={<TopbarButton onClick={() => setUploadOpen(true)}>+ Upload Content</TopbarButton>}
+      />
       <div className="flex-1 overflow-y-auto px-5 py-4">
-        <PageHeader
-          title="Formation Library"
-          description={isLoading ? "Loading…" : "Catechesis, reflections, prayer guides, and youth Bible study materials."}
-        />
 
         <div className="mb-4 grid grid-cols-1 gap-2.5 sm:grid-cols-4">
           <Kpi label="Total Items" value={String(total)}                   trend="+6 this month" tone="up"   />

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Topbar, TopbarButton } from "@/components/admin/topbar";
-import { Card, CardBody, CardHead, PageHeader } from "@/components/admin/ui-bits";
+import { Card, CardBody, CardHead } from "@/components/admin/ui-bits";
 
 export const Route = createFileRoute("/admin/reports")({
   head: () => ({
@@ -24,9 +24,12 @@ const REPORTS = [
 function ReportsPage() {
   return (
     <>
-      <Topbar title="Reports" action={<TopbarButton>+ Custom Report</TopbarButton>} />
+      <Topbar
+        title="Reports"
+        description="Standard reports the Diocese, Deanery, and Parish admins can generate on demand."
+        action={<TopbarButton>+ Custom Report</TopbarButton>}
+      />
       <div className="flex-1 overflow-y-auto px-5 py-4">
-        <PageHeader title="Reports" description="Standard reports the Diocese, Deanery, and Parish admins can generate on demand." />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {REPORTS.map((r) => (
             <Card key={r.title}>
