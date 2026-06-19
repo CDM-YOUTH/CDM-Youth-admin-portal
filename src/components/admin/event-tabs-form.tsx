@@ -26,6 +26,8 @@ export type EventDetails = {
   deanery: string;
   parish: string;
   description: string;
+  hasDuties: boolean;
+  isMass: boolean;
 };
 
 export type ProgramActivity = { id: string; name: string };
@@ -61,7 +63,9 @@ export type EventFormState = {
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 
-export const DEFAULT_DUTIES: DutyCategory[] = [
+const MASS_CATEGORY_NAMES = new Set(["Readings", "Prayers of the Faithful", "Speeches"]);
+
+export const MASS_DUTIES: DutyCategory[] = [
   {
     id: uid(),
     name: "Readings",
@@ -105,19 +109,27 @@ export function emptyEventState(): EventFormState {
       deanery: "",
       parish: "",
       description: "",
+      hasDuties: false,
+      isMass: false,
     },
     program: [
       { id: uid(), startTime: "", endTime: "", activities: [{ id: uid(), name: "" }] },
     ],
-    duties: DEFAULT_DUTIES.map((c) => ({
-      ...c,
-      id: uid(),
-      duties: c.duties.map((d) => ({
-        ...d,
+    duties: [
+      {
         id: uid(),
-        assignments: d.assignments.map((a) => ({ ...a, id: uid() })),
-      })),
-    })),
+        name: "",
+        duties: [{ id: uid(), label: "", assignments: [{ id: uid(), deanery: "", parish: "", name: "" }] }],
+      },
+    ],
+  };
+}
+
+function emptyCustomCategory(): DutyCategory {
+  return {
+    id: uid(),
+    name: "",
+    duties: [{ id: uid(), label: "", assignments: [{ id: uid(), deanery: "", parish: "", name: "" }] }],
   };
 }
 
@@ -155,7 +167,27 @@ export function EventTabsForm({
   }, [seed]);
 
   const setDetails = (patch: Partial<EventDetails>) =>
-    setState((s) => ({ ...s, details: { ...s.details, ...patch } }));
+    setState((s) => {
+      const newDetails = { ...s.details, ...patch };
+      let newDuties = s.duties;
+
+      if ("isMass" in patch) {
+        if (patch.isMass) {
+          const custom = s.duties.filter((c) => !MASS_CATEGORY_NAMES.has(c.name));
+          newDuties = [...freshMassDuties(), ...custom];
+        } else {
+          const custom = s.duties.filter((c) => !MASS_CATEGORY_NAMES.has(c.name));
+          newDuties = custom.length > 0 ? custom : [emptyCustomCategory()];
+        }
+      }
+
+      if ("hasDuties" in patch && !patch.hasDuties) {
+        newDetails.isMass = false;
+        newDuties = [emptyCustomCategory()];
+      }
+
+      return { ...s, details: newDetails, duties: newDuties };
+    });
 
   const detailsInput = () => ({
     name: state.details.name,
@@ -280,7 +312,7 @@ export function EventTabsForm({
           value="duties"
           className="data-[state=active]:bg-danger data-[state=active]:text-white data-[state=active]:shadow-none rounded font-bold text-[11px]"
         >
-          3 · Duties
+          {state.details.hasDuties ? "3 · Duties" : "3 · Activities"}
         </TabsTrigger>
       </TabsList>
 
@@ -296,6 +328,7 @@ export function EventTabsForm({
       <TabsContent value="duties" className="mt-4">
         <DutiesTab
           duties={state.duties}
+          hasDuties={state.details.hasDuties}
           setDuties={(d) => setState((s) => ({ ...s, duties: d }))}
         />
       </TabsContent>
@@ -490,6 +523,45 @@ function DetailsTab({
           />
         </FieldLabel>
       </div>
+      <div className="md:col-span-2">
+        <div className="flex flex-wrap items-center gap-5 rounded-lg border border-border bg-bg-2 px-3 py-2.5">
+          <label className="flex cursor-pointer items-center gap-2">
+            <input
+              type="checkbox"
+              checked={details.hasDuties}
+              onChange={(e) => onChange({ hasDuties: e.target.checked })}
+              className="h-4 w-4 accent-danger"
+            />
+            <span className="text-[11px] font-bold text-text-1">Has duties / activities</span>
+          </label>
+          {details.hasDuties && (
+            <label className="flex cursor-pointer items-center gap-2">
+              <input
+                type="checkbox"
+                checked={details.isMass}
+                onChange={(e) => onChange({ isMass: e.target.checked })}
+                className="h-4 w-4 accent-danger"
+              />
+              <span className="text-[11px] font-bold text-text-1">This is a Mass event</span>
+            </label>
+          )}
+          {!details.hasDuties && (
+            <span className="ml-auto text-[10px] text-text-3">
+              Tab 3: simple steps list — name each section (e.g. Agenda, Notes)
+            </span>
+          )}
+          {details.hasDuties && !details.isMass && (
+            <span className="ml-auto text-[10px] text-text-3">
+              Tab 3: add duty categories and assign people by name / parish
+            </span>
+          )}
+          {details.hasDuties && details.isMass && (
+            <span className="ml-auto text-[10px] text-text-3">
+              Tab 3: Readings · Prayers of the Faithful · Speeches pre-filled
+            </span>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -634,12 +706,26 @@ function ProgramTab({
 
 /* ---------- Duties ---------- */
 
+function freshMassDuties(): DutyCategory[] {
+  return MASS_DUTIES.map((c) => ({
+    ...c,
+    id: uid(),
+    duties: c.duties.map((d) => ({
+      ...d,
+      id: uid(),
+      assignments: d.assignments.map((a) => ({ ...a, id: uid() })),
+    })),
+  }));
+}
+
 function DutiesTab({
   duties,
   setDuties,
+  hasDuties,
 }: {
   duties: DutyCategory[];
   setDuties: (d: DutyCategory[]) => void;
+  hasDuties: boolean;
 }) {
   const updateCategory = (id: string, patch: Partial<DutyCategory>) =>
     setDuties(duties.map((c) => (c.id === id ? { ...c, ...patch } : c)));
@@ -650,11 +736,11 @@ function DutiesTab({
       ...duties,
       {
         id: uid(),
-        name: "New category",
+        name: "",
         duties: [
           {
             id: uid(),
-            label: "New duty",
+            label: "",
             assignments: [{ id: uid(), deanery: "", parish: "", name: "" }],
           },
         ],
@@ -767,149 +853,183 @@ function DutiesTab({
       ),
     );
 
-  return (
-    <div className="space-y-4">
-      <p className="text-[11px] text-text-3">
-        Each duty can have one or more people assigned, possibly from different parishes/deaneries.
-      </p>
-      {duties.map((cat) => (
-        <div key={cat.id} className="rounded-lg border border-border bg-white p-3">
-          <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-gold">
-            Category
-          </div>
-          <div className="mb-3 flex items-center gap-2">
-            <Input
-              value={cat.name}
-              onChange={(e) => updateCategory(cat.id, { name: e.target.value })}
-              className="font-bold"
-            />
-            <button
-              type="button"
-              onClick={() => removeCategory(cat.id)}
-              className="flex items-center gap-1 rounded-md border border-border bg-gray-50 px-2 py-1 text-[10px] font-bold text-text-2 hover:border-danger/50 hover:text-danger"
-            >
-              <Trash2 className="h-3 w-3" /> Remove category
-            </button>
-          </div>
-          <div className="space-y-3">
-            {cat.duties.map((duty) => (
-              <div key={duty.id} className="rounded-md border border-border bg-gray-50 p-2.5">
-                <div className="mb-1.5 text-[9px] font-bold uppercase tracking-wide text-danger">
-                  Duty
-                </div>
-                <div className="mb-2 flex items-center gap-2">
+  if (!hasDuties) {
+    return (
+      <div className="space-y-2">
+        {duties.map((cat) => (
+          <div key={cat.id} className="rounded-lg border border-border bg-white p-2">
+            <div className="mb-1.5 flex items-center gap-1.5">
+              <Input
+                value={cat.name}
+                onChange={(e) => updateCategory(cat.id, { name: e.target.value })}
+                placeholder="Step name (e.g. Agenda, Discussion, Notes)"
+                className="h-7 text-[11px] font-bold"
+              />
+              <button
+                type="button"
+                onClick={() => removeCategory(cat.id)}
+                className="shrink-0 rounded p-1 text-text-3 hover:bg-gray-100 hover:text-danger"
+                aria-label="Remove step"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <div className="space-y-1 border-l-2 border-border pl-2">
+              {cat.duties.map((duty, i) => (
+                <div key={duty.id} className="flex items-center gap-1">
+                  <span className="w-4 shrink-0 text-center text-[9px] text-text-4">{i + 1}.</span>
                   <Input
                     value={duty.label}
                     onChange={(e) => updateDuty(cat.id, duty.id, { label: e.target.value })}
-                    placeholder="Duty name (e.g. First reading)"
-                    className="font-semibold"
+                    placeholder="Item…"
+                    className="h-7 text-[10px]"
                   />
                   <button
                     type="button"
                     onClick={() => removeDuty(cat.id, duty.id)}
-                    className="rounded-md p-1 text-text-3 hover:bg-white hover:text-danger"
-                    aria-label="Remove duty"
+                    className="shrink-0 rounded p-0.5 text-text-3 hover:bg-gray-100 hover:text-danger"
+                    aria-label="Remove item"
                   >
-                    <X className="h-3.5 w-3.5" />
+                    <X className="h-3 w-3" />
                   </button>
                 </div>
-                <div className="space-y-2">
-                  {duty.assignments.map((a, i) => {
+              ))}
+              <button
+                type="button"
+                onClick={() => addDuty(cat.id)}
+                className="mt-0.5 inline-flex items-center gap-1 rounded px-1 py-0.5 text-[9px] font-bold text-text-3 hover:text-gold"
+              >
+                <Plus className="h-2.5 w-2.5" /> add item
+              </button>
+            </div>
+          </div>
+        ))}
+        <button
+          type="button"
+          onClick={addCategory}
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border bg-white px-3 py-2 text-[11px] font-bold text-text-2 hover:border-gold-3 hover:text-gold"
+        >
+          <Plus className="h-3.5 w-3.5" /> Add another step
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {duties.map((cat) => (
+        <div key={cat.id} className="rounded-lg border border-border bg-white p-2">
+          {/* Category name + remove */}
+          <div className="mb-1.5 flex items-center gap-1.5">
+            <Input
+              value={cat.name}
+              onChange={(e) => updateCategory(cat.id, { name: e.target.value })}
+              placeholder="Category name (e.g. Readings, Agenda, Teams)"
+              className="h-7 text-[11px] font-bold"
+            />
+            <button
+              type="button"
+              onClick={() => removeCategory(cat.id)}
+              className="shrink-0 rounded p-1 text-text-3 hover:bg-gray-100 hover:text-danger"
+              aria-label="Remove category"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          {/* Duties */}
+          <div className="space-y-1.5 border-l-2 border-border pl-2">
+            {cat.duties.map((duty) => (
+              <div key={duty.id} className="rounded border border-border/60 bg-gray-50 p-1.5">
+                {/* Duty label */}
+                <div className="mb-1 flex items-center gap-1">
+                  <Input
+                    value={duty.label}
+                    onChange={(e) => updateDuty(cat.id, duty.id, { label: e.target.value })}
+                    placeholder="Duty / role (e.g. First reading, Welcome speech)"
+                    className="h-6 text-[11px] font-semibold"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeDuty(cat.id, duty.id)}
+                    className="shrink-0 rounded p-0.5 text-text-3 hover:bg-white hover:text-danger"
+                    aria-label="Remove duty"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+                {/* Assignments — compact inline rows */}
+                <div className="space-y-1">
+                  {duty.assignments.map((a) => {
                     const parishOpts =
-                      ORGANIZATION.find((d) => d.name === a.deanery)?.parishes.map(
-                        (p) => p.name,
-                      ) ?? [];
+                      ORGANIZATION.find((d) => d.name === a.deanery)?.parishes.map((p) => p.name) ?? [];
                     return (
-                      <div
-                        key={a.id}
-                        className="grid grid-cols-1 gap-2 rounded border border-border/50 bg-white p-2 md:grid-cols-[1fr_1fr_1.4fr_auto]"
-                      >
-                        <div>
-                          <span className="mb-0.5 block text-[9px] font-bold uppercase text-gold-3">
-                            Deanery
-                          </span>
-                          <Select
-                            value={a.deanery}
-                            onValueChange={(v) =>
-                              updateAssignment(cat.id, duty.id, a.id, { deanery: v, parish: "" })
-                            }
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Deanery" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {ORGANIZATION.map((d) => (
-                                <SelectItem key={d.code} value={d.name}>
-                                  {d.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <span className="mb-0.5 block text-[9px] font-bold uppercase text-gold-3">
-                            Parish
-                          </span>
-                          <Select
-                            value={a.parish}
-                            onValueChange={(v) =>
-                              updateAssignment(cat.id, duty.id, a.id, { parish: v })
-                            }
-                            disabled={!a.deanery}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder={a.deanery ? "Parish" : "Pick deanery"} />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {parishOpts.map((p) => (
-                                <SelectItem key={p} value={p}>
-                                  {p}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <span className="mb-0.5 block text-[9px] font-bold uppercase text-gold-3">
-                            Name {i > 0 ? `#${i + 1}` : ""}
-                          </span>
-                          <Input
-                            value={a.name}
-                            onChange={(e) =>
-                              updateAssignment(cat.id, duty.id, a.id, { name: e.target.value })
-                            }
-                            placeholder="Youth / individual responsible"
-                          />
-                        </div>
-                        <div className="flex items-end">
-                          <button
-                            type="button"
-                            onClick={() => removeAssignment(cat.id, duty.id, a.id)}
-                            className="rounded-md p-2 text-text-3 hover:bg-gray-100 hover:text-danger"
-                            aria-label="Remove person"
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
+                      <div key={a.id} className="flex items-center gap-1">
+                        <Select
+                          value={a.deanery}
+                          onValueChange={(v) =>
+                            updateAssignment(cat.id, duty.id, a.id, { deanery: v, parish: "" })
+                          }
+                        >
+                          <SelectTrigger className="h-7 text-[10px]">
+                            <SelectValue placeholder="Deanery" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {ORGANIZATION.map((d) => (
+                              <SelectItem key={d.code} value={d.name}>{d.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Select
+                          value={a.parish}
+                          onValueChange={(v) =>
+                            updateAssignment(cat.id, duty.id, a.id, { parish: v })
+                          }
+                          disabled={!a.deanery}
+                        >
+                          <SelectTrigger className="h-7 text-[10px]">
+                            <SelectValue placeholder="Parish" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {parishOpts.map((p) => (
+                              <SelectItem key={p} value={p}>{p}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Input
+                          value={a.name}
+                          onChange={(e) =>
+                            updateAssignment(cat.id, duty.id, a.id, { name: e.target.value })
+                          }
+                          placeholder="Name"
+                          className="h-7 text-[10px]"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeAssignment(cat.id, duty.id, a.id)}
+                          className="shrink-0 rounded p-1 text-text-3 hover:bg-gray-100 hover:text-danger"
+                          aria-label="Remove"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
                       </div>
                     );
                   })}
-                  <button
-                    type="button"
-                    onClick={() => addAssignment(cat.id, duty.id)}
-                    className="inline-flex items-center gap-1 rounded-md border border-dashed border-border px-2 py-1 text-[10px] font-bold text-text-2 hover:border-gold-3 hover:text-gold"
-                  >
-                    <Plus className="h-3 w-3" /> Add another person
-                  </button>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => addAssignment(cat.id, duty.id)}
+                  className="mt-1 inline-flex items-center gap-1 rounded px-1 py-0.5 text-[9px] font-bold text-text-3 hover:text-gold"
+                >
+                  <Plus className="h-2.5 w-2.5" /> add person
+                </button>
               </div>
             ))}
             <button
               type="button"
               onClick={() => addDuty(cat.id)}
-              className="inline-flex items-center gap-1 rounded-md border border-dashed border-border px-2 py-1 text-[11px] font-bold text-text-2 hover:border-gold-3 hover:text-gold"
+              className="inline-flex items-center gap-1 rounded border border-dashed border-border px-2 py-0.5 text-[10px] font-bold text-text-3 hover:border-gold-3 hover:text-gold"
             >
-              <Plus className="h-3 w-3" /> Add duty in "{cat.name}"
+              <Plus className="h-3 w-3" /> add duty
             </button>
           </div>
         </div>

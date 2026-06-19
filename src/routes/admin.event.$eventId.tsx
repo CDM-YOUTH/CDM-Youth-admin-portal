@@ -1,7 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { ChevronRight } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Topbar, TopbarButton } from "@/components/admin/topbar";
 import { Card, CardBody, CardHead, Kpi, PageHeader, Pill } from "@/components/admin/ui-bits";
@@ -74,7 +73,12 @@ function dbCategoriesToDuties(categories: EventDutyCategory[]): DutyCategory[] {
     }));
 }
 
+const MASS_NAMES = new Set(["Readings", "Prayers of the Faithful", "Speeches"]);
+
 function eventToFormSeed(event: EventFull): EventFormState {
+  const duties = dbCategoriesToDuties(event.duty_categories);
+  const isMass = duties.some((c) => MASS_NAMES.has(c.name));
+  const hasDuties = event.duty_categories.length > 0;
   return {
     details: {
       name: event.name,
@@ -86,9 +90,11 @@ function eventToFormSeed(event: EventFull): EventFormState {
       deanery: event.deanery?.name ?? "",
       parish: event.parish?.name ?? "",
       description: event.description ?? "",
+      hasDuties,
+      isMass,
     },
     program: programItemsToSlots(event.program),
-    duties: dbCategoriesToDuties(event.duty_categories),
+    duties,
   };
 }
 
@@ -146,7 +152,16 @@ function EventDetailPage() {
               Close editor
             </button>
           ) : (
-            <TopbarButton onClick={() => setMode("edit")}>Edit Event</TopbarButton>
+            <div className="flex items-center gap-2">
+              <Link
+                to="/admin/event-checkin/$eventId"
+                params={{ eventId }}
+                className="rounded-lg bg-primary px-3.5 py-1.5 text-[11px] font-bold text-primary-foreground shadow-sm transition-opacity hover:opacity-90"
+              >
+                Register
+              </Link>
+              <TopbarButton onClick={() => setMode("edit")}>Edit Event</TopbarButton>
+            </div>
           )
         }
       />
@@ -271,38 +286,6 @@ function EventDetailPage() {
               </Card>
             )}
 
-            {/* Registrations & Check-in — click to open management page */}
-            <Link
-              to="/admin/event-checkin/$eventId"
-              params={{ eventId }}
-              className="mt-3 block"
-            >
-              <Card className="cursor-pointer transition-all hover:border-gold-3/60 hover:shadow-sm">
-                <CardHead
-                  title="Registrations & Check-in"
-                  subtitle={`${registrationCount} registered · ${guestCount} guest${guestCount !== 1 ? "s" : ""} · ${event.checkin_count} checked in`}
-                  action={
-                    <span className="inline-flex items-center gap-1 rounded-md bg-danger px-2.5 py-1 text-[11px] font-bold text-white">
-                      Open <ChevronRight className="h-3 w-3" />
-                    </span>
-                  }
-                />
-                <CardBody>
-                  <div className="flex flex-wrap gap-6">
-                    <div>
-                      <div className="text-[9px] font-bold uppercase tracking-wide text-text-3">Registrations</div>
-                      <div className="text-[20px] font-black text-text-1">{registrationCount}</div>
-                      <div className="text-[10px] text-text-3">{memberCount} member{memberCount !== 1 ? "s" : ""} · {guestCount} guest{guestCount !== 1 ? "s" : ""}</div>
-                    </div>
-                    <div className="border-l border-border pl-6">
-                      <div className="text-[9px] font-bold uppercase tracking-wide text-text-3">Day-of Check-in</div>
-                      <div className="text-[20px] font-black text-text-1">{event.checkin_count}</div>
-                      <div className="text-[10px] text-text-3">confirmed on the day</div>
-                    </div>
-                  </div>
-                </CardBody>
-              </Card>
-            </Link>
           </>
         )}
       </div>
