@@ -45,6 +45,14 @@ export type UniformOrderUpdateInput = {
   notes?: string | null;
 };
 
+export type UniformSkuInput = {
+  name: string;
+  inStock: number;
+  onOrder?: number;
+  unitPrice?: number | null;
+  swatch?: string | null;
+};
+
 export type UniformSkuUpdateInput = {
   name: string;
   inStock: number;
@@ -175,6 +183,22 @@ export async function updateUniformSku(id: string, input: UniformSkuUpdateInput)
 export async function deleteUniformSku(id: string): Promise<void> {
   const { error } = await db.from("uniform_skus").delete().eq("id", id);
   if (error) throw error;
+}
+
+export async function createUniformSku(input: UniformSkuInput): Promise<UniformSku> {
+  const { data, error } = await db
+    .from("uniform_skus")
+    .insert({
+      name:       input.name,
+      in_stock:   input.inStock,
+      on_order:   input.onOrder  ?? 0,
+      unit_price: input.unitPrice ?? null,
+      swatch:     input.swatch   ?? null,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as UniformSku;
 }
 
 export async function updateOrderStatus(id: string, status: OrderStatus): Promise<void> {

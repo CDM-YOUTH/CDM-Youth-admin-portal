@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, QrCode, Search, UserPlus, X, BadgeCheck, Download } from "lucide-react";
 import { toast } from "sonner";
 import { Topbar } from "@/components/admin/topbar";
+import { Kpi } from "@/components/admin/ui-bits";
 import { getEventFull } from "@/lib/db/events";
 import { listYouths, type YouthRow } from "@/lib/db/youths";
 import { ORGANIZATION } from "@/lib/mock-data";
@@ -170,6 +171,8 @@ function EventCheckinPage() {
 
   const memberCount = attendees.filter((a) => a.kind === "member").length;
   const guestCount = attendees.filter((a) => a.kind === "guest").length;
+  const filteredMemberCount = filtered.filter((a) => a.kind === "member").length;
+  const filteredGuestCount = filtered.filter((a) => a.kind === "guest").length;
 
   return (
     <>
@@ -188,6 +191,34 @@ function EventCheckinPage() {
       />
 
       <div className="flex flex-1 flex-col overflow-hidden">
+        {/* ── KPI cards ── */}
+        <div className="grid grid-cols-2 gap-2.5 border-b border-border px-4 py-3 sm:grid-cols-4">
+          <Kpi
+            label="Registrations"
+            value={String(filtered.length)}
+            trend={filtered.length !== attendees.length ? "after filters" : "total registered"}
+            tone="info"
+          />
+          <Kpi
+            label="Members"
+            value={String(filteredMemberCount)}
+            trend={filtered.length !== attendees.length ? `of ${memberCount} total` : "CDM youth"}
+            tone="up"
+          />
+          <Kpi
+            label="Guests"
+            value={String(filteredGuestCount)}
+            trend={filtered.length !== attendees.length ? `of ${guestCount} total` : "walk-in / external"}
+            tone="warn"
+          />
+          <Kpi
+            label="Check-ins"
+            value={String(event.checkin_count)}
+            trend="confirmed on day"
+            tone="up"
+          />
+        </div>
+
         {/* ── filter + action bar ── */}
         <div className="flex flex-wrap items-center gap-2 border-b border-border bg-bg-2 px-4 py-2.5">
           <select
@@ -255,16 +286,6 @@ function EventCheckinPage() {
               <QrCode className="h-3.5 w-3.5" /> Show QR
             </button>
           </div>
-        </div>
-
-        {/* ── stats bar ── */}
-        <div className="flex items-center gap-4 border-b border-border bg-card px-4 py-1.5 text-[11px] text-text-3">
-          <span><span className="font-bold text-text-1">{attendees.length}</span> registered</span>
-          <span><span className="font-bold text-text-1">{memberCount}</span> members</span>
-          <span><span className="font-bold text-text-1">{guestCount}</span> guests</span>
-          {filtered.length !== attendees.length && (
-            <span className="text-gold">· showing {filtered.length} after filters</span>
-          )}
         </div>
 
         {/* ── attendance table ── */}
