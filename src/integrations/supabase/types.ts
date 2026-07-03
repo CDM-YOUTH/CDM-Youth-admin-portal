@@ -504,6 +504,54 @@ export type Database = {
           },
         ]
       }
+      formation_items: {
+        Row: {
+          author: string | null
+          created_at: string
+          description: string | null
+          duration: string | null
+          file_url: string | null
+          id: string
+          kind: Database["public"]["Enums"]["formation_kind"]
+          published: boolean
+          published_by: string | null
+          tags: string[]
+          title: string
+          updated_at: string
+          views: number
+        }
+        Insert: {
+          author?: string | null
+          created_at?: string
+          description?: string | null
+          duration?: string | null
+          file_url?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["formation_kind"]
+          published?: boolean
+          published_by?: string | null
+          tags?: string[]
+          title: string
+          updated_at?: string
+          views?: number
+        }
+        Update: {
+          author?: string | null
+          created_at?: string
+          description?: string | null
+          duration?: string | null
+          file_url?: string | null
+          id?: string
+          kind?: Database["public"]["Enums"]["formation_kind"]
+          published?: boolean
+          published_by?: string | null
+          tags?: string[]
+          title?: string
+          updated_at?: string
+          views?: number
+        }
+        Relationships: []
+      }
       mission_nominees: {
         Row: {
           created_at: string
@@ -762,6 +810,7 @@ export type Database = {
           avatar_url: string | null
           created_at: string
           deanery_id: string | null
+          email: string | null
           full_name: string | null
           id: string
           parish_id: string | null
@@ -773,6 +822,7 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           deanery_id?: string | null
+          email?: string | null
           full_name?: string | null
           id: string
           parish_id?: string | null
@@ -784,6 +834,7 @@ export type Database = {
           avatar_url?: string | null
           created_at?: string
           deanery_id?: string | null
+          email?: string | null
           full_name?: string | null
           id?: string
           parish_id?: string | null
@@ -808,6 +859,132 @@ export type Database = {
           },
         ]
       }
+      role_permissions: {
+        Row: {
+          can_create: boolean
+          can_delete: boolean
+          can_edit: boolean
+          can_view: boolean
+          id: string
+          module: string
+          role: string
+        }
+        Insert: {
+          can_create?: boolean
+          can_delete?: boolean
+          can_edit?: boolean
+          can_view?: boolean
+          id?: string
+          module: string
+          role: string
+        }
+        Update: {
+          can_create?: boolean
+          can_delete?: boolean
+          can_edit?: boolean
+          can_view?: boolean
+          id?: string
+          module?: string
+          role?: string
+        }
+        Relationships: []
+      }
+      uniform_orders: {
+        Row: {
+          created_at: string
+          deanery_id: string | null
+          deanery_name: string | null
+          estimated_delivery: string | null
+          id: string
+          item_name: string
+          notes: string | null
+          ordered_by: string | null
+          quantity: number
+          sku_id: string | null
+          status: Database["public"]["Enums"]["order_status"]
+          supplier: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          deanery_id?: string | null
+          deanery_name?: string | null
+          estimated_delivery?: string | null
+          id?: string
+          item_name: string
+          notes?: string | null
+          ordered_by?: string | null
+          quantity: number
+          sku_id?: string | null
+          status?: Database["public"]["Enums"]["order_status"]
+          supplier?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deanery_id?: string | null
+          deanery_name?: string | null
+          estimated_delivery?: string | null
+          id?: string
+          item_name?: string
+          notes?: string | null
+          ordered_by?: string | null
+          quantity?: number
+          sku_id?: string | null
+          status?: Database["public"]["Enums"]["order_status"]
+          supplier?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "uniform_orders_deanery_id_fkey"
+            columns: ["deanery_id"]
+            isOneToOne: false
+            referencedRelation: "deaneries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "uniform_orders_sku_id_fkey"
+            columns: ["sku_id"]
+            isOneToOne: false
+            referencedRelation: "uniform_skus"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      uniform_skus: {
+        Row: {
+          created_at: string
+          id: string
+          in_stock: number
+          name: string
+          on_order: number
+          swatch: string | null
+          unit_price: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          in_stock?: number
+          name: string
+          on_order?: number
+          swatch?: string | null
+          unit_price?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          in_stock?: number
+          name?: string
+          on_order?: number
+          swatch?: string | null
+          unit_price?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
@@ -825,6 +1002,78 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      welfare_cases: {
+        Row: {
+          assigned_to: string | null
+          case_ref: string
+          category: string
+          cdm_id: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          opened_at: string
+          parish_id: string | null
+          parish_name: string | null
+          resolved_at: string | null
+          status: Database["public"]["Enums"]["welfare_status"]
+          updated_at: string
+          urgency: Database["public"]["Enums"]["welfare_urgency"]
+          youth_id: string | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          case_ref?: string
+          category: string
+          cdm_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          opened_at?: string
+          parish_id?: string | null
+          parish_name?: string | null
+          resolved_at?: string | null
+          status?: Database["public"]["Enums"]["welfare_status"]
+          updated_at?: string
+          urgency?: Database["public"]["Enums"]["welfare_urgency"]
+          youth_id?: string | null
+        }
+        Update: {
+          assigned_to?: string | null
+          case_ref?: string
+          category?: string
+          cdm_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          opened_at?: string
+          parish_id?: string | null
+          parish_name?: string | null
+          resolved_at?: string | null
+          status?: Database["public"]["Enums"]["welfare_status"]
+          updated_at?: string
+          urgency?: Database["public"]["Enums"]["welfare_urgency"]
+          youth_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "welfare_cases_parish_id_fkey"
+            columns: ["parish_id"]
+            isOneToOne: false
+            referencedRelation: "parishes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "welfare_cases_youth_id_fkey"
+            columns: ["youth_id"]
+            isOneToOne: false
+            referencedRelation: "youths"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       youths: {
         Row: {
@@ -936,6 +1185,7 @@ export type Database = {
       checkin_method: "search" | "qr" | "bulk" | "kiosk" | "walkin"
       enrollment_status: "paid" | "pending" | "waived"
       event_org_level: "Diocese" | "Deanery" | "Parish" | "Outstation"
+      formation_kind: "PDF" | "Audio" | "Video" | "Image" | "Other"
       gender: "Female" | "Male"
       mission_nominee_status: "nominated" | "confirmed" | "withdrawn"
       mission_pairing_status: "pending" | "sent" | "received" | "reported"
@@ -946,6 +1196,9 @@ export type Database = {
         | "pairing"
         | "execution"
         | "closed"
+      order_status: "pending" | "ordered" | "received" | "cancelled"
+      welfare_status: "open" | "in_progress" | "resolved" | "closed"
+      welfare_urgency: "low" | "medium" | "high"
       youth_category: "Primary" | "Secondary" | "Tertiary" | "Working"
       youth_status: "active" | "inactive"
     }
@@ -1079,6 +1332,7 @@ export const Constants = {
       checkin_method: ["search", "qr", "bulk", "kiosk", "walkin"],
       enrollment_status: ["paid", "pending", "waived"],
       event_org_level: ["Diocese", "Deanery", "Parish", "Outstation"],
+      formation_kind: ["PDF", "Audio", "Video", "Image", "Other"],
       gender: ["Female", "Male"],
       mission_nominee_status: ["nominated", "confirmed", "withdrawn"],
       mission_pairing_status: ["pending", "sent", "received", "reported"],
@@ -1090,6 +1344,9 @@ export const Constants = {
         "execution",
         "closed",
       ],
+      order_status: ["pending", "ordered", "received", "cancelled"],
+      welfare_status: ["open", "in_progress", "resolved", "closed"],
+      welfare_urgency: ["low", "medium", "high"],
       youth_category: ["Primary", "Secondary", "Tertiary", "Working"],
       youth_status: ["active", "inactive"],
     },
