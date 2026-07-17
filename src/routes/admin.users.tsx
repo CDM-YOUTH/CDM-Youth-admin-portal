@@ -11,6 +11,7 @@ import {
   CardBody,
   Pill,
 } from "@/components/admin/ui-bits";
+import { usePagination, TablePagination } from "@/components/admin/table-pagination";
 
 export const Route = createFileRoute("/admin/users")({
   component: UsersPage,
@@ -166,6 +167,8 @@ function UsersTab() {
     );
   });
 
+  const pagination = usePagination(filtered, 10);
+
   return (
     <div>
       <div className="mb-5 flex items-center justify-between gap-4">
@@ -179,7 +182,7 @@ function UsersTab() {
             className="h-8 w-44 rounded-lg border border-black/20 bg-white px-3 text-[11px] text-black/70 placeholder:text-gray-400 placeholder:font-normal outline-none transition-colors hover:border-gold-3/50 hover:text-black focus:border-gold-3 focus:ring-1 focus:ring-gold-3/20 focus:text-black"
           />
           <a
-            href="https://supabase.com/dashboard/project/otatghgorvqmankxnzrf/auth/users"
+            href="https://supabase.com/dashboard/project/linthhfiydxukbhjgfcz/auth/users"
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 rounded-lg bg-danger px-3 py-1.5 text-[11px] font-bold text-white transition-opacity hover:opacity-90"
@@ -223,7 +226,7 @@ function UsersTab() {
                   </td>
                 </tr>
               )}
-              {filtered.map((user) => {
+              {pagination.pageRows.map((user) => {
                 const role = user.user_roles?.[0]?.role ?? null;
                 return (
                   <tr
@@ -262,10 +265,20 @@ function UsersTab() {
             </tbody>
           </table>
         </div>
+        {filtered.length > 0 && (
+          <TablePagination
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            total={pagination.total}
+            totalPages={pagination.totalPages}
+            onPageChange={pagination.setPage}
+            onPageSizeChange={pagination.setPageSize}
+          />
+        )}
         <div className="border-t border-border bg-bg-2 px-3.5 py-2 text-[9px] text-text-3">
           To add new users go to{" "}
           <a
-            href="https://supabase.com/dashboard/project/otatghgorvqmankxnzrf/auth/users"
+            href="https://supabase.com/dashboard/project/linthhfiydxukbhjgfcz/auth/users"
             target="_blank"
             rel="noopener noreferrer"
             className="text-gold hover:underline"
@@ -479,6 +492,8 @@ function ActivityTab() {
     },
   });
 
+  const pagination = usePagination(users, 10);
+
   return (
     <div>
       <p className="mb-5 text-[12px] text-text-3">Account creation and last update timestamps</p>
@@ -520,7 +535,7 @@ function ActivityTab() {
                   </td>
                 </tr>
               )}
-              {users.map((user) => {
+              {pagination.pageRows.map((user) => {
                 const role = user.user_roles?.[0]?.role ?? null;
                 return (
                   <tr
@@ -569,6 +584,16 @@ function ActivityTab() {
             </tbody>
           </table>
         </div>
+        {users.length > 0 && (
+          <TablePagination
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            total={pagination.total}
+            totalPages={pagination.totalPages}
+            onPageChange={pagination.setPage}
+            onPageSizeChange={pagination.setPageSize}
+          />
+        )}
       </Card>
     </div>
   );

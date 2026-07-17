@@ -4,12 +4,15 @@ import { supabase } from "@/integrations/supabase/client";
 const db = supabase as any;
 
 export type PaymentStatus = "unpaid" | "partial" | "paid";
+export type OrderStage = "placed" | "confirmed" | "dispatched" | "delivered" | "cancelled";
 
 export type UniformSale = {
   id: string;
   sku_id: string | null;
   item_name: string;
   youth_name: string;
+  youth_id: string | null;
+  size: string | null;
   parish_name: string | null;
   quantity: number;
   unit_price: number;
@@ -19,6 +22,17 @@ export type UniformSale = {
   paid_amount: number;
   payment_status: PaymentStatus;
   notes: string | null;
+  order_ref: string;
+  stage: OrderStage;
+  delivery_location: string | null;
+  confirmed_at: string | null;
+  confirmed_by: string | null;
+  dispatch_contact_name: string | null;
+  dispatch_contact_phone: string | null;
+  dispatch_method: string | null;
+  dispatch_scheduled_at: string | null;
+  dispatched_at: string | null;
+  delivered_by: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -27,6 +41,8 @@ export type UniformSaleInput = {
   itemName: string;
   youthName: string;
   parishName?: string | null;
+  size?: string | null;
+  deliveryLocation?: string | null;
   quantity: number;
   unitPrice: number;
   orderedAt?: string | null;
@@ -37,6 +53,8 @@ export type UniformSaleUpdateInput = {
   itemName?: string;
   youthName?: string;
   parishName?: string | null;
+  size?: string | null;
+  deliveryLocation?: string | null;
   quantity?: number;
   unitPrice?: number;
   orderedAt?: string | null;
@@ -68,14 +86,16 @@ export async function createUniformSale(input: UniformSaleInput): Promise<Unifor
   const { data, error } = await db
     .from("uniform_sales")
     .insert({
-      sku_id:      skuId,
-      item_name:   input.itemName,
-      youth_name:  input.youthName,
-      parish_name: input.parishName  ?? null,
-      quantity:    input.quantity,
-      unit_price:  input.unitPrice,
-      ordered_at:  input.orderedAt   ?? new Date().toISOString(),
-      notes:       input.notes       ?? null,
+      sku_id:            skuId,
+      item_name:         input.itemName,
+      youth_name:        input.youthName,
+      parish_name:       input.parishName ?? null,
+      size:              input.size ?? null,
+      delivery_location: input.deliveryLocation ?? null,
+      quantity:          input.quantity,
+      unit_price:        input.unitPrice,
+      ordered_at:        input.orderedAt ?? new Date().toISOString(),
+      notes:             input.notes ?? null,
     })
     .select()
     .single();
@@ -88,6 +108,8 @@ export async function updateUniformSale(id: string, input: UniformSaleUpdateInpu
   if (input.itemName    !== undefined) payload.item_name    = input.itemName;
   if (input.youthName   !== undefined) payload.youth_name   = input.youthName;
   if (input.parishName  !== undefined) payload.parish_name  = input.parishName;
+  if (input.size        !== undefined) payload.size         = input.size;
+  if (input.deliveryLocation !== undefined) payload.delivery_location = input.deliveryLocation;
   if (input.quantity    !== undefined) payload.quantity     = input.quantity;
   if (input.unitPrice   !== undefined) payload.unit_price   = input.unitPrice;
   if (input.orderedAt   !== undefined) payload.ordered_at   = input.orderedAt   || null;
@@ -104,12 +126,56 @@ export async function updateUniformSale(id: string, input: UniformSaleUpdateInpu
   return data as UniformSale;
 }
 
-export async function markDelivered(id: string): Promise<void> {
+/** Stage 1: staff acknowledges/accepts a placed order. */
+export async function confirmOrder(id: string): Promise<void> {
+  const { data: auth } = await supabase.auth.getUser();
   const { error } = await db
     .from("uniform_sales")
-    .update({ delivered_at: new Date().toISOString() })
+    .update({ stage: "confirmed", confirmed_at: new Date().toISOString(), confirmed_by: auth.user?.id ?? null })
     .eq("id", id);
   if (error) throw error;
+}
+
+/** Stage 2: dispatch details — who's delivering, how, and when. */
+export async function confirmDispatch(
+  id: string,
+  input: { contactName: string; contactPhone?: string | null; method: string; scheduledAt?: string | null },
+): Promise<void> {
+  const { error } = await db
+    .from("uniform_sales")
+    .update({
+      stage: "dispatched",
+      dispatch_contact_name: input.contactName,
+      dispatch_contact_phone: input.contactPhone ?? null,
+      dispatch_method: input.method,
+      dispatch_scheduled_at: input.scheduledAt ?? null,
+      dispatched_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+/** Stage 3: confirm the item actually reached the youth. */
+export async function confirmDelivery(id: string, deliveredBy?: string | null): Promise<void> {
+  const { error } = await db
+    .from("uniform_sales")
+    .update({
+      stage: "delivered",
+      delivered_at: new Date().toISOString(),
+      delivered_by: deliveredBy ?? null,
+    })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function cancelOrder(id: string): Promise<void> {
+  const { error } = await db.from("uniform_sales").update({ stage: "cancelled" }).eq("id", id);
+  if (error) throw error;
+}
+
+/** @deprecated use confirmDelivery — kept for any existing callers */
+export async function markDelivered(id: string): Promise<void> {
+  return confirmDelivery(id);
 }
 
 export async function recordPayment(id: string, totalPaidSoFar: number): Promise<void> {

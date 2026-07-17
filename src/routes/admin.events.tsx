@@ -5,7 +5,18 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { EventFormState } from "@/components/admin/event-tabs-form";
 import { Topbar, TopbarButton } from "@/components/admin/topbar";
 import { Card, CardBody, CardHead, Kpi, Pill } from "@/components/admin/ui-bits";
+import { usePagination, TablePagination } from "@/components/admin/table-pagination";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Plus, Trash2 } from "lucide-react";
 import { EventTabsForm } from "@/components/admin/event-tabs-form";
@@ -40,6 +51,7 @@ function EventsPage() {
   const today = new Date().toISOString().slice(0, 10);
   const upcoming = events.filter((e) => !e.event_date || e.event_date >= today);
   const done = events.filter((e) => e.event_date && e.event_date < today);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const createMut = useMutation({
     mutationFn: createEvent,
     onSuccess: () => {
@@ -53,9 +65,10 @@ function EventsPage() {
   const deleteMut = useMutation({
     mutationFn: deleteEvent,
     onSuccess: () => {
-      toast.success("Event deleted");
+      toast.success("Event deleted — registrants have been notified.");
       qc.invalidateQueries({ queryKey: ["events"] });
       qc.invalidateQueries({ queryKey: ["events-analytics"] });
+      setDeleteTarget(null);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -75,23 +88,45 @@ function EventsPage() {
         </div>
 
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.1fr_0.9fr]">
-          <EventList title="Upcoming Events" events={upcoming} onDelete={(id) => deleteMut.mutate(id)} />
-          <EventList title="Done Events" events={done} onDelete={(id) => deleteMut.mutate(id)} />
+          <EventList title="Upcoming Events" events={upcoming} onDelete={(id, name) => setDeleteTarget({ id, name })} />
+          <EventList title="Done Events" events={done} onDelete={(id, name) => setDeleteTarget({ id, name })} />
         </div>
       </div>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => { if (!o) setDeleteTarget(null); }}>
+        <AlertDialogContent className="border-border bg-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete "{deleteTarget?.name}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes the event, its program, duty assignments, and RSVPs. Everyone
+              currently registered will be sent a cancellation notification. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-danger text-white hover:bg-danger/90"
+              onClick={() => deleteTarget && deleteMut.mutate(deleteTarget.id)}
+            >
+              Delete &amp; notify
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
 
 const MONTHS = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
 
-function EventList({ title, events, onDelete }: { title: string; events: EventRow[]; onDelete: (id: string) => void }) {
+function EventList({ title, events, onDelete }: { title: string; events: EventRow[]; onDelete: (id: string, name: string) => void }) {
+  const pagination = usePagination(events, 8);
   return (
     <Card>
       <CardHead title={title} action="Calendar →" />
       <CardBody className="space-y-2">
         {events.length === 0 && <div className="text-[11px] text-text-3">No events.</div>}
-        {events.map((event) => {
+        {pagination.pageRows.map((event) => {
           const d = event.event_date ? new Date(event.event_date) : null;
           const day = d ? String(d.getDate()).padStart(2, "0") : "—";
           const month = d ? MONTHS[d.getMonth()] : "—";
@@ -113,7 +148,7 @@ function EventList({ title, events, onDelete }: { title: string; events: EventRo
                 View / Edit
               </Link>
               <button
-                onClick={() => { if (confirm(`Delete "${event.name}"?`)) onDelete(event.id); }}
+                onClick={() => onDelete(event.id, event.name)}
                 className="rounded border border-border p-1.5 text-text-3 hover:border-danger/50 hover:text-danger"
               >
                 <Trash2 className="h-3 w-3" />
@@ -123,6 +158,17 @@ function EventList({ title, events, onDelete }: { title: string; events: EventRo
           );
         })}
       </CardBody>
+      {events.length > 0 && (
+        <TablePagination
+          page={pagination.page}
+          pageSize={pagination.pageSize}
+          total={pagination.total}
+          totalPages={pagination.totalPages}
+          onPageChange={pagination.setPage}
+          onPageSizeChange={pagination.setPageSize}
+          pageSizes={[8, 20, 50]}
+        />
+      )}
     </Card>
   );
 }

@@ -1,3 +1,7 @@
+// This file is hand-maintained (see packages/shared/src/supabase/types.ts,
+// which mirrors it) — the two must be kept in sync since both apps share one
+// database. Known gap: `role_permissions` isn't modeled here yet (existed
+// before this file was hand-maintained); see admin.users.tsx callers.
 export type Json =
   | string
   | number
@@ -7,8 +11,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
@@ -282,6 +284,7 @@ export type Database = {
           id: string
           name: string
           parish_id: string | null
+          youth_id: string | null
         }
         Insert: {
           created_at?: string
@@ -290,6 +293,7 @@ export type Database = {
           id?: string
           name: string
           parish_id?: string | null
+          youth_id?: string | null
         }
         Update: {
           created_at?: string
@@ -298,6 +302,7 @@ export type Database = {
           id?: string
           name?: string
           parish_id?: string | null
+          youth_id?: string | null
         }
         Relationships: [
           {
@@ -319,6 +324,13 @@ export type Database = {
             columns: ["parish_id"]
             isOneToOne: false
             referencedRelation: "parishes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_duty_assignees_youth_id_fkey"
+            columns: ["youth_id"]
+            isOneToOne: false
+            referencedRelation: "youths"
             referencedColumns: ["id"]
           },
         ]
@@ -447,6 +459,7 @@ export type Database = {
             | null
           outstation_id: string | null
           parish_id: string | null
+          poster_url: string | null
           updated_at: string
           venue: string | null
         }
@@ -462,6 +475,7 @@ export type Database = {
             | null
           outstation_id?: string | null
           parish_id?: string | null
+          poster_url?: string | null
           updated_at?: string
           venue?: string | null
         }
@@ -477,6 +491,7 @@ export type Database = {
             | null
           outstation_id?: string | null
           parish_id?: string | null
+          poster_url?: string | null
           updated_at?: string
           venue?: string | null
         }
@@ -699,6 +714,72 @@ export type Database = {
         }
         Relationships: []
       }
+      notifications: {
+        Row: {
+          body: string | null
+          category: Database["public"]["Enums"]["notification_category"]
+          created_at: string
+          id: string
+          is_read: boolean
+          related_id: string | null
+          title: string
+          user_id: string
+        }
+        Insert: {
+          body?: string | null
+          category?: Database["public"]["Enums"]["notification_category"]
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          related_id?: string | null
+          title: string
+          user_id: string
+        }
+        Update: {
+          body?: string | null
+          category?: Database["public"]["Enums"]["notification_category"]
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          related_id?: string | null
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      otp_codes: {
+        Row: {
+          attempts: number
+          code_hash: string
+          consumed_at: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          phone: string
+          purpose: Database["public"]["Enums"]["otp_purpose"]
+        }
+        Insert: {
+          attempts?: number
+          code_hash: string
+          consumed_at?: string | null
+          created_at?: string
+          expires_at: string
+          id?: string
+          phone: string
+          purpose?: Database["public"]["Enums"]["otp_purpose"]
+        }
+        Update: {
+          attempts?: number
+          code_hash?: string
+          consumed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          phone?: string
+          purpose?: Database["public"]["Enums"]["otp_purpose"]
+        }
+        Relationships: []
+      }
       outstations: {
         Row: {
           created_at: string
@@ -826,10 +907,371 @@ export type Database = {
         }
         Relationships: []
       }
+      welfare_cases: {
+        Row: {
+          id: string
+          case_ref: string
+          category: string
+          urgency: Database["public"]["Enums"]["welfare_urgency"]
+          status: Database["public"]["Enums"]["welfare_status"]
+          parish_id: string | null
+          parish_name: string | null
+          youth_id: string | null
+          cdm_id: string | null
+          assigned_to: string | null
+          notes: string | null
+          opened_at: string
+          resolved_at: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          case_ref?: string
+          category: string
+          urgency?: Database["public"]["Enums"]["welfare_urgency"]
+          status?: Database["public"]["Enums"]["welfare_status"]
+          parish_id?: string | null
+          parish_name?: string | null
+          youth_id?: string | null
+          cdm_id?: string | null
+          assigned_to?: string | null
+          notes?: string | null
+          opened_at?: string
+          resolved_at?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          case_ref?: string
+          category?: string
+          urgency?: Database["public"]["Enums"]["welfare_urgency"]
+          status?: Database["public"]["Enums"]["welfare_status"]
+          parish_id?: string | null
+          parish_name?: string | null
+          youth_id?: string | null
+          cdm_id?: string | null
+          assigned_to?: string | null
+          notes?: string | null
+          opened_at?: string
+          resolved_at?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "welfare_cases_youth_id_fkey"
+            columns: ["youth_id"]
+            isOneToOne: false
+            referencedRelation: "youths"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      uniform_skus: {
+        Row: {
+          id: string
+          name: string
+          swatch: string | null
+          in_stock: number
+          on_order: number
+          unit_price: number | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          swatch?: string | null
+          in_stock?: number
+          on_order?: number
+          unit_price?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          swatch?: string | null
+          in_stock?: number
+          on_order?: number
+          unit_price?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      uniform_orders: {
+        Row: {
+          id: string
+          sku_id: string | null
+          item_name: string
+          quantity: number
+          supplier: string | null
+          deanery_id: string | null
+          deanery_name: string | null
+          estimated_delivery: string | null
+          status: Database["public"]["Enums"]["order_status"]
+          notes: string | null
+          ordered_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          sku_id?: string | null
+          item_name: string
+          quantity: number
+          supplier?: string | null
+          deanery_id?: string | null
+          deanery_name?: string | null
+          estimated_delivery?: string | null
+          status?: Database["public"]["Enums"]["order_status"]
+          notes?: string | null
+          ordered_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          sku_id?: string | null
+          item_name?: string
+          quantity?: number
+          supplier?: string | null
+          deanery_id?: string | null
+          deanery_name?: string | null
+          estimated_delivery?: string | null
+          status?: Database["public"]["Enums"]["order_status"]
+          notes?: string | null
+          ordered_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      uniform_sales: {
+        Row: {
+          id: string
+          sku_id: string | null
+          item_name: string
+          youth_name: string
+          youth_id: string | null
+          size: string | null
+          parish_name: string | null
+          quantity: number
+          unit_price: number
+          ordered_at: string
+          delivered_at: string | null
+          paid_at: string | null
+          paid_amount: number
+          payment_status: Database["public"]["Enums"]["uniform_payment_status"]
+          notes: string | null
+          order_ref: string
+          stage: Database["public"]["Enums"]["uniform_order_stage"]
+          delivery_location: string | null
+          confirmed_at: string | null
+          confirmed_by: string | null
+          dispatch_contact_name: string | null
+          dispatch_contact_phone: string | null
+          dispatch_method: string | null
+          dispatch_scheduled_at: string | null
+          dispatched_at: string | null
+          delivered_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          sku_id?: string | null
+          item_name: string
+          youth_name: string
+          youth_id?: string | null
+          size?: string | null
+          parish_name?: string | null
+          quantity?: number
+          unit_price?: number
+          ordered_at?: string
+          delivered_at?: string | null
+          paid_at?: string | null
+          paid_amount?: number
+          payment_status?: Database["public"]["Enums"]["uniform_payment_status"]
+          notes?: string | null
+          order_ref?: string
+          stage?: Database["public"]["Enums"]["uniform_order_stage"]
+          delivery_location?: string | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          dispatch_contact_name?: string | null
+          dispatch_contact_phone?: string | null
+          dispatch_method?: string | null
+          dispatch_scheduled_at?: string | null
+          dispatched_at?: string | null
+          delivered_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          sku_id?: string | null
+          item_name?: string
+          youth_name?: string
+          youth_id?: string | null
+          size?: string | null
+          parish_name?: string | null
+          quantity?: number
+          unit_price?: number
+          ordered_at?: string
+          delivered_at?: string | null
+          paid_at?: string | null
+          paid_amount?: number
+          payment_status?: Database["public"]["Enums"]["uniform_payment_status"]
+          notes?: string | null
+          order_ref?: string
+          stage?: Database["public"]["Enums"]["uniform_order_stage"]
+          delivery_location?: string | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          dispatch_contact_name?: string | null
+          dispatch_contact_phone?: string | null
+          dispatch_method?: string | null
+          dispatch_scheduled_at?: string | null
+          dispatched_at?: string | null
+          delivered_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "uniform_sales_sku_id_fkey"
+            columns: ["sku_id"]
+            isOneToOne: false
+            referencedRelation: "uniform_skus"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      uniform_stock_entries: {
+        Row: {
+          id: string
+          sku_id: string | null
+          item_name: string
+          quantity: number
+          notes: string | null
+          activity: Database["public"]["Enums"]["uniform_production_activity"]
+          entered_at: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          sku_id?: string | null
+          item_name: string
+          quantity: number
+          notes?: string | null
+          activity?: Database["public"]["Enums"]["uniform_production_activity"]
+          entered_at?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          sku_id?: string | null
+          item_name?: string
+          quantity?: number
+          notes?: string | null
+          activity?: Database["public"]["Enums"]["uniform_production_activity"]
+          entered_at?: string
+          created_at?: string
+        }
+        Relationships: []
+      }
+      formation_items: {
+        Row: {
+          id: string
+          title: string
+          kind: Database["public"]["Enums"]["formation_kind"]
+          duration: string | null
+          author: string | null
+          tags: string[]
+          description: string | null
+          content_text: string | null
+          file_url: string | null
+          views: number
+          published: boolean
+          published_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          title: string
+          kind?: Database["public"]["Enums"]["formation_kind"]
+          duration?: string | null
+          author?: string | null
+          tags?: string[]
+          description?: string | null
+          content_text?: string | null
+          file_url?: string | null
+          views?: number
+          published?: boolean
+          published_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          title?: string
+          kind?: Database["public"]["Enums"]["formation_kind"]
+          duration?: string | null
+          author?: string | null
+          tags?: string[]
+          description?: string | null
+          content_text?: string | null
+          file_url?: string | null
+          views?: number
+          published?: boolean
+          published_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      formation_bookmarks: {
+        Row: {
+          id: string
+          user_id: string
+          formation_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          formation_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          formation_id?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "formation_bookmarks_formation_id_fkey"
+            columns: ["formation_id"]
+            isOneToOne: false
+            referencedRelation: "formation_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       youths: {
         Row: {
           age: number
           alt_phone: string | null
+          auth_user_id: string | null
           category: Database["public"]["Enums"]["youth_category"]
           cdm_id: string
           created_at: string
@@ -851,6 +1293,7 @@ export type Database = {
         Insert: {
           age: number
           alt_phone?: string | null
+          auth_user_id?: string | null
           category?: Database["public"]["Enums"]["youth_category"]
           cdm_id?: string
           created_at?: string
@@ -872,6 +1315,7 @@ export type Database = {
         Update: {
           age?: number
           alt_phone?: string | null
+          auth_user_id?: string | null
           category?: Database["public"]["Enums"]["youth_category"]
           cdm_id?: string
           created_at?: string
@@ -943,7 +1387,24 @@ export type Database = {
         | "pairing"
         | "execution"
         | "closed"
-      youth_category: "Primary" | "Secondary" | "Tertiary" | "Working"
+      notification_category:
+        | "formation"
+        | "event"
+        | "account"
+        | "enrollment"
+        | "mission"
+        | "welfare"
+        | "uniform"
+        | "general"
+      otp_purpose: "password_reset"
+      order_status: "pending" | "ordered" | "received" | "cancelled"
+      uniform_payment_status: "unpaid" | "partial" | "paid"
+      uniform_order_stage: "placed" | "confirmed" | "dispatched" | "delivered" | "cancelled"
+      uniform_production_activity: "sewing" | "logo" | "branding"
+      formation_kind: "PDF" | "Audio" | "Video" | "Image" | "Other"
+      welfare_urgency: "low" | "medium" | "high"
+      welfare_status: "open" | "in_progress" | "resolved" | "closed"
+      youth_category: "Primary" | "Secondary" | "Tertiary" | "Working" | "Other"
       youth_status: "active" | "inactive"
     }
     CompositeTypes: {
@@ -1087,7 +1548,25 @@ export const Constants = {
         "execution",
         "closed",
       ],
-      youth_category: ["Primary", "Secondary", "Tertiary", "Working"],
+      notification_category: [
+        "formation",
+        "event",
+        "account",
+        "enrollment",
+        "mission",
+        "welfare",
+        "uniform",
+        "general",
+      ],
+      otp_purpose: ["password_reset"],
+      order_status: ["pending", "ordered", "received", "cancelled"],
+      uniform_payment_status: ["unpaid", "partial", "paid"],
+      uniform_order_stage: ["placed", "confirmed", "dispatched", "delivered", "cancelled"],
+      uniform_production_activity: ["sewing", "logo", "branding"],
+      formation_kind: ["PDF", "Audio", "Video", "Image", "Other"],
+      welfare_urgency: ["low", "medium", "high"],
+      welfare_status: ["open", "in_progress", "resolved", "closed"],
+      youth_category: ["Primary", "Secondary", "Tertiary", "Working", "Other"],
       youth_status: ["active", "inactive"],
     },
   },

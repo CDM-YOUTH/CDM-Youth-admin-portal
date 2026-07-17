@@ -1,0 +1,18 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+@import "../../../packages/shared/src/styles/tokens.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * CDM Youth Office — Youth Portal
+ * Mobile-first. Shares design tokens with the admin portal (see
+ * packages/shared/src/styles/tokens.css) so both apps look consistent.
+ */
+
+@layer utilities {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}

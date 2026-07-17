@@ -13,6 +13,7 @@ import {
   type ColumnFilterValue,
 } from "@/components/admin/table-filters";
 import { RecordFormDialog, type FieldDef } from "@/components/admin/record-form-dialog";
+import { usePagination, TablePagination } from "@/components/admin/table-pagination";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -175,6 +176,8 @@ function MissionPage() {
     });
   }, [rows, search, fName, fSourceParish, fSourceDeanery, fHostParish, fStatus]);
 
+  const rowPagination = usePagination(filteredRows, 15);
+
   const handleExport = () => {
     const headers = ["CDM No.", "Name", "Source Parish", "Source Deanery", "Sent To Parish", "Sent To Deanery", "Status"];
     const escape = (v: string) => `"${v.replace(/"/g, '""')}"`;
@@ -329,7 +332,7 @@ function MissionPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredRows.map((r) => (
+                {rowPagination.pageRows.map((r) => (
                   <tr key={r.id} className="border-b border-border/30 last:border-0 hover:bg-bg-3">
                     <td className="px-3.5 py-2.5 font-mono text-[10px] font-bold text-gold">{r.cdmId}</td>
                     <td className="px-3.5 py-2.5 text-[11px] font-semibold text-foreground">{r.name}</td>
@@ -375,6 +378,16 @@ function MissionPage() {
               </tbody>
             </table>
           </CardBody>
+          {rows.length > 0 && (
+            <TablePagination
+              page={rowPagination.page}
+              pageSize={rowPagination.pageSize}
+              total={rowPagination.total}
+              totalPages={rowPagination.totalPages}
+              onPageChange={rowPagination.setPage}
+              onPageSizeChange={rowPagination.setPageSize}
+            />
+          )}
         </Card>
       </div>
       <RecordFormDialog

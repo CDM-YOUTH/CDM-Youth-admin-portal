@@ -13,6 +13,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ORGANIZATION } from "@/lib/mock-data";
 import { toast } from "sonner";
 import { createEvent, updateEvent, saveEventProgram, saveEventDuties } from "@/lib/db/events";
+import { YouthPicker } from "@/components/admin/youth-picker";
+import { supabase } from "@/integrations/supabase/client";
+import { Upload, Loader2 } from "lucide-react";
 
 /* ---------- Types ---------- */
 
@@ -26,6 +29,7 @@ export type EventDetails = {
   deanery: string;
   parish: string;
   description: string;
+  posterUrl: string;
   hasDuties: boolean;
   isMass: boolean;
 };
@@ -43,6 +47,7 @@ export type DutyAssignment = {
   deanery: string;
   parish: string;
   name: string;
+  youthId?: string | null;
 };
 export type DutyItem = {
   id: string;
@@ -109,6 +114,7 @@ export function emptyEventState(): EventFormState {
       deanery: "",
       parish: "",
       description: "",
+      posterUrl: "",
       hasDuties: false,
       isMass: false,
     },
@@ -194,6 +200,7 @@ export function EventTabsForm({
     eventDate: state.details.date || null,
     venue: state.details.venue || null,
     description: state.details.description || null,
+    posterUrl: state.details.posterUrl || null,
     organizationLevel: (state.details.level || null) as "Diocese" | "Deanery" | "Parish" | "Outstation" | null,
     deaneryName: state.details.deanery || null,
     parishName: state.details.parish || null,
@@ -521,6 +528,11 @@ function DetailsTab({
             placeholder="Purpose, theme and notes for the event"
             rows={3}
           />
+        </FieldLabel>
+      </div>
+      <div className="md:col-span-2">
+        <FieldLabel label="Poster (shown on the Youth Portal)">
+          <PosterUpload value={details.posterUrl} onChange={(url) => onChange({ posterUrl: url })} />
         </FieldLabel>
       </div>
       <div className="md:col-span-2">
@@ -1002,6 +1014,17 @@ function DutiesTab({
                           }
                           placeholder="Name"
                           className="h-7 text-[10px]"
+                          disabled={!!a.youthId}
+                        />
+                        <YouthPicker
+                          value={a.youthId ?? null}
+                          linkedName={a.name}
+                          onChange={(youth) =>
+                            updateAssignment(cat.id, duty.id, a.id, {
+                              youthId: youth?.id ?? null,
+                              name: youth ? youth.full_name : a.name,
+                            })
+                          }
                         />
                         <button
                           type="button"
@@ -1041,6 +1064,68 @@ function DutiesTab({
       >
         <Plus className="h-3.5 w-3.5" /> Add another category
       </button>
+    </div>
+  );
+}
+
+/* ---------- Poster upload ---------- */
+
+function PosterUpload({ value, onChange }: { value: string; onChange: (url: string) => void }) {
+  const [uploading, setUploading] = useState(false);
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024) {
+      toast.error("Poster image must be under 8MB");
+      return;
+    }
+    setUploading(true);
+    try {
+      const ext = file.name.split(".").pop() || "jpg";
+      const path = `${crypto.randomUUID()}.${ext}`;
+      const { error } = await supabase.storage.from("events").upload(path, file, {
+        cacheControl: "3600",
+        upsert: false,
+        contentType: file.type,
+      });
+      if (error) throw error;
+      const { data } = supabase.storage.from("events").getPublicUrl(path);
+      onChange(data.publicUrl);
+      toast.success("Poster uploaded");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-border bg-bg-2 p-2 normal-case tracking-normal">
+      {value ? (
+        <img src={value} alt="Event poster" className="h-16 w-24 rounded-md border border-border object-cover" />
+      ) : (
+        <div className="flex h-16 w-24 items-center justify-center rounded-md border border-dashed border-border bg-bg-3 text-text-4">
+          <Upload className="h-5 w-5" />
+        </div>
+      )}
+      <div className="flex flex-1 flex-col gap-1.5">
+        <label className="inline-flex w-fit cursor-pointer items-center gap-1.5 rounded-md border border-border bg-bg-3 px-2.5 py-1.5 text-[11px] font-bold text-text-1 hover:bg-bg-4">
+          {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+          {uploading ? "Uploading…" : value ? "Replace poster" : "Upload poster"}
+          <input type="file" accept="image/*" className="hidden" onChange={handleUpload} disabled={uploading} />
+        </label>
+        {value && (
+          <button
+            type="button"
+            onClick={() => onChange("")}
+            className="inline-flex w-fit items-center gap-1 text-[10px] font-semibold text-text-3 hover:text-danger"
+          >
+            <X className="h-3 w-3" /> Remove
+          </button>
+        )}
+      </div>
     </div>
   );
 }
