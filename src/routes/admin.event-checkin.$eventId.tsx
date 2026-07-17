@@ -1,11 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type ComponentType } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, QrCode, Search, UserPlus, X, BadgeCheck, Download } from "lucide-react";
 import { toast } from "sonner";
 import { Topbar } from "@/components/admin/topbar";
 import { Kpi } from "@/components/admin/ui-bits";
-import { getEventFull } from "@/lib/db/events";
+import { usePagination, TablePagination } from "@/components/admin/table-pagination";
+import { getEventFull, registerForEvent, deleteRegistration } from "@/lib/db/events";
 import { listYouths, type YouthRow } from "@/lib/db/youths";
 import { ORGANIZATION } from "@/lib/mock-data";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -34,24 +35,6 @@ type AttendeeEntry = {
   kind: AttendeeKind;
 };
 
-function nowTime() {
-  return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
-
-function youthToEntry(y: YouthRow): AttendeeEntry {
-  return {
-    id: y.id,
-    cdmId: y.cdm_id,
-    name: y.full_name,
-    phone: y.phone ?? "",
-    deanery: y.deanery?.name ?? "",
-    parish: y.parish?.name ?? "",
-    outstation: y.outstation?.name ?? "",
-    time: nowTime(),
-    kind: "member",
-  };
-}
-
 function selectCls(extra = "") {
   return `h-8 rounded-md border border-border bg-bg-2 px-2 text-[11px] font-medium text-text-1 outline-none transition hover:border-gold-3 focus:border-gold-3 ${extra}`;
 }
@@ -67,10 +50,25 @@ function btnCls(variant: "primary" | "ghost" = "primary", extra = "") {
 /* ─── main page ─── */
 function EventCheckinPage() {
   const { eventId } = Route.useParams();
+  const qc = useQueryClient();
 
   const { data: event, isLoading } = useQuery({
     queryKey: ["event-full", eventId],
     queryFn: () => getEventFull(eventId),
+  });
+
+  const registerMut = useMutation({
+    mutationFn: registerForEvent,
+    onSuccess: (_data, variables) => {
+      toast.success(`${variables.guestName ?? variables.cdmId ?? "Attendee"} registered`);
+      qc.invalidateQueries({ queryKey: ["event-full", eventId] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const removeMut = useMutation({
+    mutationFn: deleteRegistration,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["event-full", eventId] }),
+    onError: (e: Error) => toast.error(e.message),
   });
   const { data: allYouths = [] } = useQuery({
     queryKey: ["youths"],
@@ -145,18 +143,7 @@ function EventCheckinPage() {
     });
   }, [attendees, deanery, parish, outstation, q]);
 
-  const addAttendee = (entry: AttendeeEntry) => {
-    setAttendees((prev) => {
-      const dup = prev.some(
-        (a) => a.id === entry.id || (entry.cdmId !== "—" && a.cdmId === entry.cdmId),
-      );
-      if (dup) { toast.message(`${entry.name} is already registered`); return prev; }
-      toast.success(`${entry.name} registered`);
-      return [entry, ...prev];
-    });
-  };
-
-  const removeAttendee = (id: string) => setAttendees((prev) => prev.filter((a) => a.id !== id));
+  const pagination = usePagination(filtered, 25);
 
   if (isLoading || !event) {
     return (
@@ -313,7 +300,7 @@ function EventCheckinPage() {
                   </td>
                 </tr>
               )}
-              {filtered.map((a) => (
+              {pagination.pageRows.map((a) => (
                 <tr key={a.id} className="hover:bg-bg-2">
                   <td className="px-3 py-2 font-mono text-[10px] text-text-3">{a.cdmId}</td>
                   <td className="px-3 py-2 font-semibold text-text-1">
@@ -331,8 +318,9 @@ function EventCheckinPage() {
                   <td className="px-3 py-2 text-text-4">{a.time}</td>
                   <td className="px-3 py-2">
                     <button
-                      onClick={() => removeAttendee(a.id)}
-                      className="rounded p-0.5 text-text-4 hover:bg-danger-soft hover:text-danger"
+                      onClick={() => removeMut.mutate(a.id)}
+                      disabled={removeMut.isPending}
+                      className="rounded p-0.5 text-text-4 hover:bg-danger-soft hover:text-danger disabled:opacity-50"
                       title="Remove"
                     >
                       <X className="h-3.5 w-3.5" />
@@ -343,6 +331,16 @@ function EventCheckinPage() {
             </tbody>
           </table>
         </div>
+        {filtered.length > 0 && (
+          <TablePagination
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            total={pagination.total}
+            totalPages={pagination.totalPages}
+            onPageChange={pagination.setPage}
+            onPageSizeChange={pagination.setPageSize}
+          />
+        )}
       </div>
 
       {/* ── dialogs ── */}
@@ -354,12 +352,12 @@ function EventCheckinPage() {
         defaultDeanery={deanery}
         defaultParish={parish}
         defaultOutstation={outstation}
-        onAdd={addAttendee}
+        onAdd={(cdmId) => registerMut.mutate({ eventId, cdmId })}
       />
       <WalkInDialog
         open={walkInOpen}
         onClose={() => setWalkInOpen(false)}
-        onAdd={addAttendee}
+        onAdd={(input) => registerMut.mutate({ eventId, ...input })}
       />
       <ScanDialog
         open={scanOpen}
@@ -382,7 +380,7 @@ function RegisterDialog({
   defaultDeanery: string;
   defaultParish: string;
   defaultOutstation: string;
-  onAdd: (e: AttendeeEntry) => void;
+  onAdd: (cdmId: string) => void;
 }) {
   const [mode, setMode] = useState<"cdm" | "browse">("cdm");
 
@@ -487,7 +485,7 @@ function RegisterDialog({
                 </div>
                 {preview.phone && <div className="text-[11px] text-text-3">{preview.phone}</div>}
                 <button
-                  onClick={() => { onAdd(youthToEntry(preview)); reset(); onClose(); }}
+                  onClick={() => { onAdd(preview.cdm_id); reset(); onClose(); }}
                   className={btnCls("primary", "mt-2")}
                 >
                   <BadgeCheck className="h-3.5 w-3.5" /> Register
@@ -557,7 +555,7 @@ function RegisterDialog({
                       </div>
                     </div>
                     <button
-                      onClick={() => { onAdd(youthToEntry(y)); }}
+                      onClick={() => { onAdd(y.cdm_id); }}
                       className={btnCls("primary", "shrink-0")}
                     >
                       Register
@@ -586,7 +584,7 @@ function WalkInDialog({
 }: {
   open: boolean;
   onClose: () => void;
-  onAdd: (e: AttendeeEntry) => void;
+  onAdd: (input: { guestName: string; guestPhone?: string; notes?: string }) => void;
 }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -597,15 +595,9 @@ function WalkInDialog({
   const submit = () => {
     if (!name.trim()) { toast.error("Name is required"); return; }
     onAdd({
-      id: `guest-${Date.now()}`,
-      cdmId: "—",
-      name: name.trim(),
-      phone: phone.trim(),
-      deanery: "",
-      parish: area.trim(),
-      outstation: "",
-      time: nowTime(),
-      kind: "guest",
+      guestName: name.trim(),
+      guestPhone: phone.trim() || undefined,
+      notes: area.trim() ? `Area: ${area.trim()}` : undefined,
     });
     reset();
     onClose();

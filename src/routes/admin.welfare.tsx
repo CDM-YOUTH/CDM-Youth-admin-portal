@@ -7,6 +7,7 @@ import { Topbar, TopbarButton } from "@/components/admin/topbar";
 import { Card, CardBody, CardHead, Pill } from "@/components/admin/ui-bits";
 import { RecordFormDialog, type FieldDef } from "@/components/admin/record-form-dialog";
 import { ViewRecordDialog } from "@/components/admin/view-record-dialog";
+import { usePagination, TablePagination } from "@/components/admin/table-pagination";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -155,6 +156,7 @@ function WelfarePage() {
   }).length;
 
   const isLive = cases.length > 0;
+  const casePagination = usePagination(cases, 10);
 
   return (
     <>
@@ -176,7 +178,7 @@ function WelfarePage() {
           <CardHead title="Active Cases" subtitle="Sorted by urgency" action="Export →" />
           <CardBody className="space-y-2">
             {isLive
-              ? cases.map((c) => (
+              ? casePagination.pageRows.map((c) => (
                   <div
                     key={c.id}
                     className={`rounded-lg border p-3 ${
@@ -248,6 +250,16 @@ function WelfarePage() {
               <div className="py-6 text-center text-[11px] text-text-3">No active cases.</div>
             )}
           </CardBody>
+          {isLive && (
+            <TablePagination
+              page={casePagination.page}
+              pageSize={casePagination.pageSize}
+              total={casePagination.total}
+              totalPages={casePagination.totalPages}
+              onPageChange={casePagination.setPage}
+              onPageSizeChange={casePagination.setPageSize}
+            />
+          )}
         </Card>
       </div>
 

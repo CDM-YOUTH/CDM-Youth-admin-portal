@@ -10,7 +10,7 @@ import { Upload, Loader2, X } from "lucide-react";
 export type FieldDef = {
   key: string;
   label: string;
-  type?: "text" | "number" | "email" | "tel" | "date" | "textarea" | "select" | "image";
+  type?: "text" | "number" | "email" | "tel" | "date" | "textarea" | "select" | "image" | "file";
   options?: string[];
   placeholder?: string;
   required?: boolean;
@@ -20,8 +20,11 @@ export type FieldDef = {
   dynamicOptions?: (values: Record<string, string>) => string[];
   /** Width hint */
   full?: boolean;
-  /** For type="image": storage bucket name */
+  /** For type="image"/"file": storage bucket name */
   bucket?: string;
+  /** For type="file": accept attribute + max size in MB (defaults to 20MB, any type) */
+  accept?: string;
+  maxSizeMb?: number;
 };
 
 export function RecordFormDialog({
@@ -144,6 +147,17 @@ function renderField(
   if (field.type === "image") {
     return <ImageUpload value={value} onChange={onChange} bucket={field.bucket ?? "passports"} />;
   }
+  if (field.type === "file") {
+    return (
+      <FileUpload
+        value={value}
+        onChange={onChange}
+        bucket={field.bucket ?? "formation"}
+        accept={field.accept}
+        maxSizeMb={field.maxSizeMb ?? 20}
+      />
+    );
+  }
   if (field.type === "select") {
     return (
       <Select value={value} onValueChange={onChange}>
@@ -217,6 +231,83 @@ function ImageUpload({ value, onChange, bucket }: { value: string; onChange: (v:
             type="button"
             onClick={() => onChange("")}
             className="inline-flex w-fit items-center gap-1 text-[10px] font-semibold text-text-3 hover:text-danger"
+          >
+            <X className="h-3 w-3" /> Remove
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function FileUpload({
+  value,
+  onChange,
+  bucket,
+  accept,
+  maxSizeMb,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  bucket: string;
+  accept?: string;
+  maxSizeMb: number;
+}) {
+  const [uploading, setUploading] = useState(false);
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > maxSizeMb * 1024 * 1024) {
+      toast.error(`File must be under ${maxSizeMb}MB`);
+      return;
+    }
+    setUploading(true);
+    try {
+      const ext = file.name.split(".").pop() || "bin";
+      const path = `${crypto.randomUUID()}.${ext}`;
+      const { error } = await supabase.storage.from(bucket).upload(path, file, {
+        cacheControl: "3600",
+        upsert: false,
+        contentType: file.type,
+      });
+      if (error) throw error;
+      const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+      onChange(data.publicUrl);
+      toast.success("File uploaded");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  };
+
+  const fileName = value ? decodeURIComponent(value.split("/").pop() ?? value) : "";
+
+  return (
+    <div className="space-y-1.5 normal-case tracking-normal">
+      {value && (
+        <a
+          href={value}
+          target="_blank"
+          rel="noreferrer"
+          className="block truncate rounded-md border border-border bg-bg-2 px-2.5 py-1.5 text-[11px] text-primary underline"
+        >
+          {fileName}
+        </a>
+      )}
+      <div className="flex items-center gap-2">
+        <label className="inline-flex w-fit cursor-pointer items-center gap-1.5 rounded-md border border-border bg-bg-3 px-2.5 py-1.5 text-[11px] font-bold text-text-1 hover:bg-bg-4">
+          {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+          {uploading ? "Uploading…" : value ? "Replace file" : "Choose file"}
+          <input type="file" accept={accept} className="hidden" onChange={handleUpload} disabled={uploading} />
+        </label>
+        {value && (
+          <button
+            type="button"
+            onClick={() => onChange("")}
+            className="inline-flex items-center gap-1 text-[10px] font-semibold text-text-3 hover:text-danger"
           >
             <X className="h-3 w-3" /> Remove
           </button>

@@ -7,6 +7,7 @@ import { Topbar, TopbarButton } from "@/components/admin/topbar";
 import { Card, CardBody, CardHead, Kpi, Pill } from "@/components/admin/ui-bits";
 import { RecordFormDialog, type FieldDef } from "@/components/admin/record-form-dialog";
 import { ViewRecordDialog } from "@/components/admin/view-record-dialog";
+import { usePagination, TablePagination } from "@/components/admin/table-pagination";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -51,7 +52,7 @@ const contentFields: FieldDef[] = [
   { key: "author",      label: "Author / Facilitator", placeholder: "e.g. Fr. Peter / Diocese Chaplain" },
   { key: "tags",        label: "Topics / Tags",        placeholder: "e.g. Lent, Prayer, Vocations (comma-separated)" },
   { key: "description", label: "Description",          type: "textarea", full: true, placeholder: "Brief overview — shown on the library card." },
-  { key: "fileUrl",     label: "File URL",             full: true, placeholder: "https://… paste the public URL here" },
+  { key: "fileUrl",     label: "Content File",         type: "file", full: true, bucket: "formation", accept: "application/pdf,audio/*,video/*,image/*", maxSizeMb: 100 },
 ];
 
 function itemToInitial(i: FormationItem): Record<string, string> {
@@ -116,6 +117,7 @@ function FormationPage() {
 
   const displayItems = items.length > 0 ? items : MOCK_ITEMS;
   const isLive       = items.length > 0;
+  const itemPagination = usePagination(displayItems, 10);
 
   const total  = items.length  || 84;
   const views  = items.reduce((s, i) => s + i.views, 0) || 14820;
@@ -141,7 +143,7 @@ function FormationPage() {
         <Card>
           <CardHead title="Recently Published" action="View library →" />
           <CardBody className="space-y-2">
-            {displayItems.map((f) => (
+            {itemPagination.pageRows.map((f) => (
               <div key={f.id ?? f.title} className="flex items-start gap-3 rounded-lg border border-border bg-bg-2 p-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-bg-4 text-[14px]">
                   {kindIcon(f.kind)}
@@ -184,6 +186,16 @@ function FormationPage() {
               <div className="py-6 text-center text-[11px] text-text-3">No items published yet.</div>
             )}
           </CardBody>
+          {displayItems.length > 0 && (
+            <TablePagination
+              page={itemPagination.page}
+              pageSize={itemPagination.pageSize}
+              total={itemPagination.total}
+              totalPages={itemPagination.totalPages}
+              onPageChange={itemPagination.setPage}
+              onPageSizeChange={itemPagination.setPageSize}
+            />
+          )}
         </Card>
       </div>
 
@@ -249,7 +261,7 @@ function FormationPage() {
           { label: "Tags",          value: viewing.tags?.join(", ") || "—" },
           { label: "Description",   value: viewing.description ?? "—", full: true },
           {
-            label: "File URL",
+            label: "Content File",
             value: viewing.file_url
               ? <a href={viewing.file_url} target="_blank" rel="noreferrer" className="break-all text-primary underline">{viewing.file_url}</a>
               : "—",

@@ -67,6 +67,7 @@ function dbCategoriesToDuties(categories: EventDutyCategory[]): DutyCategory[] {
                 deanery: a.deanery?.name ?? "",
                 parish: a.parish?.name ?? "",
                 name: a.name,
+                youthId: a.youth_id,
               }))
             : [{ id: uid(), deanery: "", parish: "", name: "" }],
         })),
@@ -90,6 +91,7 @@ function eventToFormSeed(event: EventFull): EventFormState {
       deanery: event.deanery?.name ?? "",
       parish: event.parish?.name ?? "",
       description: event.description ?? "",
+      posterUrl: event.poster_url ?? "",
       hasDuties,
       isMass,
     },

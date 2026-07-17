@@ -6,6 +6,7 @@ export type EventRow = {
   event_date: string | null;
   venue: string | null;
   description: string | null;
+  poster_url: string | null;
   organization_level: "Diocese" | "Deanery" | "Parish" | "Outstation" | null;
   deanery: { name: string } | null;
   parish: { name: string } | null;
@@ -22,6 +23,7 @@ export type EventProgramItem = {
 export type EventDutyAssignee = {
   id: string;
   name: string;
+  youth_id: string | null;
   deanery: { name: string } | null;
   parish: { name: string } | null;
 };
@@ -66,6 +68,7 @@ export type EventInput = {
   eventDate?: string | null;
   venue?: string | null;
   description?: string | null;
+  posterUrl?: string | null;
   organizationLevel?: EventRow["organization_level"];
   deaneryName?: string | null;
   parishName?: string | null;
@@ -88,7 +91,7 @@ async function resolveOrgIds(deaneryName?: string | null, parishName?: string | 
 export async function listEvents(): Promise<EventRow[]> {
   const { data, error } = await supabase
     .from("events")
-    .select("id, name, event_date, venue, description, organization_level, deanery:deaneries(name), parish:parishes(name)")
+    .select("id, name, event_date, venue, description, poster_url, organization_level, deanery:deaneries(name), parish:parishes(name)")
     .order("event_date", { ascending: false })
     .limit(500);
   if (error) throw error;
@@ -104,11 +107,12 @@ export async function createEvent(input: EventInput): Promise<EventRow> {
       event_date: input.eventDate || null,
       venue: input.venue || null,
       description: input.description || null,
+      poster_url: input.posterUrl || null,
       organization_level: input.organizationLevel || null,
       deanery_id,
       parish_id,
     })
-    .select("id, name, event_date, venue, description, organization_level, deanery:deaneries(name), parish:parishes(name)")
+    .select("id, name, event_date, venue, description, poster_url, organization_level, deanery:deaneries(name), parish:parishes(name)")
     .single();
   if (error) throw error;
   return data as unknown as EventRow;
@@ -123,12 +127,13 @@ export async function updateEvent(id: string, input: EventInput): Promise<EventR
       event_date: input.eventDate || null,
       venue: input.venue || null,
       description: input.description || null,
+      poster_url: input.posterUrl || null,
       organization_level: input.organizationLevel || null,
       deanery_id,
       parish_id,
     })
     .eq("id", id)
-    .select("id, name, event_date, venue, description, organization_level, deanery:deaneries(name), parish:parishes(name)")
+    .select("id, name, event_date, venue, description, poster_url, organization_level, deanery:deaneries(name), parish:parishes(name)")
     .single();
   if (error) throw error;
   return data as unknown as EventRow;
@@ -155,7 +160,7 @@ export async function saveEventProgram(eventId: string, program: ProgramSlotInpu
   if (error) throw error;
 }
 
-type DutyAssignmentInput = { deanery: string; parish: string; name: string };
+type DutyAssignmentInput = { deanery: string; parish: string; name: string; youthId?: string | null };
 type DutyItemInput = { label: string; assignments: DutyAssignmentInput[] };
 type DutyCategoryInput = { name: string; duties: DutyItemInput[] };
 
@@ -233,6 +238,7 @@ export async function saveEventDuties(eventId: string, duties: DutyCategoryInput
         .map((a) => ({
           duty_id: dutyRow.id,
           name: a.name,
+          youth_id: a.youthId ?? null,
           deanery_id: deaneryMap[a.deanery] ?? null,
           parish_id: parishMap[a.parish] ?? null,
         }));
@@ -248,7 +254,7 @@ export async function getEventFull(eventId: string): Promise<EventFull> {
   const [eventRes, programRes, categoriesRes, registrationsRes, checkinRes] = await Promise.all([
     supabase
       .from("events")
-      .select("id, name, event_date, venue, description, organization_level, deanery:deaneries(name), parish:parishes(name)")
+      .select("id, name, event_date, venue, description, poster_url, organization_level, deanery:deaneries(name), parish:parishes(name)")
       .eq("id", eventId)
       .single(),
     supabase
@@ -258,7 +264,7 @@ export async function getEventFull(eventId: string): Promise<EventFull> {
       .order("position"),
     supabase
       .from("event_duty_categories")
-      .select(`id, name, position, duties:event_duties(id, title, position, assignees:event_duty_assignees(id, name, deanery:deaneries(name), parish:parishes(name)))`)
+      .select(`id, name, position, duties:event_duties(id, title, position, assignees:event_duty_assignees(id, name, youth_id, deanery:deaneries(name), parish:parishes(name)))`)
       .eq("event_id", eventId)
       .order("position"),
     supabase
@@ -285,6 +291,28 @@ export async function getEventFull(eventId: string): Promise<EventFull> {
 }
 
 export async function deleteEvent(id: string) {
+  // Notify everyone registered before the cascade wipes event_registrations.
+  const [{ data: event }, { data: registrants }] = await Promise.all([
+    supabase.from("events").select("name").eq("id", id).maybeSingle(),
+    supabase.from("event_registrations").select("youth_id").eq("event_id", id).not("youth_id", "is", null),
+  ]);
+
+  const youthIds = [...new Set((registrants ?? []).map((r) => r.youth_id).filter((v): v is string => !!v))];
+  if (youthIds.length > 0 && event?.name) {
+    const { data: authLinked } = await supabase.from("youths").select("id, auth_user_id").in("id", youthIds);
+    const notifications = (authLinked ?? [])
+      .filter((y) => y.auth_user_id)
+      .map((y) => ({
+        user_id: y.auth_user_id as string,
+        category: "event" as const,
+        title: "Event cancelled",
+        body: `"${event.name}" has been cancelled.`,
+      }));
+    if (notifications.length > 0) {
+      await supabase.from("notifications").insert(notifications);
+    }
+  }
+
   const { error } = await supabase.from("events").delete().eq("id", id);
   if (error) throw error;
 }
@@ -332,6 +360,11 @@ export async function registerForEvent(input: {
     },
     { onConflict: "event_id,youth_id" },
   );
+  if (error) throw error;
+}
+
+export async function deleteRegistration(registrationId: string) {
+  const { error } = await supabase.from("event_registrations").delete().eq("id", registrationId);
   if (error) throw error;
 }
 
