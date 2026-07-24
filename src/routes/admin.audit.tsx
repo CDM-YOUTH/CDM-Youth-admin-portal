@@ -2,9 +2,9 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { RefreshCw, Search, X } from "lucide-react";
-import { Topbar } from "@/components/admin/topbar";
-import { Card, CardBody, CardHead, Pill } from "@/components/admin/ui-bits";
-import { TablePagination, usePagination } from "@/components/admin/table-pagination";
+import { Topbar } from "@/components/admin/layout/topbar";
+import { Card, CardBody, CardHead, Pill } from "@/components/admin/composables/ui-bits";
+import { TablePagination, usePagination } from "@/components/admin/composables/tables/table-pagination";
 import { listEnrollmentAudit } from "@/lib/db/audit";
 
 export const Route = createFileRoute("/admin/audit")({

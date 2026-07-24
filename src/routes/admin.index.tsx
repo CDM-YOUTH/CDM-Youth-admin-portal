@@ -6,7 +6,7 @@ import {
   Topbar,
   TopbarTab,
   TopbarButton,
-} from "@/components/admin/topbar";
+} from "@/components/admin/layout/topbar";
 import {
   Card,
   CardBody,
@@ -18,12 +18,12 @@ import {
   Kpi,
   Pill,
   ProgressRow,
-} from "@/components/admin/ui-bits";
-import { Donut } from "@/components/admin/donut";
+} from "@/components/admin/composables/ui-bits";
+import { Donut } from "@/components/admin/composables/donut";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CUSA_INSTITUTIONS, buildCusaMembers, cusaGenderRows, cusaInstitutionRows, cusaMembersFor } from "@/lib/cusa-data";
 import { getDashboardCounts, getLiveAnalytics } from "@/lib/db/analytics";
-import { TablePagination, usePagination } from "@/components/admin/table-pagination";
+import { TablePagination, usePagination } from "@/components/admin/composables/tables/table-pagination";
 import {
   ACTIVITY_FEED,
   ANALYTICS_UNITS,

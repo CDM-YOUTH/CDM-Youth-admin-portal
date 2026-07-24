@@ -76,5 +76,5 @@ export async function getUserRole(
     .maybeSingle();
 
   if (error) throw error;
-  return (data?.role as "admin" | "moderator" | "user" | null) ?? null;
+  return data?.role ?? null;
 }

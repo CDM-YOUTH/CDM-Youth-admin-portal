@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { QrCode, Search, Users, Link2, UserPlus, Check, X, Camera, Download } from "lucide-react";
-import { Card, CardBody, CardHead, Pill } from "@/components/admin/ui-bits";
+import { Card, CardBody, CardHead, Pill } from "@/components/admin/composables/ui-bits";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";

@@ -4,14 +4,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { Shield, Check, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { Topbar, TopbarTab } from "@/components/admin/topbar";
+import { Topbar, TopbarTab } from "@/components/admin/layout/topbar";
 import {
   Card,
   CardHead,
   CardBody,
   Pill,
-} from "@/components/admin/ui-bits";
-import { usePagination, TablePagination } from "@/components/admin/table-pagination";
+} from "@/components/admin/composables/ui-bits";
+import { usePagination, TablePagination } from "@/components/admin/composables/tables/table-pagination";
 
 export const Route = createFileRoute("/admin/users")({
   component: UsersPage,

@@ -21,6 +21,7 @@ import { Route as AdminUniformsRouteImport } from './routes/admin.uniforms'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminReportsRouteImport } from './routes/admin.reports'
 import { Route as AdminMissionRouteImport } from './routes/admin.mission'
+import { Route as AdminLeadersRouteImport } from './routes/admin.leaders'
 import { Route as AdminFormationRouteImport } from './routes/admin.formation'
 import { Route as AdminEventsRouteImport } from './routes/admin.events'
 import { Route as AdminEnrollmentRouteImport } from './routes/admin.enrollment'
@@ -89,6 +90,11 @@ const AdminMissionRoute = AdminMissionRouteImport.update({
   path: '/mission',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminLeadersRoute = AdminLeadersRouteImport.update({
+  id: '/leaders',
+  path: '/leaders',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminFormationRoute = AdminFormationRouteImport.update({
   id: '/formation',
   path: '/formation',
@@ -135,6 +141,7 @@ export interface FileRoutesByFullPath {
   '/admin/enrollment': typeof AdminEnrollmentRoute
   '/admin/events': typeof AdminEventsRoute
   '/admin/formation': typeof AdminFormationRoute
+  '/admin/leaders': typeof AdminLeadersRoute
   '/admin/mission': typeof AdminMissionRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/settings': typeof AdminSettingsRoute
@@ -155,6 +162,7 @@ export interface FileRoutesByTo {
   '/admin/enrollment': typeof AdminEnrollmentRoute
   '/admin/events': typeof AdminEventsRoute
   '/admin/formation': typeof AdminFormationRoute
+  '/admin/leaders': typeof AdminLeadersRoute
   '/admin/mission': typeof AdminMissionRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/settings': typeof AdminSettingsRoute
@@ -177,6 +185,7 @@ export interface FileRoutesById {
   '/admin/enrollment': typeof AdminEnrollmentRoute
   '/admin/events': typeof AdminEventsRoute
   '/admin/formation': typeof AdminFormationRoute
+  '/admin/leaders': typeof AdminLeadersRoute
   '/admin/mission': typeof AdminMissionRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/settings': typeof AdminSettingsRoute
@@ -200,6 +209,7 @@ export interface FileRouteTypes {
     | '/admin/enrollment'
     | '/admin/events'
     | '/admin/formation'
+    | '/admin/leaders'
     | '/admin/mission'
     | '/admin/reports'
     | '/admin/settings'
@@ -220,6 +230,7 @@ export interface FileRouteTypes {
     | '/admin/enrollment'
     | '/admin/events'
     | '/admin/formation'
+    | '/admin/leaders'
     | '/admin/mission'
     | '/admin/reports'
     | '/admin/settings'
@@ -241,6 +252,7 @@ export interface FileRouteTypes {
     | '/admin/enrollment'
     | '/admin/events'
     | '/admin/formation'
+    | '/admin/leaders'
     | '/admin/mission'
     | '/admin/reports'
     | '/admin/settings'
@@ -347,6 +359,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminMissionRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/leaders': {
+      id: '/admin/leaders'
+      path: '/leaders'
+      fullPath: '/admin/leaders'
+      preLoaderRoute: typeof AdminLeadersRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/formation': {
       id: '/admin/formation'
       path: '/formation'
@@ -405,6 +424,7 @@ interface AdminRouteChildren {
   AdminEnrollmentRoute: typeof AdminEnrollmentRoute
   AdminEventsRoute: typeof AdminEventsRoute
   AdminFormationRoute: typeof AdminFormationRoute
+  AdminLeadersRoute: typeof AdminLeadersRoute
   AdminMissionRoute: typeof AdminMissionRoute
   AdminReportsRoute: typeof AdminReportsRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
@@ -423,6 +443,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminEnrollmentRoute: AdminEnrollmentRoute,
   AdminEventsRoute: AdminEventsRoute,
   AdminFormationRoute: AdminFormationRoute,
+  AdminLeadersRoute: AdminLeadersRoute,
   AdminMissionRoute: AdminMissionRoute,
   AdminReportsRoute: AdminReportsRoute,
   AdminSettingsRoute: AdminSettingsRoute,

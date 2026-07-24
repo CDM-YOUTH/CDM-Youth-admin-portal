@@ -4,7 +4,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { LogOut } from "lucide-react";
 import cdmLogo from "@/assets/cdm-logo.jpeg";
 import { supabase } from "@/integrations/supabase/client";
-import { getMyProfile } from "@/lib/db/profiles";
+import { getMyProfile } from "@/lib/db/youth-records/profiles";
 import {
   DropdownMenu,
   DropdownMenuContent,

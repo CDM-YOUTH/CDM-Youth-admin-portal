@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Papa from "papaparse";
 import { downloadXlsx } from "@/lib/export-xlsx";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -7,18 +7,29 @@ import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { toast } from "sonner";
 import { Download, MoreVertical, Trash2, BadgeCheck, Clock, Plus } from "lucide-react";
-import { Topbar } from "@/components/admin/topbar";
-import { Card, CardBody, Pill } from "@/components/admin/ui-bits";
-import { TablePagination, usePagination } from "@/components/admin/table-pagination";
+import { Topbar } from "@/components/admin/layout/topbar";
+import { Card, CardBody, Pill } from "@/components/admin/composables/ui-bits";
+import { TablePagination, usePagination } from "@/components/admin/composables/tables/table-pagination";
 import {
   ColumnFilter,
   ColumnHeader,
   TableToolbar,
   applyColumnFilter,
   type ColumnFilterValue,
-} from "@/components/admin/table-filters";
-import { RecordFormDialog, type FieldDef } from "@/components/admin/record-form-dialog";
+} from "@/components/admin/composables/tables/table-filters";
+import { RecordFormDialog, type FieldDef } from "@/components/admin/composables/forms/record-form-dialog";
 import { ORGANIZATION } from "@/lib/mock-data";
+import { YouthSearchInput, type PickedYouth } from "@/components/admin/composables/pickers/youth-search-input";
+import { fetchOrg, type OrgTree } from "@/lib/db/org";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { YOUTH_CATEGORIES } from "@/lib/youth-data";
 import {
   bulkEnrollRows,
@@ -27,7 +38,7 @@ import {
   listEnrollments,
   updateEnrollmentStatus,
   type BulkEnrollRow,
-} from "@/lib/db/enrollments";
+} from "@/lib/db/youth-records/enrollments";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -45,9 +56,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-
-const CURRENT_YEAR = new Date().getFullYear();
-const AVAILABLE_YEARS = Array.from({ length: CURRENT_YEAR - 2022 }, (_, i) => CURRENT_YEAR - i);
 
 const filterValueSchema = fallback(
   z
@@ -71,13 +79,6 @@ const enrollmentSearchSchema = z.object({
 });
 
 type EnrollmentSearch = z.infer<typeof enrollmentSearchSchema>;
-
-const FEE_BY_CATEGORY: Record<string, string> = {
-  Primary: "KES 300",
-  Secondary: "KES 500",
-  Tertiary: "KES 800",
-  Working: "KES 1,000",
-};
 
 export const Route = createFileRoute("/admin/enrollment")({
   head: () => ({
@@ -105,6 +106,7 @@ function EnrollmentPage() {
   const [statusTarget, setStatusTarget] = useState<null | { id: string; name: string; nextStatus: "paid" | "pending" }>(null);
   const [importResult, setImportResult] = useState<null | { inserted: number; missing: string[]; total: number }>(null);
   const qc = useQueryClient();
+  const { data: org } = useQuery({ queryKey: ["org"], queryFn: fetchOrg });
   const { data: enrollments = [], isLoading } = useQuery({
     queryKey: ["enrollments", search.year],
     queryFn: () => listEnrollments(search.year),
@@ -115,6 +117,7 @@ function EnrollmentPage() {
     onSuccess: () => {
       toast.success("Enrollment saved");
       qc.invalidateQueries({ queryKey: ["enrollments"] });
+      setAddOpen(false);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -477,14 +480,13 @@ function EnrollmentPage() {
         </Card>
 
       </div>
-      <RecordFormDialog
+      <EnrollDialog
         open={addOpen}
         onOpenChange={setAddOpen}
-        title="Enroll Youth · 2026"
-        description="The youth must already be registered. Enter their CDM No. and the bank payment reference (optional)."
-        fields={enrollFields}
-        submitLabel="Save Enrollment"
-        onSubmit={(values) => createMut.mutate({ cdmId: values.cdmId.trim(), paymentRef: values.paymentRef })}
+        year={search.year}
+        org={org}
+        isPending={createMut.isPending}
+        onSubmit={(cdmId, paymentRef) => createMut.mutate({ cdmId, paymentRef })}
       />
       <RecordFormDialog
         open={importOpen}
@@ -571,3 +573,96 @@ function EnrollmentPage() {
     </>
   );
 }
+
+/* ------------------------------------------------------------------ */
+/* Enroll dialog                                                       */
+/* ------------------------------------------------------------------ */
+
+function EnrollDialog({
+  open,
+  onOpenChange,
+  year,
+  org,
+  isPending,
+  onSubmit,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  year: number;
+  org?: OrgTree;
+  isPending: boolean;
+  onSubmit: (cdmId: string, paymentRef?: string) => void;
+}) {
+  const [youth, setYouth]         = useState<PickedYouth | null>(null);
+  const [paymentRef, setPaymentRef] = useState("");
+
+  useEffect(() => {
+    if (open) { setYouth(null); setPaymentRef(""); }
+  }, [open]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg border-border bg-white text-foreground">
+        <DialogHeader>
+          <DialogTitle className="text-display text-xl font-black text-gold">
+            Enroll Youth · {year}
+          </DialogTitle>
+          <DialogDescription className="text-[12px] text-text-3">
+            Find by CDM No. or browse by location. Name, phone and parish are filled automatically.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-text-3">Youth *</p>
+            <YouthSearchInput value={youth} onChange={setYouth} org={org} />
+          </div>
+
+          <label className="block space-y-1 text-[10px] font-bold uppercase tracking-wide text-text-3">
+            <span>Payment reference (optional)</span>
+            <Input
+              value={paymentRef}
+              onChange={(e) => setPaymentRef(e.target.value)}
+              placeholder="Bank slip / transaction ref"
+            />
+          </label>
+        </div>
+
+        <DialogFooter>
+          <button
+            type="button"
+            onClick={() => onOpenChange(false)}
+            className="rounded-lg border border-border bg-bg-3 px-3 py-2 text-[11px] font-bold text-text-2"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (!youth) { toast.error("Select a youth first"); return; }
+              onSubmit(youth.cdm_id, paymentRef.trim() || undefined);
+            }}
+            disabled={isPending}
+            className="rounded-lg bg-primary px-4 py-2 text-[11px] font-bold text-primary-foreground hover:opacity-90 disabled:opacity-60"
+          >
+            {isPending ? "Saving…" : "Save Enrollment"}
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Script — constants & config                                         */
+/* ------------------------------------------------------------------ */
+
+const CURRENT_YEAR = new Date().getFullYear();
+const AVAILABLE_YEARS = Array.from({ length: CURRENT_YEAR - 2022 }, (_, i) => CURRENT_YEAR - i);
+
+const FEE_BY_CATEGORY: Record<string, string> = {
+  Primary: "KES 300",
+  Secondary: "KES 500",
+  Tertiary: "KES 800",
+  Working: "KES 1,000",
+};

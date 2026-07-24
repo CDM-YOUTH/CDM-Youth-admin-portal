@@ -3,12 +3,12 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { MoreVertical, Eye, Pencil, Trash2, BadgeCheck, Truck, PackageCheck, Banknote } from "lucide-react";
-import { Topbar, TopbarButton, TopbarTab } from "@/components/admin/topbar";
-import { Card, Kpi, Pill } from "@/components/admin/ui-bits";
-import { RecordFormDialog, type FieldDef } from "@/components/admin/record-form-dialog";
-import { ViewRecordDialog } from "@/components/admin/view-record-dialog";
-import { DateRangeFilter, inDateRange, type DateRange } from "@/components/admin/date-range-filter";
-import { usePagination, TablePagination } from "@/components/admin/table-pagination";
+import { Topbar, TopbarButton, TopbarTab } from "@/components/admin/layout/topbar";
+import { Card, Kpi, Pill } from "@/components/admin/composables/ui-bits";
+import { RecordFormDialog, type FieldDef } from "@/components/admin/composables/forms/record-form-dialog";
+import { ViewRecordDialog } from "@/components/admin/composables/forms/view-record-dialog";
+import { DateRangeFilter, inDateRange, type DateRange } from "@/components/admin/composables/pickers/date-range-filter";
+import { usePagination, TablePagination } from "@/components/admin/composables/tables/table-pagination";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
@@ -29,16 +29,16 @@ import { ORGANIZATION } from "@/lib/mock-data";
 import {
   createUniformSku, deleteUniformSku, listUniformSkus, updateUniformSku,
   type UniformSku, type UniformSkuInput, type UniformSkuUpdateInput,
-} from "@/lib/db/uniforms";
+} from "@/lib/db/assets/uniforms";
 import {
   createStockEntry, deleteStockEntry, listStockEntries,
   type StockEntry, type StockEntryInput,
-} from "@/lib/db/uniform-stock-entries";
+} from "@/lib/db/assets/uniform-stock-entries";
 import {
   createUniformSale, deleteUniformSale, listUniformSales,
   confirmOrder, confirmDispatch, confirmDelivery, recordPayment, updateUniformSale,
   type PaymentStatus, type OrderStage, type UniformSale, type UniformSaleInput, type UniformSaleUpdateInput,
-} from "@/lib/db/uniform-sales";
+} from "@/lib/db/assets/uniform-sales";
 
 export const Route = createFileRoute("/admin/uniforms")({
   head: () => ({
@@ -49,124 +49,6 @@ export const Route = createFileRoute("/admin/uniforms")({
   }),
   component: UniformsPage,
 });
-
-/* ── types ── */
-type TabId       = "stock" | "sales" | "reports";
-type SalesFilter = "all" | "pending" | "paid" | "unpaid";
-
-/* ── constants ── */
-const EMPTY_RANGE: DateRange = { from: undefined, to: undefined };
-const parishOptions = ORGANIZATION.flatMap((d) => d.parishes.map((p) => p.name));
-
-/* ── field definitions ── */
-const skuAddFields: FieldDef[] = [
-  { key: "name",      label: "Item Name",                required: true, placeholder: "e.g. T-Shirt — Green" },
-  { key: "inStock",   label: "In Stock",                 type: "number", required: true, placeholder: "0" },
-  { key: "onOrder",   label: "On Order (from supplier)", type: "number", placeholder: "0" },
-  { key: "unitPrice", label: "Unit Price (KES)",         type: "number", placeholder: "e.g. 450" },
-];
-
-const skuEditFields: FieldDef[] = [
-  { key: "name",      label: "Item Name",                required: true },
-  { key: "inStock",   label: "In Stock",                 type: "number", required: true },
-  { key: "onOrder",   label: "On Order (from supplier)", type: "number", required: true },
-  { key: "unitPrice", label: "Unit Price (KES)",         type: "number" },
-];
-
-function buildEntryFields(skuNames: string[]): FieldDef[] {
-  const items = skuNames.length > 0 ? skuNames : MOCK_STOCK.map((s) => s.name);
-  return [
-    { key: "item",      label: "Item / SKU",    type: "select", required: true, options: items },
-    { key: "activity",  label: "Activity",      type: "select", required: true, options: ["Sewing", "Logo", "Branding"] },
-    { key: "quantity",  label: "Quantity",      type: "number", required: true, placeholder: "e.g. 50" },
-    { key: "enteredAt", label: "Date (leave blank for today)", type: "date" },
-    { key: "notes",     label: "Notes",         type: "textarea", full: true, placeholder: "Batch #, sizes breakdown…" },
-  ];
-}
-
-function buildSaleFields(skuNames: string[]): FieldDef[] {
-  const items = skuNames.length > 0 ? skuNames : MOCK_STOCK.map((s) => s.name);
-  return [
-    { key: "youthName", label: "Youth Name",       required: true, placeholder: "Full name" },
-    { key: "parish",    label: "Parish",            type: "select", options: parishOptions },
-    { key: "item",      label: "Item / SKU",        type: "select", required: true, options: items },
-    { key: "size",      label: "Size",               type: "select", options: ["S", "M", "L", "XL", "XXL"] },
-    { key: "quantity",  label: "Quantity",          type: "number", required: true, placeholder: "1" },
-    { key: "unitPrice", label: "Unit Price (KES)",  type: "number", placeholder: "e.g. 450" },
-    { key: "deliveryLocation", label: "Delivery Location", full: true, placeholder: "e.g. St. James Cathedral, Sunday Mass" },
-    { key: "orderedAt", label: "Order Date",        type: "date" },
-    { key: "notes",     label: "Notes",             type: "textarea", full: true },
-  ];
-}
-
-function buildSaleEditFields(skuNames: string[]): FieldDef[] {
-  return [
-    ...buildSaleFields(skuNames),
-    { key: "deliveredAt", label: "Delivery Date (blank = not yet delivered)", type: "date" },
-  ];
-}
-
-/* ── helpers ── */
-const fmtDate = (iso: string) =>
-  new Date(iso).toLocaleDateString("en-KE", { day: "numeric", month: "short", year: "numeric" });
-
-const fmtKES = (n: number) => `KES ${Math.round(n).toLocaleString()}`;
-
-const payTone = (s: PaymentStatus): "success" | "gold" | "danger" =>
-  s === "paid" ? "success" : s === "partial" ? "gold" : "danger";
-
-
-function groupByItem(sales: UniformSale[]) {
-  const m = new Map<string, { qty: number; revenue: number; collected: number }>();
-  for (const s of sales) {
-    const e = m.get(s.item_name) ?? { qty: 0, revenue: 0, collected: 0 };
-    m.set(s.item_name, { qty: e.qty + s.quantity, revenue: e.revenue + s.quantity * Number(s.unit_price), collected: e.collected + Number(s.paid_amount) });
-  }
-  return Array.from(m.entries()).map(([name, v]) => ({ name, ...v })).sort((a, b) => b.revenue - a.revenue);
-}
-
-function groupByDay(sales: UniformSale[]) {
-  const m = new Map<string, { qty: number; revenue: number }>();
-  for (const s of sales) {
-    const key = fmtDate(s.ordered_at);
-    const e   = m.get(key) ?? { qty: 0, revenue: 0 };
-    m.set(key, { qty: e.qty + s.quantity, revenue: e.revenue + s.quantity * Number(s.unit_price) });
-  }
-  return Array.from(m.entries()).map(([date, v]) => ({ date, ...v }))
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 30);
-}
-
-const skuToInitial = (s: UniformSku): Record<string, string> => ({
-  name: s.name, inStock: String(s.in_stock), onOrder: String(s.on_order),
-  unitPrice: s.unit_price != null ? String(s.unit_price) : "",
-});
-
-const saleToInitial = (s: UniformSale): Record<string, string> => ({
-  youthName: s.youth_name, parish: s.parish_name ?? "", item: s.item_name,
-  size: s.size ?? "",
-  quantity: String(s.quantity), unitPrice: String(s.unit_price),
-  deliveryLocation: s.delivery_location ?? "",
-  orderedAt: s.ordered_at ? s.ordered_at.split("T")[0] : "",
-  deliveredAt: s.delivered_at ? s.delivered_at.split("T")[0] : "",
-  notes: s.notes ?? "",
-});
-
-const STAGE_TONE: Record<OrderStage, "neutral" | "info" | "gold" | "success" | "danger"> = {
-  placed: "neutral",
-  confirmed: "info",
-  dispatched: "gold",
-  delivered: "success",
-  cancelled: "danger",
-};
-const STAGE_LABEL: Record<OrderStage, string> = {
-  placed: "Placed",
-  confirmed: "Confirmed",
-  dispatched: "Dispatched",
-  delivered: "Delivered",
-  cancelled: "Cancelled",
-};
-
-/* ── main component ── */
 
 function UniformsPage() {
   const [tab,          setTab]          = useState<TabId>("stock");
@@ -1017,6 +899,120 @@ function DispatchDialog({
     </Dialog>
   );
 }
+
+/* ── script — types, constants & helpers ── */
+
+type TabId       = "stock" | "sales" | "reports";
+type SalesFilter = "all" | "pending" | "paid" | "unpaid";
+
+const EMPTY_RANGE: DateRange = { from: undefined, to: undefined };
+const parishOptions = ORGANIZATION.flatMap((d) => d.parishes.map((p) => p.name));
+
+const skuAddFields: FieldDef[] = [
+  { key: "name",      label: "Item Name",                required: true, placeholder: "e.g. T-Shirt — Green" },
+  { key: "inStock",   label: "In Stock",                 type: "number", required: true, placeholder: "0" },
+  { key: "onOrder",   label: "On Order (from supplier)", type: "number", placeholder: "0" },
+  { key: "unitPrice", label: "Unit Price (KES)",         type: "number", placeholder: "e.g. 450" },
+];
+
+const skuEditFields: FieldDef[] = [
+  { key: "name",      label: "Item Name",                required: true },
+  { key: "inStock",   label: "In Stock",                 type: "number", required: true },
+  { key: "onOrder",   label: "On Order (from supplier)", type: "number", required: true },
+  { key: "unitPrice", label: "Unit Price (KES)",         type: "number" },
+];
+
+function buildEntryFields(skuNames: string[]): FieldDef[] {
+  const items = skuNames.length > 0 ? skuNames : MOCK_STOCK.map((s) => s.name);
+  return [
+    { key: "item",      label: "Item / SKU",    type: "select", required: true, options: items },
+    { key: "activity",  label: "Activity",      type: "select", required: true, options: ["Sewing", "Logo", "Branding"] },
+    { key: "quantity",  label: "Quantity",      type: "number", required: true, placeholder: "e.g. 50" },
+    { key: "enteredAt", label: "Date (leave blank for today)", type: "date" },
+    { key: "notes",     label: "Notes",         type: "textarea", full: true, placeholder: "Batch #, sizes breakdown…" },
+  ];
+}
+
+function buildSaleFields(skuNames: string[]): FieldDef[] {
+  const items = skuNames.length > 0 ? skuNames : MOCK_STOCK.map((s) => s.name);
+  return [
+    { key: "youthName", label: "Youth Name",       required: true, placeholder: "Full name" },
+    { key: "parish",    label: "Parish",            type: "select", options: parishOptions },
+    { key: "item",      label: "Item / SKU",        type: "select", required: true, options: items },
+    { key: "size",      label: "Size",               type: "select", options: ["S", "M", "L", "XL", "XXL"] },
+    { key: "quantity",  label: "Quantity",          type: "number", required: true, placeholder: "1" },
+    { key: "unitPrice", label: "Unit Price (KES)",  type: "number", placeholder: "e.g. 450" },
+    { key: "deliveryLocation", label: "Delivery Location", full: true, placeholder: "e.g. St. James Cathedral, Sunday Mass" },
+    { key: "orderedAt", label: "Order Date",        type: "date" },
+    { key: "notes",     label: "Notes",             type: "textarea", full: true },
+  ];
+}
+
+function buildSaleEditFields(skuNames: string[]): FieldDef[] {
+  return [
+    ...buildSaleFields(skuNames),
+    { key: "deliveredAt", label: "Delivery Date (blank = not yet delivered)", type: "date" },
+  ];
+}
+
+const fmtDate = (iso: string) =>
+  new Date(iso).toLocaleDateString("en-KE", { day: "numeric", month: "short", year: "numeric" });
+
+const fmtKES = (n: number) => `KES ${Math.round(n).toLocaleString()}`;
+
+const payTone = (s: PaymentStatus): "success" | "gold" | "danger" =>
+  s === "paid" ? "success" : s === "partial" ? "gold" : "danger";
+
+function groupByItem(sales: UniformSale[]) {
+  const m = new Map<string, { qty: number; revenue: number; collected: number }>();
+  for (const s of sales) {
+    const e = m.get(s.item_name) ?? { qty: 0, revenue: 0, collected: 0 };
+    m.set(s.item_name, { qty: e.qty + s.quantity, revenue: e.revenue + s.quantity * Number(s.unit_price), collected: e.collected + Number(s.paid_amount) });
+  }
+  return Array.from(m.entries()).map(([name, v]) => ({ name, ...v })).sort((a, b) => b.revenue - a.revenue);
+}
+
+function groupByDay(sales: UniformSale[]) {
+  const m = new Map<string, { qty: number; revenue: number }>();
+  for (const s of sales) {
+    const key = fmtDate(s.ordered_at);
+    const e   = m.get(key) ?? { qty: 0, revenue: 0 };
+    m.set(key, { qty: e.qty + s.quantity, revenue: e.revenue + s.quantity * Number(s.unit_price) });
+  }
+  return Array.from(m.entries()).map(([date, v]) => ({ date, ...v }))
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 30);
+}
+
+const skuToInitial = (s: UniformSku): Record<string, string> => ({
+  name: s.name, inStock: String(s.in_stock), onOrder: String(s.on_order),
+  unitPrice: s.unit_price != null ? String(s.unit_price) : "",
+});
+
+const saleToInitial = (s: UniformSale): Record<string, string> => ({
+  youthName: s.youth_name, parish: s.parish_name ?? "", item: s.item_name,
+  size: s.size ?? "",
+  quantity: String(s.quantity), unitPrice: String(s.unit_price),
+  deliveryLocation: s.delivery_location ?? "",
+  orderedAt: s.ordered_at ? s.ordered_at.split("T")[0] : "",
+  deliveredAt: s.delivered_at ? s.delivered_at.split("T")[0] : "",
+  notes: s.notes ?? "",
+});
+
+const STAGE_TONE: Record<OrderStage, "neutral" | "info" | "gold" | "success" | "danger"> = {
+  placed: "neutral",
+  confirmed: "info",
+  dispatched: "gold",
+  delivered: "success",
+  cancelled: "danger",
+};
+
+const STAGE_LABEL: Record<OrderStage, string> = {
+  placed: "Placed",
+  confirmed: "Confirmed",
+  dispatched: "Dispatched",
+  delivered: "Delivered",
+  cancelled: "Cancelled",
+};
 
 /* ── mock data ── */
 

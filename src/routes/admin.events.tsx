@@ -2,10 +2,10 @@ import { useState } from "react";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { EventFormState } from "@/components/admin/event-tabs-form";
-import { Topbar, TopbarButton } from "@/components/admin/topbar";
-import { Card, CardBody, CardHead, Kpi, Pill } from "@/components/admin/ui-bits";
-import { usePagination, TablePagination } from "@/components/admin/table-pagination";
+import type { EventFormState } from "@/components/admin/events/event-tabs-form";
+import { Topbar, TopbarButton } from "@/components/admin/layout/topbar";
+import { Card, CardBody, CardHead, Kpi, Pill } from "@/components/admin/composables/ui-bits";
+import { usePagination, TablePagination } from "@/components/admin/composables/tables/table-pagination";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -19,8 +19,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Plus, Trash2 } from "lucide-react";
-import { EventTabsForm } from "@/components/admin/event-tabs-form";
-import { createEvent, deleteEvent, getEventsAnalytics, listEvents, type EventRow } from "@/lib/db/events";
+import { EventTabsForm } from "@/components/admin/events/event-tabs-form";
+import { createEvent, deleteEvent, getEventsAnalytics, listEvents, type EventRow } from "@/lib/db/activities/events";
 
 type Row = Record<string, string>;
 const blankRow = (labels: string[]): Row => Object.fromEntries(labels.map((l) => [l, ""]));

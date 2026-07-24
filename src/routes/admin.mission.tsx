@@ -1,19 +1,28 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Topbar } from "@/components/admin/topbar";
-import { Card, CardBody, Kpi, Pill } from "@/components/admin/ui-bits";
+import { Topbar } from "@/components/admin/layout/topbar";
+import { Card, CardBody, Kpi, Pill } from "@/components/admin/composables/ui-bits";
 import {
   ColumnFilter,
   ColumnHeader,
   applyColumnFilter,
   type ColumnFilterValue,
-} from "@/components/admin/table-filters";
-import { RecordFormDialog, type FieldDef } from "@/components/admin/record-form-dialog";
-import { usePagination, TablePagination } from "@/components/admin/table-pagination";
+} from "@/components/admin/composables/tables/table-filters";
+import { YouthSearchInput, type PickedYouth } from "@/components/admin/composables/pickers/youth-search-input";
+import { fetchOrg, type OrgTree } from "@/lib/db/org";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { usePagination, TablePagination } from "@/components/admin/composables/tables/table-pagination";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,10 +48,7 @@ import {
   listMissionPairings,
   nominateYouth,
   removeNominee,
-} from "@/lib/db/mission";
-
-const CURRENT_YEAR = new Date().getFullYear();
-const AVAILABLE_YEARS = Array.from({ length: CURRENT_YEAR - 2022 }, (_, i) => CURRENT_YEAR - i);
+} from "@/lib/db/activities/mission";
 
 const missionSearchSchema = z.object({
   year: fallback(z.number(), CURRENT_YEAR).default(CURRENT_YEAR),
@@ -65,6 +71,7 @@ function MissionPage() {
   const navigate = useNavigate({ from: Route.fullPath });
   const setYear = (y: number) =>
     navigate({ search: () => ({ year: y }), replace: true });
+  const { data: org } = useQuery({ queryKey: ["org"], queryFn: fetchOrg });
   const { data: week } = useQuery({ queryKey: ["mission-week", year], queryFn: () => getOrCreateMissionWeek(year) });
   const weekId = week?.id;
   const { data: nominees = [] } = useQuery({
@@ -102,7 +109,7 @@ function MissionPage() {
   const nominateMut = useMutation({
     mutationFn: (cdmId: string) => nominateYouth(weekId!, cdmId),
     onSuccess: () => { toast.success("Nominee added"); setNominateOpen(false); invalidate(); },
-    onError: (e: Error) => toast.error(e.message),
+    onError: (e: Error) => { toast.error(e.message); },
   });
   const removeMut = useMutation({
     mutationFn: removeNominee,
@@ -131,11 +138,7 @@ function MissionPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const nominateFields: FieldDef[] = [
-    { key: "cdmId", label: "CDM No.", placeholder: "CDM-2026-00001", required: true, full: true },
-  ];
-
-  const pairingByYouth = useMemo(() => {
+const pairingByYouth = useMemo(() => {
     const m = new Map<string, (typeof pairings)[number]>();
     pairings.forEach((p) => m.set(p.youth_id, p));
     return m;
@@ -390,18 +393,12 @@ function MissionPage() {
           )}
         </Card>
       </div>
-      <RecordFormDialog
+      <NominateDialog
         open={nominateOpen}
         onOpenChange={setNominateOpen}
-        title="Nominate Missionary"
-        description="Enter the youth's CDM No. Their name, parish, and deanery will be fetched automatically."
-        fields={nominateFields}
-        submitLabel="Add Nominee"
-        onSubmit={(values) => {
-          const cdmId = values.cdmId?.trim();
-          if (!cdmId) { toast.error("CDM No. is required"); return; }
-          nominateMut.mutate(cdmId);
-        }}
+        org={org}
+        isPending={nominateMut.isPending}
+        onSubmit={(cdmId) => nominateMut.mutate(cdmId)}
       />
       <AlertDialog open={removeTarget !== null} onOpenChange={(o) => !o && setRemoveTarget(null)}>
         <AlertDialogContent>
@@ -449,3 +446,75 @@ function MissionPage() {
     </>
   );
 }
+
+/* ------------------------------------------------------------------ */
+/* Nominate dialog                                                     */
+/* ------------------------------------------------------------------ */
+
+function NominateDialog({
+  open,
+  onOpenChange,
+  org,
+  isPending,
+  onSubmit,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  org?: OrgTree;
+  isPending: boolean;
+  onSubmit: (cdmId: string) => void;
+}) {
+  const [youth, setYouth] = useState<PickedYouth | null>(null);
+
+  useEffect(() => {
+    if (open) setYouth(null);
+  }, [open]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg border-border bg-white text-foreground">
+        <DialogHeader>
+          <DialogTitle className="text-display text-xl font-black text-gold">
+            Nominate Missionary
+          </DialogTitle>
+          <DialogDescription className="text-[12px] text-text-3">
+            Find by CDM No. or browse by location. Name, phone, parish and deanery are filled automatically.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-1">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-text-3">Youth *</p>
+          <YouthSearchInput value={youth} onChange={setYouth} org={org} />
+        </div>
+
+        <DialogFooter>
+          <button
+            type="button"
+            onClick={() => onOpenChange(false)}
+            className="rounded-lg border border-border bg-bg-3 px-3 py-2 text-[11px] font-bold text-text-2"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (!youth) { toast.error("Select a youth first"); return; }
+              onSubmit(youth.cdm_id);
+            }}
+            disabled={isPending}
+            className="rounded-lg bg-primary px-4 py-2 text-[11px] font-bold text-primary-foreground hover:opacity-90 disabled:opacity-60"
+          >
+            {isPending ? "Saving…" : "Add Nominee"}
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Script — constants & config                                         */
+/* ------------------------------------------------------------------ */
+
+const CURRENT_YEAR = new Date().getFullYear();
+const AVAILABLE_YEARS = Array.from({ length: CURRENT_YEAR - 2022 }, (_, i) => CURRENT_YEAR - i);
