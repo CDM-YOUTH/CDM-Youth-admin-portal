@@ -84,17 +84,17 @@ function Landing() {
 
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           <Link
-            to="/login"
+            to="/portal"
             className="rounded-xl bg-danger px-8 py-3.5 text-[14px] font-bold text-white shadow-lg transition-all hover:opacity-90 hover:shadow-xl"
           >
-            Admin Login →
+            Open Youth Portal →
           </Link>
-          <button
-            disabled
-            className="cursor-not-allowed rounded-xl border-2 border-gold-3/50 px-8 py-3.5 text-[14px] font-semibold text-gold-3 opacity-60"
+          <Link
+            to="/login"
+            className="rounded-xl border-2 border-gold-3/50 bg-white px-8 py-3.5 text-[14px] font-semibold text-gold-3 transition-colors hover:bg-warn-soft"
           >
-            Youth Portal (coming soon)
-          </button>
+            Admin Login
+          </Link>
         </div>
 
         {/* Stats */}
