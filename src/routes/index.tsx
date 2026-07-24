@@ -35,9 +35,9 @@ function Landing() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className="hidden rounded-full border border-success/30 bg-success-soft px-3 py-1 text-[9px] font-bold text-success sm:inline">
-            v1.0 · Phase 1 Preview
-          </span>
+          {/*<span className="hidden rounded-full border border-success/30 bg-success-soft px-3 py-1 text-[9px] font-bold text-success sm:inline">*/}
+          {/*  v1.0 · Phase 1 Preview*/}
+          {/*</span>*/}
           <Link
             to="/login"
             className="rounded-lg bg-danger px-4 py-2 text-[12px] font-bold text-white shadow-sm transition-opacity hover:opacity-90"
@@ -119,40 +119,40 @@ function Landing() {
       </section>
 
       {/* Modules */}
-      <section className="bg-gradient-to-b from-white to-bg-2 px-6 pb-20 pt-10">
-        <div className="mx-auto max-w-5xl">
-          <div className="mb-6 text-center">
-            <div className="label-eyebrow mb-1">What's inside</div>
-            <h2 className="text-display text-2xl font-extrabold text-gold">
-              Nine integrated modules
-            </h2>
-            <p className="mt-1 text-[11px] text-text-3">
-              Everything the Diocese needs in one place
-            </p>
-          </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {[
-              ["Enrollment", "Annual registration with online payment tracking"],
-              ["Youth Records", "Searchable directory across all parishes"],
-              ["Events", "Schedule, RSVP, attendance & SMS reminders"],
-              ["Mission Week", "Automated cross-parish reshuffle algorithm"],
-              ["CUSA", "University chapters and tertiary youth body"],
-              ["Formation", "Catechesis library — audio, video, PDFs"],
-              ["Welfare", "Confidential pastoral case management"],
-              ["Uniforms", "Procurement, stock, and distribution"],
-              ["Reports", "Diocese, Deanery and Parish analytics"],
-            ].map(([title, desc]) => (
-              <div
-                key={title}
-                className="rounded-xl border border-gold/20 bg-white p-4 shadow-sm transition-colors hover:border-gold/50"
-              >
-                <div className="text-[12px] font-bold text-danger">{title}</div>
-                <div className="mt-1 text-[10px] leading-relaxed text-text-3">{desc}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/*<section className="bg-gradient-to-b from-white to-bg-2 px-6 pb-20 pt-10">*/}
+      {/*  <div className="mx-auto max-w-5xl">*/}
+      {/*    <div className="mb-6 text-center">*/}
+      {/*      <div className="label-eyebrow mb-1">What's inside</div>*/}
+      {/*      <h2 className="text-display text-2xl font-extrabold text-gold">*/}
+      {/*        Nine integrated modules*/}
+      {/*      </h2>*/}
+      {/*      <p className="mt-1 text-[11px] text-text-3">*/}
+      {/*        Everything the Diocese needs in one place*/}
+      {/*      </p>*/}
+      {/*    </div>*/}
+      {/*    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">*/}
+      {/*      {[*/}
+      {/*        ["Enrollment", "Annual registration with online payment tracking"],*/}
+      {/*        ["Youth Records", "Searchable directory across all parishes"],*/}
+      {/*        ["Events", "Schedule, RSVP, attendance & SMS reminders"],*/}
+      {/*        ["Mission Week", "Automated cross-parish reshuffle algorithm"],*/}
+      {/*        ["CUSA", "University chapters and tertiary youth body"],*/}
+      {/*        ["Formation", "Catechesis library — audio, video, PDFs"],*/}
+      {/*        ["Welfare", "Confidential pastoral case management"],*/}
+      {/*        ["Uniforms", "Procurement, stock, and distribution"],*/}
+      {/*        ["Reports", "Diocese, Deanery and Parish analytics"],*/}
+      {/*      ].map(([title, desc]) => (*/}
+      {/*        <div*/}
+      {/*          key={title}*/}
+      {/*          className="rounded-xl border border-gold/20 bg-white p-4 shadow-sm transition-colors hover:border-gold/50"*/}
+      {/*        >*/}
+      {/*          <div className="text-[12px] font-bold text-danger">{title}</div>*/}
+      {/*          <div className="mt-1 text-[10px] leading-relaxed text-text-3">{desc}</div>*/}
+      {/*        </div>*/}
+      {/*      ))}*/}
+      {/*    </div>*/}
+      {/*  </div>*/}
+      {/*</section>*/}
 
       {/* Bottom accent stripe */}
       <div className="h-1.5 w-full bg-gradient-to-r from-danger via-gold to-danger" />

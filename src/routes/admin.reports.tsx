@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Topbar, TopbarButton } from "@/components/admin/topbar";
-import { Card, CardBody, CardHead } from "@/components/admin/ui-bits";
+import { Topbar, TopbarButton } from "@/components/admin/layout/topbar";
+import { Card, CardBody, CardHead } from "@/components/admin/composables/ui-bits";
 
 export const Route = createFileRoute("/admin/reports")({
   head: () => ({

@@ -3,11 +3,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { MoreVertical, Eye, Pencil, Trash2 } from "lucide-react";
-import { Topbar, TopbarButton } from "@/components/admin/topbar";
-import { Card, CardBody, CardHead, Pill } from "@/components/admin/ui-bits";
-import { RecordFormDialog, type FieldDef } from "@/components/admin/record-form-dialog";
-import { ViewRecordDialog } from "@/components/admin/view-record-dialog";
-import { usePagination, TablePagination } from "@/components/admin/table-pagination";
+import { Topbar, TopbarButton } from "@/components/admin/layout/topbar";
+import { Card, CardBody, CardHead, Pill } from "@/components/admin/composables/ui-bits";
+import { RecordFormDialog, type FieldDef } from "@/components/admin/composables/forms/record-form-dialog";
+import { ViewRecordDialog } from "@/components/admin/composables/forms/view-record-dialog";
+import { usePagination, TablePagination } from "@/components/admin/composables/tables/table-pagination";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,7 +36,7 @@ import {
   type WelfareCaseUpdateInput,
   type WelfareStatus,
   type WelfareUrgency,
-} from "@/lib/db/welfare";
+} from "@/lib/db/ministry/welfare";
 
 export const Route = createFileRoute("/admin/welfare")({
   head: () => ({
@@ -51,58 +51,6 @@ export const Route = createFileRoute("/admin/welfare")({
   }),
   component: WelfarePage,
 });
-
-const parishOptions = ORGANIZATION.flatMap((d) => d.parishes.map((p) => p.name));
-
-const CATEGORY_OPTIONS = [
-  "Mental Health", "Early Pregnancy", "Substance Abuse", "School Fees",
-  "Family Crisis", "Bereavement", "Physical Disability", "Other",
-];
-const URGENCY_OPTIONS = ["high", "medium", "low"];
-const STATUS_OPTIONS  = ["open", "in_progress", "resolved", "closed"];
-
-const caseAddFields: FieldDef[] = [
-  { key: "category", label: "Case Category", type: "select", required: true, options: CATEGORY_OPTIONS },
-  { key: "urgency",  label: "Urgency",        type: "select", required: true, options: URGENCY_OPTIONS },
-  { key: "parish",   label: "Parish",          type: "select", options: parishOptions },
-  { key: "assigned", label: "Assigned To",     placeholder: "e.g. Fr. James / Sr. Mary / Office" },
-  { key: "cdmId",    label: "Youth CDM No. (if known)", placeholder: "CDM-2026-00001 — leave blank to keep anonymous" },
-  { key: "notes",    label: "Confidential Notes", type: "textarea", full: true,
-    placeholder: "Describe the situation — visible only to assigned personnel and diocese admin." },
-];
-
-const caseEditFields: FieldDef[] = [
-  { key: "category", label: "Case Category", type: "select", required: true, options: CATEGORY_OPTIONS },
-  { key: "urgency",  label: "Urgency",        type: "select", required: true, options: URGENCY_OPTIONS },
-  { key: "status",   label: "Status",          type: "select", required: true, options: STATUS_OPTIONS },
-  { key: "parish",   label: "Parish",          type: "select", options: parishOptions },
-  { key: "assigned", label: "Assigned To",     placeholder: "e.g. Fr. James / Sr. Mary / Office" },
-  { key: "cdmId",    label: "Youth CDM No.",   placeholder: "CDM-2026-00001" },
-  { key: "notes",    label: "Confidential Notes", type: "textarea", full: true },
-];
-
-function caseToInitial(c: WelfareCaseRow): Record<string, string> {
-  return {
-    category: c.category,
-    urgency:  c.urgency,
-    status:   c.status,
-    parish:   c.parish_name ?? "",
-    assigned: c.assigned_to ?? "",
-    cdmId:    c.cdm_id ?? "",
-    notes:    c.notes ?? "",
-  };
-}
-
-function urgencyTone(u: string): "danger" | "gold" | "neutral" {
-  return u === "high" ? "danger" : u === "medium" ? "gold" : "neutral";
-}
-
-function statusTone(s: string): "success" | "info" | "gold" | "neutral" {
-  if (s === "resolved" || s === "closed") return "success";
-  if (s === "in_progress") return "gold";
-  if (s === "open") return "info";
-  return "neutral";
-}
 
 function WelfarePage() {
   const [addOpen,       setAddOpen]       = useState(false);
@@ -360,6 +308,62 @@ function MiniStat({ label, value, tone }: { label: string; value: string; tone: 
       <div className={`text-display text-[24px] font-black leading-none ${color}`}>{value}</div>
     </div>
   );
+}
+
+/* ------------------------------------------------------------------ */
+/* Script — constants, field defs & helpers                           */
+/* ------------------------------------------------------------------ */
+
+const parishOptions = ORGANIZATION.flatMap((d) => d.parishes.map((p) => p.name));
+
+const CATEGORY_OPTIONS = [
+  "Mental Health", "Early Pregnancy", "Substance Abuse", "School Fees",
+  "Family Crisis", "Bereavement", "Physical Disability", "Other",
+];
+const URGENCY_OPTIONS = ["high", "medium", "low"];
+const STATUS_OPTIONS  = ["open", "in_progress", "resolved", "closed"];
+
+const caseAddFields: FieldDef[] = [
+  { key: "category", label: "Case Category", type: "select", required: true, options: CATEGORY_OPTIONS },
+  { key: "urgency",  label: "Urgency",        type: "select", required: true, options: URGENCY_OPTIONS },
+  { key: "parish",   label: "Parish",          type: "select", options: parishOptions },
+  { key: "assigned", label: "Assigned To",     placeholder: "e.g. Fr. James / Sr. Mary / Office" },
+  { key: "cdmId",    label: "Youth CDM No. (if known)", placeholder: "CDM-2026-00001 — leave blank to keep anonymous" },
+  { key: "notes",    label: "Confidential Notes", type: "textarea", full: true,
+    placeholder: "Describe the situation — visible only to assigned personnel and diocese admin." },
+];
+
+const caseEditFields: FieldDef[] = [
+  { key: "category", label: "Case Category", type: "select", required: true, options: CATEGORY_OPTIONS },
+  { key: "urgency",  label: "Urgency",        type: "select", required: true, options: URGENCY_OPTIONS },
+  { key: "status",   label: "Status",          type: "select", required: true, options: STATUS_OPTIONS },
+  { key: "parish",   label: "Parish",          type: "select", options: parishOptions },
+  { key: "assigned", label: "Assigned To",     placeholder: "e.g. Fr. James / Sr. Mary / Office" },
+  { key: "cdmId",    label: "Youth CDM No.",   placeholder: "CDM-2026-00001" },
+  { key: "notes",    label: "Confidential Notes", type: "textarea", full: true },
+];
+
+function caseToInitial(c: WelfareCaseRow): Record<string, string> {
+  return {
+    category: c.category,
+    urgency:  c.urgency,
+    status:   c.status,
+    parish:   c.parish_name ?? "",
+    assigned: c.assigned_to ?? "",
+    cdmId:    c.cdm_id ?? "",
+    notes:    c.notes ?? "",
+  };
+}
+
+function urgencyTone(u: string): "danger" | "gold" | "neutral" {
+  return u === "high" ? "danger" : u === "medium" ? "gold" : "neutral";
+}
+
+function statusTone(s: string): "success" | "info" | "gold" | "neutral" {
+  if (s === "resolved" || s === "closed") return "success";
+  if (s === "in_progress") return "gold";
+  if (s === "open") return "info";
+  return "neutral";
 }
 
 const MOCK_CASES = [

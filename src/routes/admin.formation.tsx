@@ -3,11 +3,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { MoreVertical, Eye, Pencil, Trash2 } from "lucide-react";
-import { Topbar, TopbarButton } from "@/components/admin/topbar";
-import { Card, CardBody, CardHead, Kpi, Pill } from "@/components/admin/ui-bits";
-import { RecordFormDialog, type FieldDef } from "@/components/admin/record-form-dialog";
-import { ViewRecordDialog } from "@/components/admin/view-record-dialog";
-import { usePagination, TablePagination } from "@/components/admin/table-pagination";
+import { Topbar, TopbarButton } from "@/components/admin/layout/topbar";
+import { Card, CardBody, CardHead, Kpi, Pill } from "@/components/admin/composables/ui-bits";
+import { RecordFormDialog, type FieldDef } from "@/components/admin/composables/forms/record-form-dialog";
+import { ViewRecordDialog } from "@/components/admin/composables/forms/view-record-dialog";
+import { usePagination, TablePagination } from "@/components/admin/composables/tables/table-pagination";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,7 +33,7 @@ import {
   type FormationItem,
   type FormationItemInput,
   type FormationKind,
-} from "@/lib/db/formation";
+} from "@/lib/db/ministry/formation";
 
 export const Route = createFileRoute("/admin/formation")({
   head: () => ({

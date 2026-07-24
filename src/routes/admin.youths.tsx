@@ -9,17 +9,17 @@ import { MoreVertical, Pencil, Trash2, BadgeCheck, Download, Plus } from "lucide
 import { downloadXlsx } from "@/lib/export-xlsx";
 import { fetchOrg } from "@/lib/db/org";
 import { CUSA_INSTITUTIONS } from "@/lib/cusa-data";
-import { Topbar } from "@/components/admin/topbar";
-import { Card, CardBody, Pill } from "@/components/admin/ui-bits";
-import { TablePagination, usePagination } from "@/components/admin/table-pagination";
+import { Topbar } from "@/components/admin/layout/topbar";
+import { Card, CardBody, Pill } from "@/components/admin/composables/ui-bits";
+import { TablePagination, usePagination } from "@/components/admin/composables/tables/table-pagination";
 import {
   ColumnFilter,
   ColumnHeader,
   TableToolbar,
   applyColumnFilter,
   type ColumnFilterValue,
-} from "@/components/admin/table-filters";
-import { RecordFormDialog, type FieldDef } from "@/components/admin/record-form-dialog";
+} from "@/components/admin/composables/tables/table-filters";
+import { RecordFormDialog, type FieldDef } from "@/components/admin/composables/forms/record-form-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -48,8 +48,8 @@ import {
   type YouthCategory,
   type YouthInput,
   type YouthRow,
-} from "@/lib/db/youths";
-import { createEnrollment } from "@/lib/db/enrollments";
+} from "@/lib/db/youth-records/youths";
+import { createEnrollment } from "@/lib/db/youth-records/enrollments";
 
 const filterValueSchema = fallback(
   z

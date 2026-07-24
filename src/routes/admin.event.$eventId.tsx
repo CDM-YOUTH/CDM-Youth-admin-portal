@@ -2,21 +2,21 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Topbar, TopbarButton } from "@/components/admin/topbar";
-import { Card, CardBody, CardHead, Kpi, PageHeader, Pill } from "@/components/admin/ui-bits";
+import { Topbar, TopbarButton } from "@/components/admin/layout/topbar";
+import { Card, CardBody, CardHead, Kpi, PageHeader, Pill } from "@/components/admin/composables/ui-bits";
 import {
   EventTabsForm,
   emptyEventState,
   type EventFormState,
   type ProgramSlot,
   type DutyCategory,
-} from "@/components/admin/event-tabs-form";
+} from "@/components/admin/events/event-tabs-form";
 import {
   getEventFull,
   type EventFull,
   type EventProgramItem,
   type EventDutyCategory,
-} from "@/lib/db/events";
+} from "@/lib/db/activities/events";
 
 export const Route = createFileRoute("/admin/event/$eventId")({
   head: () => ({

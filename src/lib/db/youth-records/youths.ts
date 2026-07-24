@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { fetchOrg, resolveOrgIds, type OrgTree } from "./org";
+import { fetchOrg, resolveOrgIds, type OrgTree } from "../org";
 
 export type YouthCategory = "Primary" | "Secondary" | "Tertiary" | "Working";
 export type Gender = "Female" | "Male";

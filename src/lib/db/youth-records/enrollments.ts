@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { logEnrollmentAudit } from "./audit";
+import { logEnrollmentAudit } from "../audit";
 
 export type EnrollmentRow = {
   id: string;

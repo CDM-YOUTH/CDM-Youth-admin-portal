@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { fetchOrg, resolveOrgIds } from "./org";
+import { fetchOrg, resolveOrgIds } from "../org";
 import { createYouth } from "./youths";
 
 export type CusaRow = {

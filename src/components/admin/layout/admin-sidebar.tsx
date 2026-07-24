@@ -16,11 +16,12 @@ import {
   ClipboardList,
   PanelLeftClose,
   PanelLeftOpen,
+  Crown,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useSidebar } from "./sidebar-context";
 import { supabase } from "@/integrations/supabase/client";
-import { getMyProfile } from "@/lib/db/profiles";
+import { getMyProfile } from "@/lib/db/youth-records/profiles";
 
 type NavItem = {
   to: string;
@@ -44,7 +45,14 @@ const GROUPS: NavGroup[] = [
         to: "/admin/enrollment",
         label: "Enrollment",
         icon: UserPlus,
-        badge: { text: "23", tone: "danger" },
+        // badge: { text: "", tone: "danger" },
+      },
+      { to: "/admin/leaders", label: "Leaders", icon: Crown },
+      {
+        to: "/admin/cusa",
+        label: "CUSA",
+        icon: GraduationCap,
+        // badge: { text: "312", tone: "info" },
       },
     ],
   },
@@ -58,36 +66,30 @@ const GROUPS: NavGroup[] = [
         icon: Compass,
         badge: { text: "Active", tone: "gold" },
       },
-      {
-        to: "/admin/cusa",
-        label: "CUSA",
-        icon: GraduationCap,
-        badge: { text: "312", tone: "info" },
-      },
     ],
   },
-  {
-    label: "Pastoral",
-    items: [
-      { to: "/admin/formation", label: "Formation", icon: BookOpen },
-      {
-        to: "/admin/welfare",
-        label: "Welfare",
-        icon: HeartPulse,
-        badge: { text: "5", tone: "danger" },
-      },
-      { to: "/admin/uniforms", label: "Uniforms", icon: Shirt },
-    ],
-  },
-  {
-    label: "Admin",
-    items: [
-      { to: "/admin/reports", label: "Reports", icon: BarChart3 },
-      { to: "/admin/users", label: "User Mgmt", icon: Shield },
-      { to: "/admin/audit", label: "Audit Log", icon: ClipboardList },
-      { to: "/admin/settings", label: "Settings", icon: Settings },
-    ],
-  },
+  // {
+  //   label: "Pastoral",
+  //   items: [
+  //     { to: "/admin/formation", label: "Formation", icon: BookOpen },
+  //     {
+  //       to: "/admin/welfare",
+  //       label: "Welfare",
+  //       icon: HeartPulse,
+  //       badge: { text: "5", tone: "danger" },
+  //     },
+  //     { to: "/admin/uniforms", label: "Uniforms", icon: Shirt },
+  //   ],
+  // },
+  // {
+  //   label: "Admin",
+  //   items: [
+  //     { to: "/admin/reports", label: "Reports", icon: BarChart3 },
+  //     { to: "/admin/users", label: "User Mgmt", icon: Shield },
+  //     { to: "/admin/audit", label: "Audit Log", icon: ClipboardList },
+  //     { to: "/admin/settings", label: "Settings", icon: Settings },
+  //   ],
+  // },
 ];
 
 function Badge({

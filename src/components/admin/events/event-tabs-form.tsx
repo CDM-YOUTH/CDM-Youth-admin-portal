@@ -12,8 +12,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ORGANIZATION } from "@/lib/mock-data";
 import { toast } from "sonner";
-import { createEvent, updateEvent, saveEventProgram, saveEventDuties } from "@/lib/db/events";
-import { YouthPicker } from "@/components/admin/youth-picker";
+import { createEvent, updateEvent, saveEventProgram, saveEventDuties } from "@/lib/db/activities/events";
+import { YouthPicker } from "@/components/admin/composables/pickers/youth-picker";
 import { supabase } from "@/integrations/supabase/client";
 import { Upload, Loader2 } from "lucide-react";
 

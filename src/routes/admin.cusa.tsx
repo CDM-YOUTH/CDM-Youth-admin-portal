@@ -1,16 +1,16 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { MoreVertical, Pencil, Trash2, Plus } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Topbar } from "@/components/admin/topbar";
-import { Card, CardBody, Pill } from "@/components/admin/ui-bits";
+import { Topbar } from "@/components/admin/layout/topbar";
+import { Card, CardBody, Pill } from "@/components/admin/composables/ui-bits";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CUSA_INSTITUTIONS } from "@/lib/cusa-data";
 import { ORGANIZATION } from "@/lib/mock-data";
-import { createCusaMember, deleteCusaMember, listCusa, updateCusaMember } from "@/lib/db/cusa";
+import { createCusaMember, deleteCusaMember, listCusa, updateCusaMember } from "@/lib/db/youth-records/cusa";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,15 +28,27 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { TablePagination, usePagination } from "@/components/admin/table-pagination";
+import { TablePagination, usePagination } from "@/components/admin/composables/tables/table-pagination";
 import {
   ColumnFilter,
   ColumnHeader,
   TableToolbar,
   applyColumnFilter,
   type ColumnFilterValue,
-} from "@/components/admin/table-filters";
-import { RecordFormDialog, type FieldDef } from "@/components/admin/record-form-dialog";
+} from "@/components/admin/composables/tables/table-filters";
+import { RecordFormDialog } from "@/components/admin/composables/forms/record-form-dialog";
+import { YouthSearchInput, type PickedYouth } from "@/components/admin/composables/pickers/youth-search-input";
+import { fetchOrg, type OrgTree } from "@/lib/db/org";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const filterValueSchema = fallback(
   z
@@ -66,7 +78,7 @@ export const Route = createFileRoute("/admin/cusa")({
   head: () => ({
     meta: [
       { title: "CUSA — CDM Youth Office" },
-      { name: "description", content: "Catholic University Students Association: chapters, members, and events." },
+      { name: "description", content: "Colleges and Universities Students Association: chapters, members, and events." },
     ],
   }),
   validateSearch: zodValidator(cusaSearchSchema),
@@ -80,26 +92,18 @@ function CusaPage() {
   const [editing, setEditing] = useState<null | { id: string; name: string; values: Record<string, string> }>(null);
   const [deleteTarget, setDeleteTarget] = useState<null | { id: string; name: string }>(null);
   const qc = useQueryClient();
+  const { data: org } = useQuery({ queryKey: ["org"], queryFn: fetchOrg });
   const { data: cusa = [], isLoading } = useQuery({ queryKey: ["cusa"], queryFn: () => listCusa() });
   const createMut = useMutation({
-    mutationFn: (vals: Record<string, string>) =>
-      createCusaMember({
-        cdmId: vals.cdmId?.trim() || null,
-        fullName: vals.fullName,
-        gender: (vals.gender as "Female" | "Male") || "Female",
-        age: parseInt(vals.age || "0", 10) || undefined,
-        phone: vals.phone || undefined,
-        email: vals.email || undefined,
-        deaneryName: vals.deanery || undefined,
-        parishName: vals.parish || undefined,
-        outstationName: vals.outstation || undefined,
-        institution: vals.institution,
-        course: vals.course || undefined,
-        yearOfStudy: vals.year || undefined,
-        leadershipRole: vals.role || undefined,
-      }),
+    mutationFn: (vals: {
+      cdmId?: string | null; fullName: string; gender: "Female" | "Male";
+      age?: number; phone?: string; email?: string;
+      deaneryName?: string; parishName?: string; outstationName?: string;
+      institution: string; course?: string; yearOfStudy?: string; leadershipRole?: string;
+    }) => createCusaMember(vals),
     onSuccess: () => {
       toast.success("CUSA member saved");
+      setAddOpen(false);
       qc.invalidateQueries({ queryKey: ["cusa"] });
       qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
       qc.invalidateQueries({ queryKey: ["live-analytics"] });
@@ -216,36 +220,7 @@ function CusaPage() {
     new Set(outstationScope.flatMap((p) => p.churches.map((c) => c.name))),
   ).map((name) => ({ value: name, label: name }));
 
-  const cusaFields: FieldDef[] = [
-    { key: "cdmId", label: "Existing CDM No. (optional — leave blank to register a new youth)", placeholder: "CDM-2026-00001" },
-    { key: "fullName", label: "Full name", required: true, placeholder: "Grace Wanjiku" },
-    { key: "gender", label: "Gender", type: "select", options: ["Female", "Male"], required: true },
-    { key: "age", label: "Age", type: "number", placeholder: "20" },
-    { key: "phone", label: "Phone", type: "tel" },
-    { key: "email", label: "Email", type: "email", placeholder: "name@uni.ac.ke" },
-    { key: "institution", label: "Institution", type: "select", options: [...CUSA_INSTITUTIONS], required: true },
-    { key: "course", label: "Course", placeholder: "e.g. Education", required: true },
-    { key: "year", label: "Year of study", type: "select", options: ["Year 1", "Year 2", "Year 3", "Year 4", "Year 5"], required: true },
-    {
-      key: "deanery", label: "Home deanery", type: "select", required: true,
-      options: ORGANIZATION.map((d) => d.name),
-    },
-    {
-      key: "parish", label: "Home parish", type: "select", required: true,
-      dynamicOptions: (v) => ORGANIZATION.find((d) => d.name === v.deanery)?.parishes.map((p) => p.name) ?? [],
-    },
-    {
-      key: "outstation", label: "Home outstation", type: "select",
-      dynamicOptions: (v) => {
-        const d = ORGANIZATION.find((d) => d.name === v.deanery);
-        const p = d?.parishes.find((p) => p.name === v.parish);
-        return p?.churches.map((c) => c.name) ?? [];
-      },
-    },
-    { key: "role", label: "Leadership role (optional)", placeholder: "e.g. Chairperson" },
-  ];
-
-  const fc = (key: keyof CusaSearch, label: string, mode: "text" | "select" = "text", options?: { value: string; label: string }[]) => (
+const fc = (key: keyof CusaSearch, label: string, mode: "text" | "select" = "text", options?: { value: string; label: string }[]) => (
     <ColumnFilter
       label={label}
       mode={mode}
@@ -258,7 +233,7 @@ function CusaPage() {
   return (
     <>
       <Topbar
-        title="Catholic University Students Association"
+        title="Colleges & Universities Students Association (CUSA)"
         description={isLoading ? "Loading CUSA members…" : `${filteredMembers.length.toLocaleString()} of ${allMembers.length.toLocaleString()} members shown — share this URL to share the same view.`}
         action={
           <button
@@ -420,14 +395,12 @@ function CusaPage() {
           </CardBody>
         </Card>
       </div>
-      <RecordFormDialog
+      <AddCusaDialog
         open={addOpen}
         onOpenChange={setAddOpen}
-        title="Add CUSA Member"
-        description="Provide an existing CDM No. to link, or leave it blank to register a new youth + CUSA record together."
-        fields={cusaFields}
-        submitLabel="Save Member"
-        onSubmit={(values) => createMut.mutate(values)}
+        org={org}
+        isPending={createMut.isPending}
+        onSubmit={(vals) => createMut.mutate(vals)}
       />
       <RecordFormDialog
         open={editing !== null}
@@ -469,5 +442,143 @@ function CusaPage() {
         </AlertDialogContent>
       </AlertDialog>
     </>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Add CUSA member dialog                                              */
+/* ------------------------------------------------------------------ */
+
+function AddCusaDialog({
+  open,
+  onOpenChange,
+  org,
+  isPending,
+  onSubmit,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  org?: OrgTree;
+  isPending: boolean;
+  onSubmit: (vals: {
+    cdmId?: string | null; fullName: string; gender: "Female" | "Male";
+    age?: number; phone?: string; email?: string;
+    deaneryName?: string; parishName?: string; outstationName?: string;
+    institution: string; course?: string; yearOfStudy?: string; leadershipRole?: string;
+  }) => void;
+}) {
+  const [youth,       setYouth]       = useState<PickedYouth | null>(null);
+  const [institution, setInstitution] = useState("");
+  const [course,      setCourse]      = useState("");
+  const [year,        setYear]        = useState("");
+  const [role,        setRole]        = useState("");
+
+  useEffect(() => {
+    if (open) {
+      setYouth(null); setInstitution(""); setCourse(""); setYear(""); setRole("");
+    }
+  }, [open]);
+
+  const handleSubmit = () => {
+    if (!youth)        { toast.error("Select a youth first"); return; }
+    if (!institution)  { toast.error("Select an institution"); return; }
+    onSubmit({
+      cdmId:         youth.cdm_id,
+      fullName:      youth.full_name,
+      gender:        "Female",
+      phone:         youth.phone    ?? undefined,
+      email:         youth.email    ?? undefined,
+      deaneryName:   youth.deanery_name   || undefined,
+      parishName:    youth.parish_name    || undefined,
+      outstationName: youth.outstation_name || undefined,
+      institution,
+      course:        course.trim()  || undefined,
+      yearOfStudy:   year           || undefined,
+      leadershipRole: role.trim()   || undefined,
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg border-border bg-white text-foreground">
+        <DialogHeader>
+          <DialogTitle className="text-display text-xl font-black text-gold">
+            Add CUSA Member
+          </DialogTitle>
+          <DialogDescription className="text-[12px] text-text-3">
+            Find by CDM No. or browse by location. Name, phone and parish are filled automatically.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          <div className="space-y-1">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-text-3">Youth *</p>
+            <YouthSearchInput value={youth} onChange={setYouth} org={org} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <label className="space-y-1 text-[10px] font-bold uppercase tracking-wide text-text-3">
+              <span>Institution *</span>
+              <Select value={institution} onValueChange={setInstitution}>
+                <SelectTrigger><SelectValue placeholder="Select institution" /></SelectTrigger>
+                <SelectContent>
+                  {CUSA_INSTITUTIONS.map((i) => (
+                    <SelectItem key={i} value={i}>{i}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </label>
+
+            <label className="space-y-1 text-[10px] font-bold uppercase tracking-wide text-text-3">
+              <span>Year of Study</span>
+              <Select value={year} onValueChange={setYear}>
+                <SelectTrigger><SelectValue placeholder="Select year" /></SelectTrigger>
+                <SelectContent>
+                  {["Year 1", "Year 2", "Year 3", "Year 4", "Year 5"].map((y) => (
+                    <SelectItem key={y} value={y}>{y}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </label>
+
+            <label className="space-y-1 text-[10px] font-bold uppercase tracking-wide text-text-3">
+              <span>Course</span>
+              <Input
+                value={course}
+                onChange={(e) => setCourse(e.target.value)}
+                placeholder="e.g. Education"
+              />
+            </label>
+
+            <label className="space-y-1 text-[10px] font-bold uppercase tracking-wide text-text-3">
+              <span>Leadership role (optional)</span>
+              <Input
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+                placeholder="e.g. Chairperson"
+              />
+            </label>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <button
+            type="button"
+            onClick={() => onOpenChange(false)}
+            className="rounded-lg border border-border bg-bg-3 px-3 py-2 text-[11px] font-bold text-text-2"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={isPending}
+            className="rounded-lg bg-primary px-4 py-2 text-[11px] font-bold text-primary-foreground hover:opacity-90 disabled:opacity-60"
+          >
+            {isPending ? "Saving…" : "Save Member"}
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
