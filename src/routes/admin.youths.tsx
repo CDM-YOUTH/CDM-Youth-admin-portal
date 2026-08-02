@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import Papa from "papaparse";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
@@ -9,9 +9,10 @@ import { MoreVertical, Pencil, Trash2, BadgeCheck, Download, Plus } from "lucide
 import { downloadXlsx } from "@/lib/export-xlsx";
 import { fetchOrg } from "@/lib/db/org";
 import { CUSA_INSTITUTIONS } from "@/lib/cusa-data";
+import { type PagedResponse } from "@/lib/api/fetch-api";
 import { Topbar } from "@/components/admin/layout/topbar";
 import { Card, CardBody, Pill } from "@/components/admin/composables/ui-bits";
-import { TablePagination, usePagination } from "@/components/admin/composables/tables/table-pagination";
+import { TablePagination } from "@/components/admin/composables/tables/table-pagination";
 import {
   ColumnFilter,
   ColumnHeader,
@@ -43,7 +44,7 @@ import {
   bulkInsertYouths,
   createYouth,
   deleteYouth,
-  listYouths,
+  listYouthsPaged,
   updateYouth,
   type YouthCategory,
   type YouthInput,
@@ -62,15 +63,19 @@ const filterValueSchema = fallback(
 );
 
 const youthSearchSchema = z.object({
+  // Server-side params
   q: fallback(z.string(), "").default(""),
+  deanery_id: fallback(z.string(), "").default(""),
+  parish_id: fallback(z.string(), "").default(""),
+  outstation_id: fallback(z.string(), "").default(""),
+  category: fallback(z.string(), "").default(""),
+  status: fallback(z.string(), "").default(""),
+  page: fallback(z.number().int().min(1), 1).default(1),
+  size: fallback(z.number().int().min(1).max(100), 25).default(25),
+  // Client-side column filters (applied on current page rows only)
   f_cdm: filterValueSchema,
   f_name: filterValueSchema,
   f_sex: filterValueSchema,
-  f_deanery: filterValueSchema,
-  f_parish: filterValueSchema,
-  f_outstation: filterValueSchema,
-  f_category: filterValueSchema,
-  f_status: filterValueSchema,
 });
 
 type YouthSearch = z.infer<typeof youthSearchSchema>;
@@ -96,11 +101,41 @@ function YouthsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importResult, setImportResult] = useState<null | { inserted: number; skipped: number; total: number; firstCdms: string[] }>(null);
   const qc = useQueryClient();
-  const { data: youths = [], isLoading } = useQuery({ queryKey: ["youths"], queryFn: listYouths });
+
+  const { data: org } = useQuery({ queryKey: ["org"], queryFn: fetchOrg });
+
+  const { data: resp, isLoading } = useQuery({
+    queryKey: [
+      "youths",
+      search.page - 1,
+      search.size,
+      search.q,
+      search.deanery_id,
+      search.parish_id,
+      search.outstation_id,
+      search.category,
+      search.status,
+    ],
+    queryFn: () =>
+      listYouthsPaged({
+        page: search.page - 1,
+        size: search.size,
+        q: search.q,
+        deaneryId: search.deanery_id || null,
+        parishId: search.parish_id || null,
+        outstationId: search.outstation_id || null,
+        category: search.category || null,
+        status: search.status || null,
+      }),
+    placeholderData: keepPreviousData,
+  });
+
+  const total = resp?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / search.size));
 
   const rows = useMemo(
     () =>
-      youths.map((y) => ({
+      (resp?.data ?? []).map((y) => ({
         id: y.id,
         cdmId: y.cdm_id,
         name: y.full_name,
@@ -121,8 +156,19 @@ function YouthsPage() {
         enrolled: (y.enrollments?.length ?? 0) > 0,
         raw: y as YouthRow,
       })),
-    [youths],
+    [resp],
   );
+
+  // Client-side column filters applied on the current page only
+  const displayRows = useMemo(() => {
+    if (!search.f_cdm && !search.f_name && !search.f_sex) return rows;
+    return rows.filter((row) => {
+      if (!applyColumnFilter(row.cdmId, search.f_cdm)) return false;
+      if (!applyColumnFilter(row.name, search.f_name)) return false;
+      if (!applyColumnFilter(row.gender, search.f_sex)) return false;
+      return true;
+    });
+  }, [rows, search.f_cdm, search.f_name, search.f_sex]);
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["youths"] });
 
@@ -169,70 +215,17 @@ function YouthsPage() {
   });
 
   const setFilter = (patch: Partial<YouthSearch>) => {
-    navigate({ search: (prev: YouthSearch) => ({ ...prev, ...patch }), replace: true });
-  };
-  const setDeaneryFilter = (v: ColumnFilterValue | undefined) => {
-    navigate({
-      search: (prev: YouthSearch) => ({ ...prev, f_deanery: v, f_parish: undefined, f_outstation: undefined }),
-      replace: true,
-    });
-  };
-  const setParishFilter = (v: ColumnFilterValue | undefined) => {
-    navigate({
-      search: (prev: YouthSearch) => ({ ...prev, f_parish: v, f_outstation: undefined }),
-      replace: true,
-    });
+    navigate({ search: (prev: YouthSearch) => ({ ...prev, ...patch, page: 1 }), replace: true });
   };
 
-  const filtered = useMemo(() => {
-    const q = search.q.trim().toLowerCase();
-    return rows.filter((row) => {
-      if (!applyColumnFilter(row.cdmId, search.f_cdm)) return false;
-      if (!applyColumnFilter(row.name, search.f_name)) return false;
-      if (!applyColumnFilter(row.gender, search.f_sex)) return false;
-      if (!applyColumnFilter(row.deaneryName, search.f_deanery)) return false;
-      if (!applyColumnFilter(row.parishName, search.f_parish)) return false;
-      if (!applyColumnFilter(row.churchName, search.f_outstation)) return false;
-      if (!applyColumnFilter(row.category, search.f_category)) return false;
-      if (!applyColumnFilter(row.status, search.f_status)) return false;
-      if (q) {
-        const haystack = [
-          row.cdmId,
-          row.name,
-          row.parishName,
-          row.deaneryName,
-          row.churchName,
-          row.institution,
-          row.phone,
-        ]
-          .join(" ")
-          .toLowerCase();
-        if (!haystack.includes(q)) return false;
-      }
-      return true;
-    });
-  }, [search, rows]);
-
-  const pagination = usePagination(filtered, 10);
-
-  const deaneryOptions = ORGANIZATION.map((d) => ({ value: d.name, label: d.name }));
-  const selectedDeaneryName =
-    search.f_deanery?.operator === "equals" ? search.f_deanery.value : "";
-  const selectedParishName =
-    search.f_parish?.operator === "equals" ? search.f_parish.value : "";
-  const parishScope = selectedDeaneryName
-    ? ORGANIZATION.find((d) => d.name === selectedDeaneryName)?.parishes ?? []
-    : ORGANIZATION.flatMap((d) => d.parishes);
-  const parishOptions = Array.from(new Set(parishScope.map((p) => p.name))).map((name) => ({
-    value: name,
-    label: name,
-  }));
-  const outstationScope = selectedParishName
-    ? parishScope.filter((p) => p.name === selectedParishName)
-    : parishScope;
-  const outstationOptions = Array.from(
-    new Set(outstationScope.flatMap((p) => p.churches.map((c) => c.name))),
-  ).map((name) => ({ value: name, label: name }));
+  // Org dropdowns use UUIDs as values (from live Supabase org tree)
+  const deaneryOptions = (org?.deaneries ?? []).map((d) => ({ value: d.id, label: d.name }));
+  const parishOptions = (org?.parishes ?? [])
+    .filter((p) => !search.deanery_id || p.deanery_id === search.deanery_id)
+    .map((p) => ({ value: p.id, label: p.name }));
+  const outstationOptions = (org?.outstations ?? [])
+    .filter((o) => !search.parish_id || o.parish_id === search.parish_id)
+    .map((o) => ({ value: o.id, label: o.name }));
 
   const youthFields: FieldDef[] = [
     { key: "fullName", label: "Full name", required: true, placeholder: "Grace Wanjiku" },
@@ -396,7 +389,7 @@ function YouthsPage() {
     <>
       <Topbar
         title="Youth Directory"
-        description={isLoading ? "Loading youths…" : `${filtered.length.toLocaleString()} of ${rows.length.toLocaleString()} youths · share this URL to share the same view.`}
+        description={isLoading ? "Loading youths…" : `${total.toLocaleString()} youth${total !== 1 ? "s" : ""} · share this URL to share the same view.`}
         action={
           <button
             type="button"
@@ -414,10 +407,24 @@ function YouthsPage() {
             onSearchChange={(value) => setFilter({ q: value })}
             searchPlaceholder="Search name, CDM No., parish, deanery, outstation, institution…"
             onImport={() => fileInputRef.current?.click()}
-            onExport={() => {
-              const headers = ["CDM No.", "Full Name", "Gender", "Age", "Phone", "Alt Phone", "Email", "Deanery", "Parish", "Outstation", "Category", "Institution", "Year of Study", "Status"];
-              const data: (string | number | null)[][] = filtered.map((r) => [r.cdmId, r.name, r.gender, r.age, r.phone, r.altPhone, r.email, r.deaneryName, r.parishName, r.churchName, r.category, r.institution, r.yearOfStudy, r.status]);
-              downloadXlsx("youths-export", "Youth Records", headers, data).then(() => toast.success(`Exported ${filtered.length} youths`)).catch((e: Error) => toast.error(e.message));
+            onExport={async () => {
+              try {
+                const all = await listYouthsPaged({
+                  page: 0, size: 2000,
+                  q: search.q,
+                  deaneryId: search.deanery_id || null,
+                  parishId: search.parish_id || null,
+                  outstationId: search.outstation_id || null,
+                  category: search.category || null,
+                  status: search.status || null,
+                });
+                const headers = ["CDM No.", "Full Name", "Gender", "Age", "Phone", "Alt Phone", "Email", "Deanery", "Parish", "Outstation", "Category", "Institution", "Year of Study", "Status"];
+                const data: (string | number | null)[][] = (all.data ?? []).map((y) => [y.cdm_id, y.full_name, y.gender ?? null, y.age ?? null, y.phone ?? null, y.alt_phone ?? null, y.email ?? null, y.deanery?.name ?? null, y.parish?.name ?? null, y.outstation?.name ?? null, y.category ?? null, y.institution ?? null, y.year_of_study ?? null, y.status ?? null]);
+                await downloadXlsx("youths-export", "Youth Records", headers, data);
+                toast.success(`Exported ${all.total} youths`);
+              } catch (e) {
+                toast.error((e as Error).message);
+              }
             }}
             extra={
               <button
@@ -466,8 +473,8 @@ function YouthsPage() {
                           label="Deanery"
                           mode="select"
                           options={deaneryOptions}
-                          value={search.f_deanery}
-                          onChange={setDeaneryFilter}
+                          value={search.deanery_id ? { operator: "equals", value: search.deanery_id } : undefined}
+                          onChange={(v) => setFilter({ deanery_id: v?.value ?? "", parish_id: "", outstation_id: "" })}
                         />
                       }
                     />
@@ -480,35 +487,59 @@ function YouthsPage() {
                           label="Parish"
                           mode="select"
                           options={parishOptions}
-                          value={search.f_parish}
-                          onChange={setParishFilter}
+                          value={search.parish_id ? { operator: "equals", value: search.parish_id } : undefined}
+                          onChange={(v) => setFilter({ parish_id: v?.value ?? "", outstation_id: "" })}
                         />
                       }
                     />
                   </th>
                   <th className="label-eyebrow px-3.5 py-2.5 text-left">
-                    <ColumnHeader label="Outstation" filter={fc("f_outstation", "Outstation", "select", outstationOptions)} />
+                    <ColumnHeader
+                      label="Outstation"
+                      filter={
+                        <ColumnFilter
+                          label="Outstation"
+                          mode="select"
+                          options={outstationOptions}
+                          value={search.outstation_id ? { operator: "equals", value: search.outstation_id } : undefined}
+                          onChange={(v) => setFilter({ outstation_id: v?.value ?? "" })}
+                        />
+                      }
+                    />
                   </th>
                   <th className="label-eyebrow px-3.5 py-2.5 text-left">
                     <ColumnHeader
                       label="Category"
-                      filter={fc("f_category", "Category", "select", YOUTH_CATEGORIES.map((c) => ({ value: c, label: c })))}
+                      filter={
+                        <ColumnFilter
+                          label="Category"
+                          mode="select"
+                          options={YOUTH_CATEGORIES.map((c) => ({ value: c, label: c }))}
+                          value={search.category ? { operator: "equals", value: search.category } : undefined}
+                          onChange={(v) => setFilter({ category: v?.value ?? "" })}
+                        />
+                      }
                     />
                   </th>
                   <th className="label-eyebrow px-3.5 py-2.5 text-left">
                     <ColumnHeader
                       label="Status"
-                      filter={fc("f_status", "Status", "select", [
-                        { value: "active", label: "Active" },
-                        { value: "inactive", label: "Inactive" },
-                      ])}
+                      filter={
+                        <ColumnFilter
+                          label="Status"
+                          mode="select"
+                          options={[{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }]}
+                          value={search.status ? { operator: "equals", value: search.status } : undefined}
+                          onChange={(v) => setFilter({ status: v?.value ?? "" })}
+                        />
+                      }
                     />
                   </th>
                   <th className="label-eyebrow px-3.5 py-2.5 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {pagination.pageRows.map((row) => (
+                {displayRows.map((row) => (
                   <tr key={row.id} className="border-b border-border/30 last:border-0 hover:bg-bg-3">
                     <td className="px-3.5 py-2.5 font-mono text-[10px] font-bold text-gold">{row.cdmId}</td>
                     <td className="px-3.5 py-2.5 text-[11px] font-semibold text-foreground">{row.name}</td>
@@ -575,7 +606,7 @@ function YouthsPage() {
                     </td>
                   </tr>
                 ))}
-                {pagination.pageRows.length === 0 && (
+                {displayRows.length === 0 && !isLoading && (
                   <tr>
                     <td colSpan={10} className="px-3.5 py-6 text-center text-[11px] text-text-3">
                       No youths match your search.
@@ -585,12 +616,12 @@ function YouthsPage() {
               </tbody>
             </table>
             <TablePagination
-              page={pagination.page}
-              pageSize={pagination.pageSize}
-              total={pagination.total}
-              totalPages={pagination.totalPages}
-              onPageChange={pagination.setPage}
-              onPageSizeChange={pagination.setPageSize}
+              page={search.page}
+              pageSize={search.size}
+              total={total}
+              totalPages={totalPages}
+              onPageChange={(p) => navigate({ search: (prev: YouthSearch) => ({ ...prev, page: p }), replace: true })}
+              onPageSizeChange={(s) => navigate({ search: (prev: YouthSearch) => ({ ...prev, size: s, page: 1 }), replace: true })}
             />
           </CardBody>
         </Card>

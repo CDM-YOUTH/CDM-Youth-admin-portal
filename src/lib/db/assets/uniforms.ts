@@ -69,6 +69,27 @@ export async function listUniformSkus(): Promise<UniformSku[]> {
   return (data ?? []) as UniformSku[];
 }
 
+export async function listUniformSkusPaged(opts: {
+  page?: number;
+  size?: number;
+  q?: string;
+}): Promise<{ data: UniformSku[]; total: number; page: number; size: number }> {
+  const page = opts.page ?? 0;
+  const size = Math.min(opts.size ?? 50, 100);
+
+  let query = db
+    .from("uniform_skus")
+    .select("*", { count: "exact" })
+    .order("name")
+    .range(page * size, page * size + size - 1);
+
+  if (opts.q?.trim()) query = query.ilike("name", `%${opts.q.trim()}%`);
+
+  const { data, error, count } = await query;
+  if (error) throw error;
+  return { data: (data ?? []) as UniformSku[], total: count ?? 0, page, size };
+}
+
 export async function listUniformOrders(limit = 100): Promise<UniformOrder[]> {
   const { data, error } = await db
     .from("uniform_orders")

@@ -50,6 +50,9 @@ import {
   removeNominee,
 } from "@/lib/db/activities/mission";
 
+const CURRENT_YEAR = new Date().getFullYear();
+const AVAILABLE_YEARS = Array.from({ length: CURRENT_YEAR - 2022 }, (_, i) => CURRENT_YEAR - i);
+
 const missionSearchSchema = z.object({
   year: fallback(z.number(), CURRENT_YEAR).default(CURRENT_YEAR),
 });
@@ -515,6 +518,3 @@ function NominateDialog({
 /* ------------------------------------------------------------------ */
 /* Script — constants & config                                         */
 /* ------------------------------------------------------------------ */
-
-const CURRENT_YEAR = new Date().getFullYear();
-const AVAILABLE_YEARS = Array.from({ length: CURRENT_YEAR - 2022 }, (_, i) => CURRENT_YEAR - i);

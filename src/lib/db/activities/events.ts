@@ -379,6 +379,42 @@ export async function listRegistrations(eventId: string) {
   return data ?? [];
 }
 
+export async function listEventsPaged(opts: {
+  page?: number;
+  size?: number;
+  q?: string;
+  deaneryId?: string | null;
+  parishId?: string | null;
+  period?: "upcoming" | "done" | null;
+}): Promise<{ data: EventRow[]; total: number; page: number; size: number }> {
+  const page = opts.page ?? 0;
+  const size = Math.min(opts.size ?? 25, 100);
+  const today = new Date().toISOString().slice(0, 10);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let query = (supabase as any)
+    .from("events")
+    .select(
+      "id, name, event_date, venue, description, poster_url, organization_level, deanery:deaneries(name), parish:parishes(name)",
+      { count: "exact" },
+    )
+    .order("event_date", { ascending: opts.period === "upcoming" })
+    .range(page * size, page * size + size - 1);
+
+  if (opts.deaneryId) query = query.eq("deanery_id", opts.deaneryId);
+  if (opts.parishId)  query = query.eq("parish_id",  opts.parishId);
+  if (opts.period === "upcoming") query = query.gte("event_date", today);
+  if (opts.period === "done")     query = query.lt("event_date",  today);
+  if (opts.q?.trim()) {
+    const t = `%${opts.q.trim()}%`;
+    query = query.or(`name.ilike.${t},venue.ilike.${t}`);
+  }
+
+  const { data, error, count } = await query;
+  if (error) throw error;
+  return { data: (data ?? []) as unknown as EventRow[], total: count ?? 0, page, size };
+}
+
 export async function getEventsAnalytics() {
   const today = new Date().toISOString().slice(0, 10);
   const [up, done, regCount] = await Promise.all([

@@ -72,6 +72,48 @@ export async function listUniformSales(limit = 300): Promise<UniformSale[]> {
   return (data ?? []) as UniformSale[];
 }
 
+export async function listUniformSalesPaged(opts: {
+  page?: number;
+  size?: number;
+  q?: string;
+  stage?: string | null;
+  paymentStatus?: string | null;
+  from?: string | null;
+  to?: string | null;
+}): Promise<{ data: UniformSale[]; total: number; page: number; size: number }> {
+  const page = opts.page ?? 0;
+  const size = Math.min(opts.size ?? 25, 100);
+
+  let query = db
+    .from("uniform_sales")
+    .select("*", { count: "exact" })
+    .order("ordered_at", { ascending: false })
+    .range(page * size, page * size + size - 1);
+
+  if (opts.stage) {
+    if (opts.stage === "pending") {
+      query = query.not("stage", "in", "(delivered,cancelled)");
+    } else {
+      query = query.eq("stage", opts.stage);
+    }
+  }
+  if (opts.paymentStatus === "not_paid") {
+    query = query.neq("payment_status", "paid");
+  } else if (opts.paymentStatus) {
+    query = query.eq("payment_status", opts.paymentStatus);
+  }
+  if (opts.from) query = query.gte("ordered_at", opts.from);
+  if (opts.to)   query = query.lte("ordered_at", `${opts.to}T23:59:59Z`);
+  if (opts.q?.trim()) {
+    const t = `%${opts.q.trim()}%`;
+    query = query.or(`youth_name.ilike.${t},item_name.ilike.${t},parish_name.ilike.${t}`);
+  }
+
+  const { data, error, count } = await query;
+  if (error) throw error;
+  return { data: (data ?? []) as UniformSale[], total: count ?? 0, page, size };
+}
+
 export async function createUniformSale(input: UniformSaleInput): Promise<UniformSale> {
   let skuId: string | null = null;
   if (input.itemName) {

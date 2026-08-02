@@ -34,6 +34,49 @@ export async function listCusa(year?: number): Promise<CusaRow[]> {
   return (data ?? []) as unknown as CusaRow[];
 }
 
+export async function listCusaPaged(opts: {
+  page?: number;
+  size?: number;
+  q?: string;
+  year?: number | null;
+  institution?: string | null;
+  deaneryId?: string | null;
+  parishId?: string | null;
+}): Promise<{ data: CusaRow[]; total: number; page: number; size: number }> {
+  const page = opts.page ?? 0;
+  const size = Math.min(opts.size ?? 25, 100);
+  const year = opts.year ?? new Date().getFullYear();
+
+  // Use !inner join when filtering on youth columns so non-matching rows are excluded
+  const needsInner = !!(opts.deaneryId || opts.parishId);
+  const youthJoin = needsInner
+    ? "youth:youths!inner(cdm_id, full_name, gender, deanery:deaneries(name), parish:parishes(name))"
+    : "youth:youths(cdm_id, full_name, gender, deanery:deaneries(name), parish:parishes(name))";
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let query = (supabase as any)
+    .from("cusa_members")
+    .select(`*, ${youthJoin}`, { count: "exact" })
+    .eq("year", year)
+    .order("created_at", { ascending: false })
+    .range(page * size, page * size + size - 1);
+
+  // Own-table filters
+  if (opts.institution) query = query.eq("institution", opts.institution);
+  if (opts.q?.trim()) {
+    const t = `%${opts.q.trim()}%`;
+    query = query.or(`institution.ilike.${t},course.ilike.${t}`);
+  }
+
+  // Embedded table filters — use real table name "youths", not alias "youth"
+  if (opts.deaneryId) query = query.eq("youths.deanery_id", opts.deaneryId);
+  if (opts.parishId)  query = query.eq("youths.parish_id",  opts.parishId);
+
+  const { data, error, count } = await query;
+  if (error) throw error;
+  return { data: (data ?? []) as unknown as CusaRow[], total: count ?? 0, page, size };
+}
+
 export type CusaInput = {
   // either link existing youth by cdmId OR create new
   cdmId?: string | null;

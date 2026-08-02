@@ -144,6 +144,54 @@ export async function updateWelfareCaseStatus(id: string, status: WelfareStatus)
   if (error) throw error;
 }
 
+export async function getWelfareKpis(): Promise<{
+  open: number; urgent: number; inProgress: number; resolved30d: number;
+}> {
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 86400_000).toISOString();
+  const [openRes, urgentRes, inProgressRes, resolved30dRes] = await Promise.all([
+    db.from("welfare_cases").select("id", { count: "exact", head: true }).in("status", ["open", "in_progress"]),
+    db.from("welfare_cases").select("id", { count: "exact", head: true }).eq("urgency", "high").in("status", ["open", "in_progress"]),
+    db.from("welfare_cases").select("id", { count: "exact", head: true }).eq("status", "in_progress"),
+    db.from("welfare_cases").select("id", { count: "exact", head: true }).in("status", ["resolved", "closed"]).gte("resolved_at", thirtyDaysAgo),
+  ]);
+  return {
+    open: openRes.count ?? 0,
+    urgent: urgentRes.count ?? 0,
+    inProgress: inProgressRes.count ?? 0,
+    resolved30d: resolved30dRes.count ?? 0,
+  };
+}
+
+export async function listWelfareCasesPaged(opts: {
+  page?: number;
+  size?: number;
+  q?: string;
+  parishId?: string | null;
+  status?: string | null;
+  urgency?: string | null;
+}): Promise<{ data: WelfareCaseRow[]; total: number; page: number; size: number }> {
+  const page = opts.page ?? 0;
+  const size = Math.min(opts.size ?? 25, 100);
+
+  let query = db
+    .from("welfare_cases")
+    .select("*", { count: "exact" })
+    .order("opened_at", { ascending: false })
+    .range(page * size, page * size + size - 1);
+
+  if (opts.parishId) query = query.eq("parish_id", opts.parishId);
+  if (opts.status)   query = query.eq("status",    opts.status);
+  if (opts.urgency)  query = query.eq("urgency",   opts.urgency);
+  if (opts.q?.trim()) {
+    const t = `%${opts.q.trim()}%`;
+    query = query.or(`category.ilike.${t},assigned_to.ilike.${t},cdm_id.ilike.${t},parish_name.ilike.${t}`);
+  }
+
+  const { data, error, count } = await query;
+  if (error) throw error;
+  return { data: (data ?? []) as WelfareCaseRow[], total: count ?? 0, page, size };
+}
+
 export async function deleteWelfareCase(id: string): Promise<void> {
   const { error } = await db.from("welfare_cases").delete().eq("id", id);
   if (error) throw error;

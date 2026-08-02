@@ -41,6 +41,43 @@ export async function listYouths(): Promise<YouthRow[]> {
   return (data ?? []) as unknown as YouthRow[];
 }
 
+export async function listYouthsPaged(opts: {
+  page?: number;
+  size?: number;
+  q?: string;
+  deaneryId?: string | null;
+  parishId?: string | null;
+  outstationId?: string | null;
+  category?: string | null;
+  status?: string | null;
+}): Promise<{ data: YouthRow[]; total: number; page: number; size: number }> {
+  const page = opts.page ?? 0;
+  const size = Math.min(opts.size ?? 25, 100);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let query = (supabase as any)
+    .from("youths")
+    .select(
+      "*, deanery:deaneries(name), parish:parishes(name), outstation:outstations(name), enrollments(id)",
+      { count: "exact" },
+    )
+    .order("created_at", { ascending: false })
+    .range(page * size, page * size + size - 1);
+
+  if (opts.deaneryId) query = query.eq("deanery_id", opts.deaneryId);
+  if (opts.parishId) query = query.eq("parish_id", opts.parishId);
+  if (opts.outstationId) query = query.eq("outstation_id", opts.outstationId);
+  if (opts.category) query = query.eq("category", opts.category);
+  if (opts.status) query = query.eq("status", opts.status);
+  if (opts.q?.trim()) {
+    const t = `%${opts.q.trim()}%`;
+    query = query.or(`full_name.ilike.${t},cdm_id.ilike.${t},phone.ilike.${t}`);
+  }
+
+  const { data, error, count } = await query;
+  if (error) throw error;
+  return { data: (data ?? []) as unknown as YouthRow[], total: count ?? 0, page, size };
+}
+
 export type YouthInput = {
   fullName: string;
   gender: Gender;
