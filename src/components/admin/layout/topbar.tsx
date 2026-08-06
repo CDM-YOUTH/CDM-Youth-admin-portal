@@ -66,7 +66,7 @@ export function UserMenu() {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
-    await navigate({ to: "/" });
+    await navigate({ to: "/login" });
   };
 
   return (

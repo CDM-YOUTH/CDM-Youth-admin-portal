@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Papa from "papaparse";
-import { createFileRoute } from "@tanstack/react-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { zodValidator, fallback } from "@tanstack/zod-adapter";
+import { z } from "zod";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { History, MoreVertical, Upload } from "lucide-react";
+import { type PagedResponse } from "@/lib/api/fetch-api";
 import { YouthSearchInput, type PickedYouth } from "@/components/admin/composables/pickers/youth-search-input";
 import { Topbar, TopbarButton, TopbarTab } from "@/components/admin/layout/topbar";
 import { Card, CardBody, Kpi } from "@/components/admin/composables/ui-bits";
-import { TablePagination, usePagination } from "@/components/admin/composables/tables/table-pagination";
+import { TablePagination } from "@/components/admin/composables/tables/table-pagination";
 import {
   ColumnFilter,
   ColumnHeader,
@@ -42,21 +45,34 @@ import {
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { fetchOrg, type OrgTree } from "@/lib/db/org";
+import { useAdminScope } from "@/lib/hooks/use-admin-scope";
 import {
   appointLeader,
   bulkImportLeaders,
+  createRoleType,
   deleteLeader,
   endLeaderTerm,
-  listLeadershipRoles,
+  listLeadersPaged,
+  listRoleTypes,
   updateLeader,
   type BulkLeaderRow,
   type LeadershipLevel,
   type LeadershipRoleInput,
   type LeadershipRoleRow,
   type LeadershipRoleUpdate,
+  type RoleTypeRow,
 } from "@/lib/db/youth-records/leaders";
 
+const leadersSearchSchema = z.object({
+  q:             fallback(z.string(), "").default(""),
+  deanery_id:    fallback(z.string(), "").default(""),
+  parish_id:     fallback(z.string(), "").default(""),
+  outstation_id: fallback(z.string(), "").default(""),
+});
+type LeadersSearch = z.infer<typeof leadersSearchSchema>;
+
 export const Route = createFileRoute("/admin/leaders")({
+  validateSearch: zodValidator(leadersSearchSchema),
   head: () => ({
     meta: [
       { title: "Youth Leaders — CDM Youth Office" },
@@ -79,30 +95,66 @@ function LeadersPage() {
   const [deleteTarget, setDeleteTarget] = useState<LeadershipRoleRow | null>(null);
   const qc = useQueryClient();
 
+  const search  = Route.useSearch();
+  const navigate = useNavigate({ from: Route.fullPath });
+  const setFilter = (patch: Partial<LeadersSearch>) =>
+    navigate({ search: (prev: LeadersSearch) => ({ ...prev, ...patch }), replace: true });
+
+  const scope = useAdminScope();
+  const deaneryId    = scope.deaneryId || search.deanery_id;
+  const parishId     = scope.parishId  || search.parish_id;
+  const outstationId = search.outstation_id;
+
   const { data: org } = useQuery({ queryKey: ["org"], queryFn: fetchOrg });
-  const { data: roles = [], isLoading } = useQuery({
-    queryKey: ["leadership-roles"],
-    queryFn: listLeadershipRoles,
+  const { data: roleTypes = [] } = useQuery({ queryKey: ["role-types"], queryFn: listRoleTypes });
+  // Fetch a summary of active leader counts across all levels (small query, unfiltered)
+  const { data: allActiveResp } = useQuery({
+    queryKey: ["leadership-roles-counts"],
+    queryFn: () => listLeadersPaged({ page: 0, size: 500, active: true }),
+    placeholderData: keepPreviousData,
   });
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
+  const { data: resp, isLoading } = useQuery({
+    queryKey: [
+      "leadership-roles", tab,
+      search.q, deaneryId, parishId, outstationId,
+      page - 1, pageSize,
+    ],
+    queryFn: () =>
+      listLeadersPaged({
+        level:         tab,
+        page:          page - 1,
+        size:          pageSize,
+        q:             search.q     || undefined,
+        deaneryId:     deaneryId    || null,
+        parishId:      parishId     || null,
+        outstationId:  outstationId || null,
+      }),
+    placeholderData: keepPreviousData,
+  });
+  const roles = resp?.data ?? [];
+  const total = resp?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
-  const byLevel = useMemo(
-    () => ({
-      diocese:    roles.filter((r) => r.level === "diocese"),
-      deanery:    roles.filter((r) => r.level === "deanery"),
-      parish:     roles.filter((r) => r.level === "parish"),
-      outstation: roles.filter((r) => r.level === "outstation"),
-    }),
-    [roles],
-  );
-
+  const allActive = allActiveResp?.data ?? [];
   const activeCount = (lvl: LeadershipLevel) =>
-    byLevel[lvl].filter((r) => !r.end_date).length;
+    allActive.filter((r) => r.level === lvl && !r.end_date).length;
 
-  const invalidate = () => qc.invalidateQueries({ queryKey: ["leadership-roles"] });
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ["leadership-roles"] });
+    qc.invalidateQueries({ queryKey: ["leadership-roles-counts"] });
+  };
 
   const appointMut = useMutation({
     mutationFn: appointLeader,
     onSuccess: () => { toast.success("Leader appointed"); invalidate(); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const createRoleTypeMut = useMutation({
+    mutationFn: createRoleType,
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["role-types"] }),
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -132,7 +184,7 @@ function LeadersPage() {
         tabs={
           <>
             {LEVELS.map((lvl) => (
-              <TopbarTab key={lvl} active={tab === lvl} onClick={() => setTab(lvl)}>
+              <TopbarTab key={lvl} active={tab === lvl} onClick={() => { setTab(lvl); setPage(1); }}>
                 {LEVEL_LABELS[lvl]} ({activeCount(lvl)})
               </TopbarTab>
             ))}
@@ -162,13 +214,26 @@ function LeadersPage() {
         <Card>
           <LeadersTable
             key={tab}
-            rows={byLevel[tab]}
+            rows={roles}
             org={org}
             levelLabel={LEVEL_LABELS[tab]}
             isLoading={isLoading}
+            page={page}
+            pageSize={pageSize}
+            total={total}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
             onEdit={setEditTarget}
             onEndTerm={setEndTarget}
             onDelete={setDeleteTarget}
+            q={search.q}
+            deaneryId={deaneryId}
+            parishId={parishId}
+            outstationId={outstationId}
+            scopeDeaneryId={scope.deaneryId}
+            scopeParishId={scope.parishId}
+            onFilterChange={(patch) => { setFilter(patch); setPage(1); }}
           />
         </Card>
       </div>
@@ -178,14 +243,18 @@ function LeadersPage() {
         onOpenChange={setAppointOpen}
         defaultLevel={tab}
         org={org}
+        roleTypes={roleTypes}
         isPending={appointMut.isPending}
+        onCreateRoleType={createRoleTypeMut.mutateAsync}
         onSubmit={(input) => { appointMut.mutate(input); setAppointOpen(false); }}
       />
 
       <EditDialog
         row={editTarget}
+        roleTypes={roleTypes}
         onOpenChange={(o) => { if (!o) setEditTarget(null); }}
         isPending={updateMut.isPending}
+        onCreateRoleType={createRoleTypeMut.mutateAsync}
         onSubmit={(input) => editTarget && updateMut.mutate({ id: editTarget.id, input })}
       />
 
@@ -201,7 +270,7 @@ function LeadersPage() {
             <AlertDialogTitle>End term for {endTarget?.youth?.full_name}?</AlertDialogTitle>
             <AlertDialogDescription>
               Today will be recorded as the end of their{" "}
-              <strong>{endTarget?.role}</strong> role at{" "}
+              <strong>{endTarget?.role_type?.name}</strong> role at{" "}
               {LEVEL_LABELS[endTarget?.level ?? "diocese"]} level. The appointment history is
               preserved — this cannot be undone.
             </AlertDialogDescription>
@@ -225,7 +294,7 @@ function LeadersPage() {
             <AlertDialogDescription>
               This will permanently remove{" "}
               <strong>{deleteTarget?.youth?.full_name}</strong>'s{" "}
-              <strong>{deleteTarget?.role}</strong> appointment. This cannot be undone.
+              <strong>{deleteTarget?.role_type?.name}</strong> appointment. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -252,52 +321,86 @@ function LeadersTable({
   org,
   levelLabel,
   isLoading,
+  page,
+  pageSize,
+  total,
+  totalPages,
+  onPageChange,
+  onPageSizeChange,
   onEdit,
   onEndTerm,
   onDelete,
+  q,
+  deaneryId,
+  parishId,
+  outstationId,
+  scopeDeaneryId,
+  scopeParishId,
+  onFilterChange,
 }: {
   rows: LeadershipRoleRow[];
   org?: OrgTree;
   levelLabel: string;
   isLoading: boolean;
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  onPageChange: (p: number) => void;
+  onPageSizeChange: (s: number) => void;
   onEdit: (row: LeadershipRoleRow) => void;
   onEndTerm: (row: LeadershipRoleRow) => void;
   onDelete: (row: LeadershipRoleRow) => void;
+  q: string;
+  deaneryId: string;
+  parishId: string;
+  outstationId: string;
+  scopeDeaneryId: string | null;
+  scopeParishId: string | null;
+  onFilterChange: (patch: Partial<LeadersSearch>) => void;
 }) {
   const [showHistory, setShowHistory] = useState(false);
   const [filterPeriod, setFilterPeriod] = useState("all");
-  const [searchQuery, setSearchQuery]   = useState("");
+  // Local input state for search box; debounces before hitting the server
+  const [searchInput, setSearchInput] = useState(q);
   const [fCdm,  setFCdm]  = useState<ColumnFilterValue | undefined>();
   const [fName, setFName] = useState<ColumnFilterValue | undefined>();
-  const [fDeanery,    setFDeanery]    = useState<ColumnFilterValue | undefined>();
-  const [fParish,     setFParish]     = useState<ColumnFilterValue | undefined>();
-  const [fOutstation, setFOutstation] = useState<ColumnFilterValue | undefined>();
-  const [fRole,       setFRole]       = useState<ColumnFilterValue | undefined>();
+  const [fRole, setFRole] = useState<ColumnFilterValue | undefined>();
 
-  const deaneryOptions = useMemo(() => {
-    const seen = new Set<string>();
-    rows.forEach((r) => { if (r.deanery?.name) seen.add(r.deanery.name); });
-    return Array.from(seen).sort().map((n) => ({ value: n, label: n }));
-  }, [rows]);
+  // Debounce search input → URL (server query)
+  useEffect(() => {
+    const t = setTimeout(() => { if (searchInput !== q) onFilterChange({ q: searchInput }); }, 300);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchInput]);
 
-  const parishOptions = useMemo(() => {
-    const seen = new Set<string>();
-    rows.forEach((r) => { if (r.parish?.name) seen.add(r.parish.name); });
-    return Array.from(seen).sort().map((n) => ({ value: n, label: n }));
-  }, [rows]);
-
-  const outstationOptions = useMemo(() => {
-    const seen = new Set<string>();
-    rows.forEach((r) => { if (r.outstation?.name) seen.add(r.outstation.name); });
-    return Array.from(seen).sort().map((n) => ({ value: n, label: n }));
-  }, [rows]);
-
+  // Build dropdown options from live org tree (UUID values for server-side filtering)
+  const deaneryOptions = useMemo(
+    () => (org?.deaneries ?? []).map((d) => ({ value: d.id, label: d.name })),
+    [org?.deaneries],
+  );
+  const parishOptions = useMemo(
+    () =>
+      (org?.parishes ?? [])
+        .filter((p) => !deaneryId || p.deanery_id === deaneryId)
+        .map((p) => ({ value: p.id, label: p.name })),
+    [org?.parishes, deaneryId],
+  );
+  const outstationOptions = useMemo(
+    () =>
+      (org?.outstations ?? [])
+        .filter((o) => !parishId || o.parish_id === parishId)
+        .map((o) => ({ value: o.id, label: o.name })),
+    [org?.outstations, parishId],
+  );
   const roleOptions = useMemo(() => {
     const seen = new Set<string>();
-    rows.forEach((r) => seen.add(r.role));
+    rows.forEach((r) => { if (r.role_type?.name) seen.add(r.role_type.name); });
     return Array.from(seen).sort().map((n) => ({ value: n, label: n }));
   }, [rows]);
 
+  // Client-side filter only for period/history and column-level CDM/name/role refinement.
+  // Deanery/parish/outstation/search are server-side (already applied by the query).
   const displayRows = useMemo(() => {
     let base = rows;
     if (filterPeriod !== "all") {
@@ -312,27 +415,13 @@ function LeadersTable({
     } else if (!showHistory) {
       base = rows.filter((r) => !r.end_date);
     }
-
-    const q = searchQuery.trim().toLowerCase();
     return base.filter((r) => {
-      if (!applyColumnFilter(r.youth?.cdm_id,       fCdm))  return false;
-      if (!applyColumnFilter(r.youth?.full_name,     fName)) return false;
-      if (!applyColumnFilter(r.deanery?.name ?? "",  fDeanery))    return false;
-      if (!applyColumnFilter(r.parish?.name ?? "",   fParish))     return false;
-      if (!applyColumnFilter(r.outstation?.name ?? "", fOutstation)) return false;
-      if (!applyColumnFilter(r.role,                 fRole)) return false;
-      if (q) {
-        const hay = [
-          r.youth?.cdm_id, r.youth?.full_name, r.role,
-          r.deanery?.name, r.parish?.name, r.outstation?.name,
-        ].join(" ").toLowerCase();
-        if (!hay.includes(q)) return false;
-      }
+      if (!applyColumnFilter(r.youth?.cdm_id,        fCdm))  return false;
+      if (!applyColumnFilter(r.youth?.full_name,      fName)) return false;
+      if (!applyColumnFilter(r.role_type?.name ?? "", fRole)) return false;
       return true;
     });
-  }, [rows, showHistory, filterPeriod, searchQuery, fCdm, fName, fDeanery, fParish, fOutstation, fRole]);
-
-  const pagination = usePagination(displayRows, 15);
+  }, [rows, showHistory, filterPeriod, fCdm, fName, fRole]);
 
   const fc = (
     label: string,
@@ -349,8 +438,8 @@ function LeadersTable({
   return (
     <>
       <TableToolbar
-        searchValue={searchQuery}
-        onSearchChange={setSearchQuery}
+        searchValue={searchInput}
+        onSearchChange={setSearchInput}
         searchPlaceholder={`Search ${levelLabel.toLowerCase()} leaders…`}
         extra={
           <div className="flex items-center gap-1.5">
@@ -400,19 +489,51 @@ function LeadersTable({
                 <th className="label-eyebrow px-3.5 py-2.5 text-left">
                   <ColumnHeader
                     label="Deanery"
-                    filter={fc("Deanery", fDeanery, setFDeanery, "select", deaneryOptions)}
+                    filter={
+                      <ColumnFilter
+                        label="Deanery"
+                        mode="select"
+                        options={deaneryOptions}
+                        value={deaneryId ? { operator: "equals", value: deaneryId } : undefined}
+                        onChange={(v) =>
+                          onFilterChange({ deanery_id: v?.value ?? "", parish_id: "", outstation_id: "" })
+                        }
+                        disabled={!!scopeDeaneryId}
+                      />
+                    }
                   />
                 </th>
                 <th className="label-eyebrow px-3.5 py-2.5 text-left">
                   <ColumnHeader
                     label="Parish"
-                    filter={fc("Parish", fParish, setFParish, "select", parishOptions)}
+                    filter={
+                      <ColumnFilter
+                        label="Parish"
+                        mode="select"
+                        options={parishOptions}
+                        value={parishId ? { operator: "equals", value: parishId } : undefined}
+                        onChange={(v) =>
+                          onFilterChange({ parish_id: v?.value ?? "", outstation_id: "" })
+                        }
+                        disabled={!!scopeParishId}
+                      />
+                    }
                   />
                 </th>
                 <th className="label-eyebrow px-3.5 py-2.5 text-left">
                   <ColumnHeader
                     label="Outstation"
-                    filter={fc("Outstation", fOutstation, setFOutstation, "select", outstationOptions)}
+                    filter={
+                      <ColumnFilter
+                        label="Outstation"
+                        mode="select"
+                        options={outstationOptions}
+                        value={outstationId ? { operator: "equals", value: outstationId } : undefined}
+                        onChange={(v) =>
+                          onFilterChange({ outstation_id: v?.value ?? "" })
+                        }
+                      />
+                    }
                   />
                 </th>
                 <th className="label-eyebrow px-3.5 py-2.5 text-left">
@@ -428,7 +549,7 @@ function LeadersTable({
               </tr>
             </thead>
             <tbody>
-              {pagination.pageRows.map((row) => (
+              {displayRows.map((row) => (
                 <tr key={row.id} className="border-b border-border/30 last:border-0 hover:bg-bg-3">
                   <td className="px-3.5 py-2.5 font-mono text-[10px] font-bold text-gold">
                     {row.youth?.cdm_id ?? "—"}
@@ -448,7 +569,7 @@ function LeadersTable({
                   <td className="px-3.5 py-2.5 text-[11px] text-text-2">
                     {row.outstation?.name ?? "—"}
                   </td>
-                  <td className="px-3.5 py-2.5 text-[11px] text-text-1">{row.role}</td>
+                  <td className="px-3.5 py-2.5 text-[11px] text-text-1">{row.role_type?.name ?? "—"}</td>
                   {showEndDate && (
                     <td className="px-3.5 py-2.5 text-[11px] text-text-3">
                       {row.start_date} — {row.end_date ?? "present"}
@@ -500,14 +621,14 @@ function LeadersTable({
         )}
       </CardBody>
 
-      {displayRows.length > 0 && (
+      {total > 0 && (
         <TablePagination
-          page={pagination.page}
-          pageSize={pagination.pageSize}
-          total={pagination.total}
-          totalPages={pagination.totalPages}
-          onPageChange={pagination.setPage}
-          onPageSizeChange={pagination.setPageSize}
+          page={page}
+          pageSize={pageSize}
+          total={total}
+          totalPages={totalPages}
+          onPageChange={onPageChange}
+          onPageSizeChange={onPageSizeChange}
           pageSizes={[15, 30, 50]}
         />
       )}
@@ -521,16 +642,20 @@ function LeadersTable({
 
 function EditDialog({
   row,
+  roleTypes,
   onOpenChange,
   isPending,
+  onCreateRoleType,
   onSubmit,
 }: {
   row: LeadershipRoleRow | null;
+  roleTypes: RoleTypeRow[];
   onOpenChange: (o: boolean) => void;
   isPending: boolean;
+  onCreateRoleType: (name: string) => Promise<RoleTypeRow>;
   onSubmit: (input: LeadershipRoleUpdate) => void;
 }) {
-  const [roleSelect, setRoleSelect] = useState("");
+  const [roleId, setRoleId]         = useState("");
   const [roleCustom, setRoleCustom] = useState("");
   const [level, setLevel]           = useState<LeadershipLevel>("diocese");
   const [startDate, setStartDate]   = useState("");
@@ -538,25 +663,23 @@ function EditDialog({
 
   useEffect(() => {
     if (row) {
-      const preset = ROLES.includes(row.role) ? row.role : "__other__";
-      setRoleSelect(preset);
-      setRoleCustom(preset === "__other__" ? row.role : "");
+      setRoleId(row.role_id);
+      setRoleCustom("");
       setLevel(row.level);
       setStartDate(row.start_date);
       setNotes(row.notes ?? "");
     }
   }, [row]);
 
-  const effectiveRole = roleSelect === "__other__" ? roleCustom.trim() : roleSelect;
-
-  const handleSubmit = () => {
-    if (!effectiveRole) { toast.error("Enter or select a position"); return; }
-    onSubmit({
-      role:      effectiveRole,
-      level,
-      startDate,
-      notes:     notes.trim() || null,
-    });
+  const handleSubmit = async () => {
+    let effectiveRoleId = roleId;
+    if (roleId === "__new__") {
+      if (!roleCustom.trim()) { toast.error("Enter a position name"); return; }
+      const created = await onCreateRoleType(roleCustom.trim());
+      effectiveRoleId = created.id;
+    }
+    if (!effectiveRoleId) { toast.error("Select a position"); return; }
+    onSubmit({ roleId: effectiveRoleId, level, startDate, notes: notes.trim() || null });
   };
 
   return (
@@ -578,22 +701,22 @@ function EditDialog({
           <div className="grid grid-cols-2 gap-3">
             <label className="space-y-1 text-[10px] font-bold uppercase tracking-wide text-text-3">
               <span>Position *</span>
-              <Select value={roleSelect} onValueChange={setRoleSelect}>
+              <Select value={roleId} onValueChange={setRoleId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select position" />
                 </SelectTrigger>
                 <SelectContent>
-                  {ROLES.map((r) => (
-                    <SelectItem key={r} value={r}>{r}</SelectItem>
+                  {roleTypes.map((r) => (
+                    <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
                   ))}
-                  <SelectItem value="__other__">Other…</SelectItem>
+                  <SelectItem value="__new__">New position…</SelectItem>
                 </SelectContent>
               </Select>
             </label>
 
-            {roleSelect === "__other__" && (
+            {roleId === "__new__" && (
               <label className="space-y-1 text-[10px] font-bold uppercase tracking-wide text-text-3">
-                <span>Custom Position *</span>
+                <span>Position name *</span>
                 <Input
                   value={roleCustom}
                   onChange={(e) => setRoleCustom(e.target.value)}
@@ -666,42 +789,50 @@ function AppointDialog({
   onOpenChange,
   defaultLevel,
   org,
+  roleTypes,
   isPending,
+  onCreateRoleType,
   onSubmit,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   defaultLevel: LeadershipLevel;
   org?: OrgTree;
+  roleTypes: RoleTypeRow[];
   isPending: boolean;
+  onCreateRoleType: (name: string) => Promise<RoleTypeRow>;
   onSubmit: (input: LeadershipRoleInput) => void;
 }) {
-  const [youth, setYouth]           = useState<PickedYouth | null>(null);
-  const [roleSelect, setRoleSelect] = useState("");
+  const [youth, setYouth]         = useState<PickedYouth | null>(null);
+  const [roleId, setRoleId]       = useState("");
   const [roleCustom, setRoleCustom] = useState("");
-  const [level, setLevel]           = useState<LeadershipLevel>(defaultLevel);
-  const [startDate, setStartDate]   = useState(new Date().toISOString().slice(0, 10));
-  const [notes, setNotes]           = useState("");
+  const [level, setLevel]         = useState<LeadershipLevel>(defaultLevel);
+  const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
+  const [notes, setNotes]         = useState("");
 
   useEffect(() => {
     if (open) {
       setYouth(null);
-      setRoleSelect(""); setRoleCustom("");
+      setRoleId(""); setRoleCustom("");
       setLevel(defaultLevel);
       setStartDate(new Date().toISOString().slice(0, 10));
       setNotes("");
     }
   }, [open, defaultLevel]);
 
-  const effectiveRole = roleSelect === "__other__" ? roleCustom.trim() : roleSelect;
-
-  const handleSubmit = () => {
-    if (!youth)         { toast.error("Select a youth first"); return; }
-    if (!effectiveRole) { toast.error("Enter or select a position"); return; }
+  const handleSubmit = async () => {
+    if (!youth) { toast.error("Select a youth first"); return; }
+    let effectiveRoleId = roleId;
+    if (roleId === "__new__") {
+      if (!roleCustom.trim()) { toast.error("Enter a position name"); return; }
+      const created = await onCreateRoleType(roleCustom.trim());
+      effectiveRoleId = created.id;
+    }
+    if (!effectiveRoleId) { toast.error("Select a position"); return; }
 
     onSubmit({
       youthId:      youth.id,
-      role:         effectiveRole,
+      roleId:       effectiveRoleId,
       level,
       deaneryId:    youth.deanery_id,
       parishId:     youth.parish_id,
@@ -732,22 +863,22 @@ function AppointDialog({
           <div className="grid grid-cols-2 gap-3">
             <label className="space-y-1 text-[10px] font-bold uppercase tracking-wide text-text-3">
               <span>Position *</span>
-              <Select value={roleSelect} onValueChange={setRoleSelect}>
+              <Select value={roleId} onValueChange={setRoleId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select position" />
                 </SelectTrigger>
                 <SelectContent>
-                  {ROLES.map((r) => (
-                    <SelectItem key={r} value={r}>{r}</SelectItem>
+                  {roleTypes.map((r) => (
+                    <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
                   ))}
-                  <SelectItem value="__other__">Other…</SelectItem>
+                  <SelectItem value="__new__">New position…</SelectItem>
                 </SelectContent>
               </Select>
             </label>
 
-            {roleSelect === "__other__" && (
+            {roleId === "__new__" && (
               <label className="space-y-1 text-[10px] font-bold uppercase tracking-wide text-text-3">
-                <span>Custom Position *</span>
+                <span>Position name *</span>
                 <Input
                   value={roleCustom}
                   onChange={(e) => setRoleCustom(e.target.value)}
@@ -845,13 +976,13 @@ function ImportDialog({
       skipEmptyLines: true,
       complete: async ({ data }) => {
         const rows: BulkLeaderRow[] = data.map((row) => ({
-          cdmId:        (row["cdm_id"]    ?? row["CDM ID"]    ?? "").trim(),
-          role:         (row["role"]      ?? row["Role"]      ?? "").trim(),
-          level:        ((row["level"]    ?? row["Level"]     ?? "parish")
-                          .toLowerCase().trim()) as LeadershipLevel,
-          deaneryName:  (row["deanery"]   ?? row["Deanery"]   ?? "").trim(),
-          parishName:   (row["parish"]    ?? row["Parish"]    ?? "").trim(),
-          outstationName: (row["outstation"] ?? row["Outstation"] ?? "").trim(),
+          cdmId:          (row["cdm_id"]      ?? row["CDM ID"]      ?? "").trim(),
+          roleName:       (row["role"]        ?? row["Role"]        ?? "").trim(),
+          level:          ((row["level"]      ?? row["Level"]       ?? "parish")
+                            .toLowerCase().trim()) as LeadershipLevel,
+          deaneryName:    (row["deanery"]     ?? row["Deanery"]     ?? "").trim(),
+          parishName:     (row["parish"]      ?? row["Parish"]      ?? "").trim(),
+          outstationName: (row["outstation"]  ?? row["Outstation"]  ?? "").trim(),
         }));
         try {
           const res = await bulkImportLeaders(rows);
@@ -938,18 +1069,6 @@ function ImportDialog({
 /* ------------------------------------------------------------------ */
 /* Script — constants & config                                         */
 /* ------------------------------------------------------------------ */
-
-const ROLES = [
-  "Coordinator",
-  "Vice Coordinator",
-  "Secretary",
-  "Vice Secretary",
-  "Treasurer",
-  "Organising Secretary",
-  "Discipline Master/Mistress",
-  "Liturgist",
-  "Choir Master",
-];
 
 const LEVELS: LeadershipLevel[] = ["diocese", "deanery", "parish", "outstation"];
 const LEVEL_LABELS: Record<LeadershipLevel, string> = {

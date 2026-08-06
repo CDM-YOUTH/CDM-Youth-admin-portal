@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { fetchOrg, resolveOrgIds, type OrgTree } from "../org";
+import { likePattern } from "@/lib/utils";
 
 export type YouthCategory = "Primary" | "Secondary" | "Tertiary" | "Working";
 export type Gender = "Female" | "Male";
@@ -39,6 +40,53 @@ export async function listYouths(): Promise<YouthRow[]> {
     .limit(2000);
   if (error) throw error;
   return (data ?? []) as unknown as YouthRow[];
+}
+
+export async function fetchYouthByCdmId(cdmId: string): Promise<YouthRow | null> {
+  const { data, error } = await supabase
+    .from("youths")
+    .select("*, deanery:deaneries(name), parish:parishes(name), outstation:outstations(name)")
+    .eq("cdm_id", cdmId.trim().toUpperCase())
+    .maybeSingle();
+  if (error) throw error;
+  return data as unknown as YouthRow | null;
+}
+
+export async function listYouthsPaged(opts: {
+  page?: number;
+  size?: number;
+  q?: string;
+  deaneryId?: string | null;
+  parishId?: string | null;
+  outstationId?: string | null;
+  category?: string | null;
+  status?: string | null;
+}): Promise<{ data: YouthRow[]; total: number; page: number; size: number }> {
+  const page = opts.page ?? 0;
+  const size = Math.min(opts.size ?? 25, 100);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let query = (supabase as any)
+    .from("youths")
+    .select(
+      "*, deanery:deaneries(name), parish:parishes(name), outstation:outstations(name), enrollments(id)",
+      { count: "exact" },
+    )
+    .order("created_at", { ascending: false })
+    .range(page * size, page * size + size - 1);
+
+  if (opts.deaneryId) query = query.eq("deanery_id", opts.deaneryId);
+  if (opts.parishId) query = query.eq("parish_id", opts.parishId);
+  if (opts.outstationId) query = query.eq("outstation_id", opts.outstationId);
+  if (opts.category) query = query.eq("category", opts.category);
+  if (opts.status) query = query.eq("status", opts.status);
+  if (opts.q?.trim()) {
+    const t = likePattern(opts.q);
+    query = query.or(`full_name.ilike.${t},cdm_id.ilike.${t},phone.ilike.${t}`);
+  }
+
+  const { data, error, count } = await query;
+  if (error) throw error;
+  return { data: (data ?? []) as unknown as YouthRow[], total: count ?? 0, page, size };
 }
 
 export type YouthInput = {
@@ -107,7 +155,7 @@ export async function bulkInsertYouths(rows: YouthInput[]) {
 
 export async function searchYouths(q: string, limit = 25): Promise<YouthRow[]> {
   if (!q.trim()) return [];
-  const term = `%${q.trim()}%`;
+  const term = likePattern(q);
   const { data, error } = await supabase
     .from("youths")
     .select("*, deanery:deaneries(name), parish:parishes(name), outstation:outstations(name)")

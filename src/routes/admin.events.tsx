@@ -1,11 +1,14 @@
 import { useState } from "react";
-import { Link, createFileRoute } from "@tanstack/react-router";
+import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
+import { zodValidator, fallback } from "@tanstack/zod-adapter";
+import { z } from "zod";
 import { toast } from "sonner";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { EventFormState } from "@/components/admin/events/event-tabs-form";
 import { Topbar, TopbarButton } from "@/components/admin/layout/topbar";
 import { Card, CardBody, CardHead, Kpi, Pill } from "@/components/admin/composables/ui-bits";
-import { usePagination, TablePagination } from "@/components/admin/composables/tables/table-pagination";
+import { TablePagination } from "@/components/admin/composables/tables/table-pagination";
+import { FilterRow, FilterSearch, FilterSelect, FilterClear } from "@/components/admin/composables/tables/table-filters";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -17,10 +20,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Input } from "@/components/ui/input";
 import { Plus, Trash2 } from "lucide-react";
 import { EventTabsForm } from "@/components/admin/events/event-tabs-form";
-import { createEvent, deleteEvent, getEventsAnalytics, listEvents, type EventRow } from "@/lib/db/activities/events";
+import { createEvent, deleteEvent, getEventsAnalytics, listEventsPaged, type EventRow } from "@/lib/db/activities/events";
+import { fetchOrg } from "@/lib/db/org";
+import { useAdminScope } from "@/lib/hooks/use-admin-scope";
 
 type Row = Record<string, string>;
 const blankRow = (labels: string[]): Row => Object.fromEntries(labels.map((l) => [l, ""]));
@@ -34,6 +38,17 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+const eventSearchSchema = z.object({
+  q: fallback(z.string(), "").default(""),
+  deanery_id: fallback(z.string(), "").default(""),
+  parish_id: fallback(z.string(), "").default(""),
+  upcoming_page: fallback(z.number().int().min(1), 1).default(1),
+  done_page: fallback(z.number().int().min(1), 1).default(1),
+  size: fallback(z.number().int().min(1).max(50), 8).default(8),
+});
+
+type EventSearch = z.infer<typeof eventSearchSchema>;
+
 export const Route = createFileRoute("/admin/events")({
   head: () => ({
     meta: [
@@ -41,17 +56,61 @@ export const Route = createFileRoute("/admin/events")({
       { name: "description", content: "Diocese-wide event scheduling, RSVP tracking, and attendance recording." },
     ],
   }),
+  validateSearch: zodValidator(eventSearchSchema),
   component: EventsPage,
 });
 
 function EventsPage() {
+  const search = Route.useSearch();
+  const navigate = useNavigate({ from: Route.fullPath });
   const qc = useQueryClient();
-  const { data: events = [] } = useQuery({ queryKey: ["events"], queryFn: listEvents });
+
+  const setFilter = (patch: Partial<EventSearch>) => {
+    navigate({ search: (prev: EventSearch) => ({ ...prev, ...patch }), replace: true });
+  };
+
+  const scope = useAdminScope();
+  const deaneryId = scope.deaneryId || search.deanery_id;
+  const parishId  = scope.parishId  || search.parish_id;
+
+  const { data: org } = useQuery({ queryKey: ["org"], queryFn: fetchOrg });
   const { data: analytics } = useQuery({ queryKey: ["events-analytics"], queryFn: getEventsAnalytics });
-  const today = new Date().toISOString().slice(0, 10);
-  const upcoming = events.filter((e) => !e.event_date || e.event_date >= today);
-  const done = events.filter((e) => e.event_date && e.event_date < today);
+
+  const { data: upcomingResp } = useQuery({
+    queryKey: ["events", "upcoming", search.q, deaneryId, parishId, search.upcoming_page, search.size],
+    queryFn: () =>
+      listEventsPaged({
+        page: search.upcoming_page - 1,
+        size: search.size,
+        q: search.q,
+        deaneryId: deaneryId || null,
+        parishId:  parishId  || null,
+        period: "upcoming",
+      }),
+    placeholderData: keepPreviousData,
+  });
+
+  const { data: doneResp } = useQuery({
+    queryKey: ["events", "done", search.q, deaneryId, parishId, search.done_page, search.size],
+    queryFn: () =>
+      listEventsPaged({
+        page: search.done_page - 1,
+        size: search.size,
+        q: search.q,
+        deaneryId: deaneryId || null,
+        parishId:  parishId  || null,
+        period: "done",
+      }),
+    placeholderData: keepPreviousData,
+  });
+
+  const upcomingEvents = upcomingResp?.data ?? [];
+  const doneEvents = doneResp?.data ?? [];
+  const upcomingTotal = upcomingResp?.total ?? 0;
+  const doneTotal = doneResp?.total ?? 0;
+
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+
   const createMut = useMutation({
     mutationFn: createEvent,
     onSuccess: () => {
@@ -72,6 +131,13 @@ function EventsPage() {
     },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  const deaneryOptions = (org?.deaneries ?? []).map((d) => ({ value: d.id, label: d.name }));
+  const parishOptions = (org?.parishes ?? [])
+    .filter((p) => !deaneryId || p.deanery_id === deaneryId)
+    .map((p) => ({ value: p.id, label: p.name }));
+  const hasFilter = !!(search.q || search.deanery_id || search.parish_id);
+
   return (
     <>
       <Topbar
@@ -79,17 +145,61 @@ function EventsPage() {
         description="Plan events, register participants, assign teams, and review post-event reports."
         action={<CreateEventDialog onCreate={(d) => createMut.mutate(d)} />}
       />
-      <div className="flex-1 overflow-y-auto px-5 py-4">
-        <div className="mb-4 grid grid-cols-1 gap-2.5 sm:grid-cols-4">
-          <Kpi label="Upcoming" value={String(analytics?.upcoming ?? upcoming.length)} trend="future events" tone="info" />
-          <Kpi label="Done" value={String(analytics?.done ?? done.length)} trend="completed" tone="up" />
-          <Kpi label="Registered" value={(analytics?.registered ?? 0).toLocaleString()} trend="all events" tone="up" />
-          <Kpi label="Total" value={String(events.length)} trend="in calendar" tone="up" />
-        </div>
+      <div className="flex-1 overflow-y-auto">
+        <FilterRow>
+          <FilterSearch
+            value={search.q}
+            onChange={(v) => setFilter({ q: v, upcoming_page: 1, done_page: 1 })}
+            placeholder="Search events, venues…"
+          />
+          <FilterSelect
+            label="Deanery"
+            value={deaneryId}
+            onChange={(v) => setFilter({ deanery_id: v, parish_id: "", upcoming_page: 1, done_page: 1 })}
+            options={deaneryOptions}
+            disabled={!!scope.deaneryId}
+          />
+          <FilterSelect
+            label="Parish"
+            value={parishId}
+            onChange={(v) => setFilter({ parish_id: v, upcoming_page: 1, done_page: 1 })}
+            options={parishOptions}
+            disabled={!!scope.parishId || (!deaneryId && parishOptions.length === 0)}
+          />
+          <FilterClear
+            visible={hasFilter}
+            onClick={() => setFilter({ q: "", deanery_id: "", parish_id: "", upcoming_page: 1, done_page: 1 })}
+          />
+        </FilterRow>
 
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.1fr_0.9fr]">
-          <EventList title="Upcoming Events" events={upcoming} onDelete={(id, name) => setDeleteTarget({ id, name })} />
-          <EventList title="Done Events" events={done} onDelete={(id, name) => setDeleteTarget({ id, name })} />
+        <div className="px-5 py-4">
+          <div className="mb-4 grid grid-cols-1 gap-2.5 sm:grid-cols-4">
+            <Kpi label="Upcoming" value={String(analytics?.upcoming ?? upcomingTotal)} trend="future events" tone="info" />
+            <Kpi label="Done" value={String(analytics?.done ?? doneTotal)} trend="completed" tone="up" />
+            <Kpi label="Registered" value={(analytics?.registered ?? 0).toLocaleString()} trend="all events" tone="up" />
+            <Kpi label="Total" value={String((analytics?.upcoming ?? 0) + (analytics?.done ?? 0))} trend="in calendar" tone="up" />
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.1fr_0.9fr]">
+            <EventList
+              title="Upcoming Events"
+              events={upcomingEvents}
+              total={upcomingTotal}
+              page={search.upcoming_page}
+              size={search.size}
+              onPageChange={(p) => setFilter({ upcoming_page: p })}
+              onDelete={(id, name) => setDeleteTarget({ id, name })}
+            />
+            <EventList
+              title="Done Events"
+              events={doneEvents}
+              total={doneTotal}
+              page={search.done_page}
+              size={search.size}
+              onPageChange={(p) => setFilter({ done_page: p })}
+              onDelete={(id, name) => setDeleteTarget({ id, name })}
+            />
+          </div>
         </div>
       </div>
 
@@ -119,14 +229,30 @@ function EventsPage() {
 
 const MONTHS = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
 
-function EventList({ title, events, onDelete }: { title: string; events: EventRow[]; onDelete: (id: string, name: string) => void }) {
-  const pagination = usePagination(events, 8);
+function EventList({
+  title,
+  events,
+  total,
+  page,
+  size,
+  onPageChange,
+  onDelete,
+}: {
+  title: string;
+  events: EventRow[];
+  total: number;
+  page: number;
+  size: number;
+  onPageChange: (p: number) => void;
+  onDelete: (id: string, name: string) => void;
+}) {
+  const totalPages = Math.max(1, Math.ceil(total / size));
   return (
     <Card>
       <CardHead title={title} action="Calendar →" />
       <CardBody className="space-y-2">
         {events.length === 0 && <div className="text-[11px] text-text-3">No events.</div>}
-        {pagination.pageRows.map((event) => {
+        {events.map((event) => {
           const d = event.event_date ? new Date(event.event_date) : null;
           const day = d ? String(d.getDate()).padStart(2, "0") : "—";
           const month = d ? MONTHS[d.getMonth()] : "—";
@@ -158,14 +284,14 @@ function EventList({ title, events, onDelete }: { title: string; events: EventRo
           );
         })}
       </CardBody>
-      {events.length > 0 && (
+      {total > 0 && (
         <TablePagination
-          page={pagination.page}
-          pageSize={pagination.pageSize}
-          total={pagination.total}
-          totalPages={pagination.totalPages}
-          onPageChange={pagination.setPage}
-          onPageSizeChange={pagination.setPageSize}
+          page={page}
+          pageSize={size}
+          total={total}
+          totalPages={totalPages}
+          onPageChange={onPageChange}
+          onPageSizeChange={() => {}}
           pageSizes={[8, 20, 50]}
         />
       )}
@@ -179,13 +305,11 @@ function CreateEventDialog({ onCreate }: { onCreate: (data: { name: string; even
 
   const handleSave = (state: EventFormState, eventId: string | null) => {
     if (eventId) {
-      // Event was already persisted step-by-step — just refresh the list
       qc.invalidateQueries({ queryKey: ["events"] });
       qc.invalidateQueries({ queryKey: ["events-analytics"] });
       qc.invalidateQueries({ queryKey: ["live-analytics"] });
       toast.success("Event created");
     } else {
-      // Fallback: user skipped draft saves (shouldn't happen with new flow)
       onCreate({
         name: state.details.name,
         eventDate: state.details.date || null,
@@ -262,7 +386,8 @@ export function RepeatingRows({
           <div className="grid gap-3 md:grid-cols-2">
             {labels.map((label) => (
               <Field key={label} label={label}>
-                <Input
+                <input
+                  className="w-full rounded-md border border-border bg-white px-3 py-1.5 text-[12px] text-foreground outline-none focus:border-gold-3"
                   placeholder={label}
                   value={row[label] ?? ""}
                   onChange={(e) => update(index, label, e.target.value)}

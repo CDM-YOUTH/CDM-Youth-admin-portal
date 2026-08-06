@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Papa from "papaparse";
 import { downloadXlsx } from "@/lib/export-xlsx";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { toast } from "sonner";
 import { Download, MoreVertical, Trash2, BadgeCheck, Clock, Plus } from "lucide-react";
+import { type PagedResponse } from "@/lib/api/fetch-api";
 import { Topbar } from "@/components/admin/layout/topbar";
 import { Card, CardBody, Pill } from "@/components/admin/composables/ui-bits";
-import { TablePagination, usePagination } from "@/components/admin/composables/tables/table-pagination";
+import { TablePagination } from "@/components/admin/composables/tables/table-pagination";
 import {
   ColumnFilter,
   ColumnHeader,
@@ -21,6 +22,7 @@ import { RecordFormDialog, type FieldDef } from "@/components/admin/composables/
 import { ORGANIZATION } from "@/lib/mock-data";
 import { YouthSearchInput, type PickedYouth } from "@/components/admin/composables/pickers/youth-search-input";
 import { fetchOrg, type OrgTree } from "@/lib/db/org";
+import { useAdminScope } from "@/lib/hooks/use-admin-scope";
 import {
   Dialog,
   DialogContent,
@@ -35,9 +37,10 @@ import {
   bulkEnrollRows,
   createEnrollment,
   deleteEnrollment,
-  listEnrollments,
+  listEnrollmentsPaged,
   updateEnrollmentStatus,
   type BulkEnrollRow,
+  type EnrollmentRow,
 } from "@/lib/db/youth-records/enrollments";
 import {
   DropdownMenu,
@@ -57,6 +60,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+const CURRENT_YEAR = new Date().getFullYear();
+const AVAILABLE_YEARS = Array.from({ length: CURRENT_YEAR - 2022 }, (_, i) => CURRENT_YEAR - i);
+
 const filterValueSchema = fallback(
   z
     .object({
@@ -68,12 +74,17 @@ const filterValueSchema = fallback(
 );
 
 const enrollmentSearchSchema = z.object({
+  // Server-side params
   year: fallback(z.number(), CURRENT_YEAR).default(CURRENT_YEAR),
   q: fallback(z.string(), "").default(""),
+  status: fallback(z.string(), "").default(""),
+  deanery_id: fallback(z.string(), "").default(""),
+  parish_id: fallback(z.string(), "").default(""),
+  page: fallback(z.number().int().min(1), 1).default(1),
+  size: fallback(z.number().int().min(1).max(100), 25).default(25),
+  // Client-side column filters on current page
   f_cdm: filterValueSchema,
   f_name: filterValueSchema,
-  f_deanery: filterValueSchema,
-  f_parish: filterValueSchema,
   f_category: filterValueSchema,
   f_payment: filterValueSchema,
 });
@@ -106,11 +117,26 @@ function EnrollmentPage() {
   const [statusTarget, setStatusTarget] = useState<null | { id: string; name: string; nextStatus: "paid" | "pending" }>(null);
   const [importResult, setImportResult] = useState<null | { inserted: number; missing: string[]; total: number }>(null);
   const qc = useQueryClient();
+  const scope = useAdminScope();
+  const deaneryId = scope.deaneryId || search.deanery_id;
+  const parishId  = scope.parishId  || search.parish_id;
   const { data: org } = useQuery({ queryKey: ["org"], queryFn: fetchOrg });
-  const { data: enrollments = [], isLoading } = useQuery({
-    queryKey: ["enrollments", search.year],
-    queryFn: () => listEnrollments(search.year),
+  const { data: resp, isLoading } = useQuery({
+    queryKey: ["enrollments", search.year, search.page - 1, search.size, search.q, search.status, deaneryId, parishId],
+    queryFn: () =>
+      listEnrollmentsPaged({
+        page: search.page - 1,
+        size: search.size,
+        year: search.year || null,
+        q: search.q,
+        status: search.status || null,
+        deaneryId: deaneryId || null,
+        parishId:  parishId  || null,
+      }),
+    placeholderData: keepPreviousData,
   });
+  const total = resp?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / search.size));
   const createMut = useMutation({
     mutationFn: (vals: { cdmId: string; paymentRef?: string }) =>
       createEnrollment({ cdmId: vals.cdmId, paymentRef: vals.paymentRef || null, year: search.year }),
@@ -154,19 +180,12 @@ function EnrollmentPage() {
     onError: (e: Error) => toast.error(e.message),
   });
   const setFilter = (patch: Partial<EnrollmentSearch>) => {
-    navigate({ search: (prev: EnrollmentSearch) => ({ ...prev, ...patch }), replace: true });
-  };
-  const setDeaneryFilter = (v: ColumnFilterValue | undefined) => {
-    navigate({
-      search: (prev: EnrollmentSearch) => ({ ...prev, f_deanery: v, f_parish: undefined }),
-      replace: true,
-    });
+    navigate({ search: (prev: EnrollmentSearch) => ({ ...prev, ...patch, page: 1 }), replace: true });
   };
 
-  const enrollmentRows = useMemo(() => {
-    const q = search.q.trim().toLowerCase();
-    return enrollments
-      .map((e) => ({
+  const enrollmentRows = useMemo(
+    () =>
+      (resp?.data ?? []).map((e) => ({
         id: e.id,
         cdmId: e.youth?.cdm_id ?? "",
         name: e.youth?.full_name ?? "",
@@ -175,34 +194,26 @@ function EnrollmentPage() {
         category: e.youth?.category ?? "",
         fee: FEE_BY_CATEGORY[e.youth?.category ?? ""] ?? "KES 500",
         paymentStatus: e.status === "paid" ? "approved" : "pending",
-      }))
-      .filter((row) => {
-        if (!applyColumnFilter(row.cdmId, search.f_cdm)) return false;
-        if (!applyColumnFilter(row.name, search.f_name)) return false;
-        if (!applyColumnFilter(row.deaneryName, search.f_deanery)) return false;
-        if (!applyColumnFilter(row.parishName, search.f_parish)) return false;
-        if (!applyColumnFilter(row.category, search.f_category)) return false;
-        if (!applyColumnFilter(row.paymentStatus, search.f_payment)) return false;
-        if (q) {
-          const haystack = [row.cdmId, row.name, row.parishName, row.deaneryName].join(" ").toLowerCase();
-          if (!haystack.includes(q)) return false;
-        }
-        return true;
-      });
-  }, [search, enrollments]);
+      })),
+    [resp],
+  );
 
-  const pagination = usePagination(enrollmentRows, 10);
+  // Client-side column filters on current page
+  const displayRows = useMemo(() => {
+    if (!search.f_cdm && !search.f_name && !search.f_category && !search.f_payment) return enrollmentRows;
+    return enrollmentRows.filter((row) => {
+      if (!applyColumnFilter(row.cdmId, search.f_cdm)) return false;
+      if (!applyColumnFilter(row.name, search.f_name)) return false;
+      if (!applyColumnFilter(row.category, search.f_category)) return false;
+      if (!applyColumnFilter(row.paymentStatus, search.f_payment)) return false;
+      return true;
+    });
+  }, [enrollmentRows, search.f_cdm, search.f_name, search.f_category, search.f_payment]);
 
-  const deaneryOptions = ORGANIZATION.map((d) => ({ value: d.name, label: d.name }));
-  const selectedDeaneryName =
-    search.f_deanery?.operator === "equals" ? search.f_deanery.value : "";
-  const parishScope = selectedDeaneryName
-    ? ORGANIZATION.find((d) => d.name === selectedDeaneryName)?.parishes ?? []
-    : ORGANIZATION.flatMap((d) => d.parishes);
-  const parishOptions = Array.from(new Set(parishScope.map((p) => p.name))).map((name) => ({
-    value: name,
-    label: name,
-  }));
+  const deaneryOptions = (org?.deaneries ?? []).map((d) => ({ value: d.id, label: d.name }));
+  const parishOptions = (org?.parishes ?? [])
+    .filter((p) => !deaneryId || p.deanery_id === deaneryId)
+    .map((p) => ({ value: p.id, label: p.name }));
 
   const enrollFields: FieldDef[] = [
     { key: "cdmId", label: "CDM No.", required: true, placeholder: "CDM-2026-00001" },
@@ -386,14 +397,27 @@ function EnrollmentPage() {
                           label="Deanery"
                           mode="select"
                           options={deaneryOptions}
-                          value={search.f_deanery}
-                          onChange={setDeaneryFilter}
+                          value={deaneryId ? { operator: "equals", value: deaneryId } : undefined}
+                          onChange={(v) => setFilter({ deanery_id: v?.value ?? "", parish_id: "" })}
+                          disabled={!!scope.deaneryId}
                         />
                       }
                     />
                   </th>
                   <th className="label-eyebrow px-3.5 py-2.5 text-left">
-                    <ColumnHeader label="Parish" filter={fc("f_parish", "Parish", "select", parishOptions)} />
+                    <ColumnHeader
+                      label="Parish"
+                      filter={
+                        <ColumnFilter
+                          label="Parish"
+                          mode="select"
+                          options={parishOptions}
+                          value={parishId ? { operator: "equals", value: parishId } : undefined}
+                          onChange={(v) => setFilter({ parish_id: v?.value ?? "" })}
+                          disabled={!!scope.parishId}
+                        />
+                      }
+                    />
                   </th>
                   <th className="label-eyebrow px-3.5 py-2.5 text-left">
                     <ColumnHeader
@@ -415,7 +439,7 @@ function EnrollmentPage() {
                 </tr>
               </thead>
               <tbody>
-                {pagination.pageRows.map((row) => (
+                {displayRows.map((row) => (
                   <tr key={row.id} className="border-b border-border/30 last:border-0 hover:bg-bg-3">
                     <td className="px-3.5 py-2.5 font-mono text-[10px] font-bold text-gold">{row.cdmId}</td>
                     <td className="px-3.5 py-2.5 text-[11px] font-semibold text-foreground">{row.name}</td>
@@ -459,7 +483,7 @@ function EnrollmentPage() {
                     </td>
                   </tr>
                 ))}
-                {pagination.pageRows.length === 0 && (
+                {displayRows.length === 0 && !isLoading && (
                   <tr>
                     <td colSpan={8} className="px-3.5 py-6 text-center text-[11px] text-text-3">
                       No enrollments match your search.
@@ -469,12 +493,12 @@ function EnrollmentPage() {
               </tbody>
             </table>
             <TablePagination
-              page={pagination.page}
-              pageSize={pagination.pageSize}
-              total={pagination.total}
-              totalPages={pagination.totalPages}
-              onPageChange={pagination.setPage}
-              onPageSizeChange={pagination.setPageSize}
+              page={search.page}
+              pageSize={search.size}
+              total={total}
+              totalPages={totalPages}
+              onPageChange={(p) => navigate({ search: (prev: EnrollmentSearch) => ({ ...prev, page: p }), replace: true })}
+              onPageSizeChange={(s) => navigate({ search: (prev: EnrollmentSearch) => ({ ...prev, size: s, page: 1 }), replace: true })}
             />
           </CardBody>
         </Card>
@@ -656,9 +680,6 @@ function EnrollDialog({
 /* ------------------------------------------------------------------ */
 /* Script — constants & config                                         */
 /* ------------------------------------------------------------------ */
-
-const CURRENT_YEAR = new Date().getFullYear();
-const AVAILABLE_YEARS = Array.from({ length: CURRENT_YEAR - 2022 }, (_, i) => CURRENT_YEAR - i);
 
 const FEE_BY_CATEGORY: Record<string, string> = {
   Primary: "KES 300",

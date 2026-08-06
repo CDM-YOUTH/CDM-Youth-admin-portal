@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { likePattern } from "@/lib/utils";
 
 export type EventRow = {
   id: string;
@@ -52,7 +53,10 @@ export type EventRegistration = {
   youth: {
     cdm_id: string;
     full_name: string;
+    phone: string | null;
+    deanery: { name: string } | null;
     parish: { name: string } | null;
+    outstation: { name: string } | null;
   } | null;
 };
 
@@ -269,7 +273,7 @@ export async function getEventFull(eventId: string): Promise<EventFull> {
       .order("position"),
     supabase
       .from("event_registrations")
-      .select("id, guest_name, guest_phone, guest_email, notes, created_at, youth:youths(cdm_id, full_name, parish:parishes(name))")
+      .select("id, guest_name, guest_phone, guest_email, notes, created_at, youth:youths(cdm_id, full_name, phone, deanery:deaneries(name), parish:parishes(name), outstation:outstations(name))")
       .eq("event_id", eventId)
       .order("created_at", { ascending: false })
       .limit(500),
@@ -377,6 +381,42 @@ export async function listRegistrations(eventId: string) {
     .limit(2000);
   if (error) throw error;
   return data ?? [];
+}
+
+export async function listEventsPaged(opts: {
+  page?: number;
+  size?: number;
+  q?: string;
+  deaneryId?: string | null;
+  parishId?: string | null;
+  period?: "upcoming" | "done" | null;
+}): Promise<{ data: EventRow[]; total: number; page: number; size: number }> {
+  const page = opts.page ?? 0;
+  const size = Math.min(opts.size ?? 25, 100);
+  const today = new Date().toISOString().slice(0, 10);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let query = (supabase as any)
+    .from("events")
+    .select(
+      "id, name, event_date, venue, description, poster_url, organization_level, deanery:deaneries(name), parish:parishes(name)",
+      { count: "exact" },
+    )
+    .order("event_date", { ascending: opts.period === "upcoming" })
+    .range(page * size, page * size + size - 1);
+
+  if (opts.deaneryId) query = query.eq("deanery_id", opts.deaneryId);
+  if (opts.parishId)  query = query.eq("parish_id",  opts.parishId);
+  if (opts.period === "upcoming") query = query.gte("event_date", today);
+  if (opts.period === "done")     query = query.lt("event_date",  today);
+  if (opts.q?.trim()) {
+    const t = likePattern(opts.q);
+    query = query.or(`name.ilike.${t},venue.ilike.${t}`);
+  }
+
+  const { data, error, count } = await query;
+  if (error) throw error;
+  return { data: (data ?? []) as unknown as EventRow[], total: count ?? 0, page, size };
 }
 
 export async function getEventsAnalytics() {
