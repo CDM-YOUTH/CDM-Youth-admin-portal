@@ -9,10 +9,17 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as PortalRouteImport } from './routes/portal'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PortalIndexRouteImport } from './routes/portal.index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
+import { Route as PortalFormationRouteImport } from './routes/portal.formation'
+import { Route as PortalEventsRouteImport } from './routes/portal.events'
+import { Route as PortalEnrollRouteImport } from './routes/portal.enroll'
+import { Route as PortalAuthRouteImport } from './routes/portal.auth'
+import { Route as PortalAccountRouteImport } from './routes/portal.account'
 import { Route as CheckinEventIdRouteImport } from './routes/checkin.$eventId'
 import { Route as AdminYouthsRouteImport } from './routes/admin.youths'
 import { Route as AdminWelfareRouteImport } from './routes/admin.welfare'
@@ -27,9 +34,15 @@ import { Route as AdminEventsRouteImport } from './routes/admin.events'
 import { Route as AdminEnrollmentRouteImport } from './routes/admin.enrollment'
 import { Route as AdminCusaRouteImport } from './routes/admin.cusa'
 import { Route as AdminAuditRouteImport } from './routes/admin.audit'
+import { Route as PortalEventsEventIdRouteImport } from './routes/portal.events.$eventId'
 import { Route as AdminEventEventIdRouteImport } from './routes/admin.event.$eventId'
 import { Route as AdminEventCheckinEventIdRouteImport } from './routes/admin.event-checkin.$eventId'
 
+const PortalRoute = PortalRouteImport.update({
+  id: '/portal',
+  path: '/portal',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
@@ -45,10 +58,40 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PortalIndexRoute = PortalIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => PortalRoute,
+} as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AdminRoute,
+} as any)
+const PortalFormationRoute = PortalFormationRouteImport.update({
+  id: '/formation',
+  path: '/formation',
+  getParentRoute: () => PortalRoute,
+} as any)
+const PortalEventsRoute = PortalEventsRouteImport.update({
+  id: '/events',
+  path: '/events',
+  getParentRoute: () => PortalRoute,
+} as any)
+const PortalEnrollRoute = PortalEnrollRouteImport.update({
+  id: '/enroll',
+  path: '/enroll',
+  getParentRoute: () => PortalRoute,
+} as any)
+const PortalAuthRoute = PortalAuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => PortalRoute,
+} as any)
+const PortalAccountRoute = PortalAccountRouteImport.update({
+  id: '/account',
+  path: '/account',
+  getParentRoute: () => PortalRoute,
 } as any)
 const CheckinEventIdRoute = CheckinEventIdRouteImport.update({
   id: '/checkin/$eventId',
@@ -120,6 +163,11 @@ const AdminAuditRoute = AdminAuditRouteImport.update({
   path: '/audit',
   getParentRoute: () => AdminRoute,
 } as any)
+const PortalEventsEventIdRoute = PortalEventsEventIdRouteImport.update({
+  id: '/$eventId',
+  path: '/$eventId',
+  getParentRoute: () => PortalEventsRoute,
+} as any)
 const AdminEventEventIdRoute = AdminEventEventIdRouteImport.update({
   id: '/event/$eventId',
   path: '/event/$eventId',
@@ -136,6 +184,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/login': typeof LoginRoute
+  '/portal': typeof PortalRouteWithChildren
   '/admin/audit': typeof AdminAuditRoute
   '/admin/cusa': typeof AdminCusaRoute
   '/admin/enrollment': typeof AdminEnrollmentRoute
@@ -150,9 +199,16 @@ export interface FileRoutesByFullPath {
   '/admin/welfare': typeof AdminWelfareRoute
   '/admin/youths': typeof AdminYouthsRoute
   '/checkin/$eventId': typeof CheckinEventIdRoute
+  '/portal/account': typeof PortalAccountRoute
+  '/portal/auth': typeof PortalAuthRoute
+  '/portal/enroll': typeof PortalEnrollRoute
+  '/portal/events': typeof PortalEventsRouteWithChildren
+  '/portal/formation': typeof PortalFormationRoute
   '/admin/': typeof AdminIndexRoute
+  '/portal/': typeof PortalIndexRoute
   '/admin/event-checkin/$eventId': typeof AdminEventCheckinEventIdRoute
   '/admin/event/$eventId': typeof AdminEventEventIdRoute
+  '/portal/events/$eventId': typeof PortalEventsEventIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -171,15 +227,23 @@ export interface FileRoutesByTo {
   '/admin/welfare': typeof AdminWelfareRoute
   '/admin/youths': typeof AdminYouthsRoute
   '/checkin/$eventId': typeof CheckinEventIdRoute
+  '/portal/account': typeof PortalAccountRoute
+  '/portal/auth': typeof PortalAuthRoute
+  '/portal/enroll': typeof PortalEnrollRoute
+  '/portal/events': typeof PortalEventsRouteWithChildren
+  '/portal/formation': typeof PortalFormationRoute
   '/admin': typeof AdminIndexRoute
+  '/portal': typeof PortalIndexRoute
   '/admin/event-checkin/$eventId': typeof AdminEventCheckinEventIdRoute
   '/admin/event/$eventId': typeof AdminEventEventIdRoute
+  '/portal/events/$eventId': typeof PortalEventsEventIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/login': typeof LoginRoute
+  '/portal': typeof PortalRouteWithChildren
   '/admin/audit': typeof AdminAuditRoute
   '/admin/cusa': typeof AdminCusaRoute
   '/admin/enrollment': typeof AdminEnrollmentRoute
@@ -194,9 +258,16 @@ export interface FileRoutesById {
   '/admin/welfare': typeof AdminWelfareRoute
   '/admin/youths': typeof AdminYouthsRoute
   '/checkin/$eventId': typeof CheckinEventIdRoute
+  '/portal/account': typeof PortalAccountRoute
+  '/portal/auth': typeof PortalAuthRoute
+  '/portal/enroll': typeof PortalEnrollRoute
+  '/portal/events': typeof PortalEventsRouteWithChildren
+  '/portal/formation': typeof PortalFormationRoute
   '/admin/': typeof AdminIndexRoute
+  '/portal/': typeof PortalIndexRoute
   '/admin/event-checkin/$eventId': typeof AdminEventCheckinEventIdRoute
   '/admin/event/$eventId': typeof AdminEventEventIdRoute
+  '/portal/events/$eventId': typeof PortalEventsEventIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -204,6 +275,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/login'
+    | '/portal'
     | '/admin/audit'
     | '/admin/cusa'
     | '/admin/enrollment'
@@ -218,9 +290,16 @@ export interface FileRouteTypes {
     | '/admin/welfare'
     | '/admin/youths'
     | '/checkin/$eventId'
+    | '/portal/account'
+    | '/portal/auth'
+    | '/portal/enroll'
+    | '/portal/events'
+    | '/portal/formation'
     | '/admin/'
+    | '/portal/'
     | '/admin/event-checkin/$eventId'
     | '/admin/event/$eventId'
+    | '/portal/events/$eventId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -239,14 +318,22 @@ export interface FileRouteTypes {
     | '/admin/welfare'
     | '/admin/youths'
     | '/checkin/$eventId'
+    | '/portal/account'
+    | '/portal/auth'
+    | '/portal/enroll'
+    | '/portal/events'
+    | '/portal/formation'
     | '/admin'
+    | '/portal'
     | '/admin/event-checkin/$eventId'
     | '/admin/event/$eventId'
+    | '/portal/events/$eventId'
   id:
     | '__root__'
     | '/'
     | '/admin'
     | '/login'
+    | '/portal'
     | '/admin/audit'
     | '/admin/cusa'
     | '/admin/enrollment'
@@ -261,20 +348,35 @@ export interface FileRouteTypes {
     | '/admin/welfare'
     | '/admin/youths'
     | '/checkin/$eventId'
+    | '/portal/account'
+    | '/portal/auth'
+    | '/portal/enroll'
+    | '/portal/events'
+    | '/portal/formation'
     | '/admin/'
+    | '/portal/'
     | '/admin/event-checkin/$eventId'
     | '/admin/event/$eventId'
+    | '/portal/events/$eventId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRouteWithChildren
   LoginRoute: typeof LoginRoute
+  PortalRoute: typeof PortalRouteWithChildren
   CheckinEventIdRoute: typeof CheckinEventIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/portal': {
+      id: '/portal'
+      path: '/portal'
+      fullPath: '/portal'
+      preLoaderRoute: typeof PortalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
@@ -296,12 +398,54 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/portal/': {
+      id: '/portal/'
+      path: '/'
+      fullPath: '/portal/'
+      preLoaderRoute: typeof PortalIndexRouteImport
+      parentRoute: typeof PortalRoute
+    }
     '/admin/': {
       id: '/admin/'
       path: '/'
       fullPath: '/admin/'
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof AdminRoute
+    }
+    '/portal/formation': {
+      id: '/portal/formation'
+      path: '/formation'
+      fullPath: '/portal/formation'
+      preLoaderRoute: typeof PortalFormationRouteImport
+      parentRoute: typeof PortalRoute
+    }
+    '/portal/events': {
+      id: '/portal/events'
+      path: '/events'
+      fullPath: '/portal/events'
+      preLoaderRoute: typeof PortalEventsRouteImport
+      parentRoute: typeof PortalRoute
+    }
+    '/portal/enroll': {
+      id: '/portal/enroll'
+      path: '/enroll'
+      fullPath: '/portal/enroll'
+      preLoaderRoute: typeof PortalEnrollRouteImport
+      parentRoute: typeof PortalRoute
+    }
+    '/portal/auth': {
+      id: '/portal/auth'
+      path: '/auth'
+      fullPath: '/portal/auth'
+      preLoaderRoute: typeof PortalAuthRouteImport
+      parentRoute: typeof PortalRoute
+    }
+    '/portal/account': {
+      id: '/portal/account'
+      path: '/account'
+      fullPath: '/portal/account'
+      preLoaderRoute: typeof PortalAccountRouteImport
+      parentRoute: typeof PortalRoute
     }
     '/checkin/$eventId': {
       id: '/checkin/$eventId'
@@ -401,6 +545,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAuditRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/portal/events/$eventId': {
+      id: '/portal/events/$eventId'
+      path: '/$eventId'
+      fullPath: '/portal/events/$eventId'
+      preLoaderRoute: typeof PortalEventsEventIdRouteImport
+      parentRoute: typeof PortalEventsRoute
+    }
     '/admin/event/$eventId': {
       id: '/admin/event/$eventId'
       path: '/event/$eventId'
@@ -458,10 +609,44 @@ const AdminRouteChildren: AdminRouteChildren = {
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
+interface PortalEventsRouteChildren {
+  PortalEventsEventIdRoute: typeof PortalEventsEventIdRoute
+}
+
+const PortalEventsRouteChildren: PortalEventsRouteChildren = {
+  PortalEventsEventIdRoute: PortalEventsEventIdRoute,
+}
+
+const PortalEventsRouteWithChildren = PortalEventsRoute._addFileChildren(
+  PortalEventsRouteChildren,
+)
+
+interface PortalRouteChildren {
+  PortalAccountRoute: typeof PortalAccountRoute
+  PortalAuthRoute: typeof PortalAuthRoute
+  PortalEnrollRoute: typeof PortalEnrollRoute
+  PortalEventsRoute: typeof PortalEventsRouteWithChildren
+  PortalFormationRoute: typeof PortalFormationRoute
+  PortalIndexRoute: typeof PortalIndexRoute
+}
+
+const PortalRouteChildren: PortalRouteChildren = {
+  PortalAccountRoute: PortalAccountRoute,
+  PortalAuthRoute: PortalAuthRoute,
+  PortalEnrollRoute: PortalEnrollRoute,
+  PortalEventsRoute: PortalEventsRouteWithChildren,
+  PortalFormationRoute: PortalFormationRoute,
+  PortalIndexRoute: PortalIndexRoute,
+}
+
+const PortalRouteWithChildren =
+  PortalRoute._addFileChildren(PortalRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
   LoginRoute: LoginRoute,
+  PortalRoute: PortalRouteWithChildren,
   CheckinEventIdRoute: CheckinEventIdRoute,
 }
 export const routeTree = rootRouteImport

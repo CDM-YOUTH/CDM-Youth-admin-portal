@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { logEnrollmentAudit } from "../audit";
+import { likePattern } from "@/lib/utils";
 
 export type EnrollmentRow = {
   id: string;
@@ -31,6 +32,50 @@ export async function listEnrollments(year?: number): Promise<EnrollmentRow[]> {
   const { data, error } = await q;
   if (error) throw error;
   return (data ?? []) as unknown as EnrollmentRow[];
+}
+
+export async function listEnrollmentsPaged(opts: {
+  page?: number;
+  size?: number;
+  q?: string;
+  year?: number | null;
+  status?: string | null;
+  deaneryId?: string | null;
+  parishId?: string | null;
+}): Promise<{ data: EnrollmentRow[]; total: number; page: number; size: number }> {
+  const page = opts.page ?? 0;
+  const size = Math.min(opts.size ?? 25, 100);
+
+  // Use !inner join when filtering on youth columns so non-matching rows are excluded
+  const needsInner = !!(opts.deaneryId || opts.parishId || opts.q?.trim());
+  const youthJoin = needsInner
+    ? "youth:youths!inner(cdm_id, full_name, category, deanery:deaneries(name), parish:parishes(name))"
+    : "youth:youths(cdm_id, full_name, category, deanery:deaneries(name), parish:parishes(name))";
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let query = (supabase as any)
+    .from("enrollments")
+    .select(`*, ${youthJoin}`, { count: "exact" })
+    .order("created_at", { ascending: false })
+    .range(page * size, page * size + size - 1);
+
+  // Own-table filters
+  if (opts.year)   query = query.eq("year", opts.year);
+  if (opts.status) query = query.eq("status", opts.status);
+
+  // Embedded table filters — use real table name "youths", not alias "youth"
+  if (opts.deaneryId) query = query.eq("youths.deanery_id", opts.deaneryId);
+  if (opts.parishId)  query = query.eq("youths.parish_id",  opts.parishId);
+
+  // Text search on youth name / CDM (own columns of the joined table)
+  if (opts.q?.trim()) {
+    const t = likePattern(opts.q);
+    query = query.or(`cdm_id.ilike.${t},full_name.ilike.${t}`, { referencedTable: "youths" });
+  }
+
+  const { data, error, count } = await query;
+  if (error) throw error;
+  return { data: (data ?? []) as unknown as EnrollmentRow[], total: count ?? 0, page, size };
 }
 
 export type EnrollInput = {

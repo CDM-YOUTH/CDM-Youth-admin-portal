@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { MoreVertical, Eye, Pencil, Trash2, BadgeCheck, Truck, PackageCheck, Banknote } from "lucide-react";
 import { Topbar, TopbarButton, TopbarTab } from "@/components/admin/layout/topbar";
@@ -35,7 +35,7 @@ import {
   type StockEntry, type StockEntryInput,
 } from "@/lib/db/assets/uniform-stock-entries";
 import {
-  createUniformSale, deleteUniformSale, listUniformSales,
+  createUniformSale, deleteUniformSale, listUniformSales, listUniformSalesPaged,
   confirmOrder, confirmDispatch, confirmDelivery, recordPayment, updateUniformSale,
   type PaymentStatus, type OrderStage, type UniformSale, type UniformSaleInput, type UniformSaleUpdateInput,
 } from "@/lib/db/assets/uniform-sales";
@@ -56,6 +56,8 @@ function UniformsPage() {
   const [salesRange,   setSalesRange]   = useState<DateRange>(EMPTY_RANGE);
   const [reportRange,  setReportRange]  = useState<DateRange>(EMPTY_RANGE);
   const [salesFilter,  setSalesFilter]  = useState<SalesFilter>("all");
+  const [salesPage,    setSalesPage]    = useState(1);
+  const [salesQ,       setSalesQ]       = useState("");
 
   /* ── SKU dialogs ── */
   const [addSkuOpen, setAddSkuOpen] = useState(false);
@@ -81,8 +83,27 @@ function UniformsPage() {
   const { data: skusRaw    } = useQuery({ queryKey: ["uniform-skus"],    queryFn: listUniformSkus });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: entriesRaw } = useQuery({ queryKey: ["uniform-entries"],  queryFn: listStockEntries as any });
+  // Full list for KPIs and reports tab
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data: salesRaw   } = useQuery({ queryKey: ["uniform-sales"],   queryFn: listUniformSales as any });
+  // Paginated + filtered for the sales table
+  const SALES_PAGE_SIZE = 10;
+  const { data: salesPagedResp } = useQuery({
+    queryKey: ["uniform-sales-paged", salesPage, SALES_PAGE_SIZE, salesQ, salesFilter, salesRange.from?.toISOString(), salesRange.to?.toISOString()],
+    queryFn: () =>
+      listUniformSalesPaged({
+        page: salesPage - 1,
+        size: SALES_PAGE_SIZE,
+        q: salesQ,
+        stage: salesFilter === "pending" ? "pending" : null,
+        paymentStatus:
+          salesFilter === "paid"   ? "paid"     :
+          salesFilter === "unpaid" ? "not_paid" : null,
+        from: salesRange.from?.toISOString().slice(0, 10) ?? null,
+        to:   salesRange.to?.toISOString().slice(0, 10)   ?? null,
+      }),
+    placeholderData: keepPreviousData,
+  });
 
   const skus    = (skusRaw    ?? []) as UniformSku[];
   const entries = (entriesRaw ?? []) as StockEntry[];
@@ -90,12 +111,18 @@ function UniformsPage() {
 
   const isLiveSkus    = skus.length    > 0;
   const isLiveEntries = entries.length > 0;
-  const isLiveSales   = sales.length   > 0;
+  const isLiveSales   = (salesPagedResp?.total ?? 0) > 0 || sales.length > 0;
 
   const displaySkus    = isLiveSkus    ? skus    : MOCK_STOCK;
   const displayEntries = isLiveEntries ? entries : MOCK_ENTRIES;
-  const displaySales   = isLiveSales   ? sales   : MOCK_SALES;
+  // displaySales is for KPIs and reports; sales table uses salesPagedResp
+  const displaySales   = sales.length > 0 ? sales : MOCK_SALES;
   const skuNames       = displaySkus.map((s) => s.name);
+
+  // Server-paginated rows for the sales tab table
+  const pagedSaleRows    = (salesPagedResp?.data ?? (sales.length > 0 ? [] : MOCK_SALES)) as UniformSale[];
+  const pagedSalesTotal  = salesPagedResp?.total ?? (sales.length > 0 ? 0 : MOCK_SALES.length);
+  const pagedSalesTotalPages = Math.max(1, Math.ceil(pagedSalesTotal / SALES_PAGE_SIZE));
 
   /* ── derived ── */
   const filteredEntries = useMemo(
@@ -103,17 +130,8 @@ function UniformsPage() {
     [displayEntries, stockRange],
   );
 
-  const filteredSales = useMemo(() => {
-    let s = displaySales.filter((x) => inDateRange(x.ordered_at, salesRange));
-    if (salesFilter === "pending") s = s.filter((x) => !x.delivered_at);
-    if (salesFilter === "paid")    s = s.filter((x) => x.payment_status === "paid");
-    if (salesFilter === "unpaid")  s = s.filter((x) => x.payment_status !== "paid");
-    return s;
-  }, [displaySales, salesRange, salesFilter]);
-
   const skuPagination   = usePagination(displaySkus, 10);
   const entryPagination = usePagination(filteredEntries, 10);
-  const salesPagination = usePagination(filteredSales, 10);
 
   const stockKpis = useMemo(() => ({
     totalStock: displaySkus.reduce((a, u) => a + u.in_stock, 0),
@@ -230,6 +248,10 @@ function UniformsPage() {
     onSuccess: () => { toast.success("Sale deleted."); qc.invalidateQueries({ queryKey: ["uniform-sales"] }); setDeleteSale(null); },
     onError: (e: Error) => toast.error(e.message),
   });
+
+  const changeSalesFilter = (f: SalesFilter) => { setSalesFilter(f); setSalesPage(1); };
+  const changeSalesRange  = (r: DateRange)   => { setSalesRange(r);  setSalesPage(1); };
+  const changeSalesQ      = (q: string)      => { setSalesQ(q);      setSalesPage(1); };
 
   /* ── topbar action ── */
   const actionBtn =
@@ -426,12 +448,18 @@ function UniformsPage() {
 
             {/* Filter bar */}
             <div className="mb-3 flex flex-wrap items-center gap-2">
-              <DateRangeFilter value={salesRange} onChange={setSalesRange} />
+              <input
+                value={salesQ}
+                onChange={(e) => changeSalesQ(e.target.value)}
+                placeholder="Search youth, item, parish…"
+                className="min-w-[200px] rounded-md border border-black/20 bg-white px-3 py-1.5 text-[12px] text-black/70 placeholder:text-gray-400 outline-none hover:border-gold-3/50 focus:border-gold-3"
+              />
+              <DateRangeFilter value={salesRange} onChange={changeSalesRange} />
               <div className="mx-1 h-4 w-px bg-border" />
               {(["all", "pending", "paid", "unpaid"] as const).map((f) => (
                 <button
                   key={f}
-                  onClick={() => setSalesFilter(f)}
+                  onClick={() => changeSalesFilter(f)}
                   className={`rounded-full px-3 py-1 text-[10px] font-bold transition-colors ${
                     salesFilter === f ? "bg-danger text-white" : "bg-bg-3 text-text-2 hover:bg-bg-4"
                   }`}
@@ -440,7 +468,7 @@ function UniformsPage() {
                 </button>
               ))}
               <span className="ml-auto text-[9px] font-bold text-text-4">
-                {filteredSales.length} record{filteredSales.length !== 1 ? "s" : ""}
+                {pagedSalesTotal} record{pagedSalesTotal !== 1 ? "s" : ""}
               </span>
             </div>
 
@@ -461,13 +489,13 @@ function UniformsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredSales.length === 0 ? (
+                  {pagedSaleRows.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={9} className="py-6 text-center text-[11px] text-text-3">
                         No sales for this filter.
                       </TableCell>
                     </TableRow>
-                  ) : salesPagination.pageRows.map((s) => {
+                  ) : pagedSaleRows.map((s) => {
                     const total       = s.quantity * Number(s.unit_price);
                     const outstanding = total - Number(s.paid_amount);
                     return (
@@ -544,14 +572,14 @@ function UniformsPage() {
                   })}
                 </TableBody>
               </Table>
-              {filteredSales.length > 0 && (
+              {pagedSalesTotal > 0 && (
                 <TablePagination
-                  page={salesPagination.page}
-                  pageSize={salesPagination.pageSize}
-                  total={salesPagination.total}
-                  totalPages={salesPagination.totalPages}
-                  onPageChange={salesPagination.setPage}
-                  onPageSizeChange={salesPagination.setPageSize}
+                  page={salesPage}
+                  pageSize={SALES_PAGE_SIZE}
+                  total={pagedSalesTotal}
+                  totalPages={pagedSalesTotalPages}
+                  onPageChange={setSalesPage}
+                  onPageSizeChange={() => {}}
                 />
               )}
             </div>

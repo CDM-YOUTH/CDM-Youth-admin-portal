@@ -1,16 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { MoreVertical, Pencil, Trash2, Plus } from "lucide-react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { toast } from "sonner";
+import { type PagedResponse } from "@/lib/api/fetch-api";
 import { Topbar } from "@/components/admin/layout/topbar";
 import { Card, CardBody, Pill } from "@/components/admin/composables/ui-bits";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CUSA_INSTITUTIONS } from "@/lib/cusa-data";
-import { ORGANIZATION } from "@/lib/mock-data";
-import { createCusaMember, deleteCusaMember, listCusa, updateCusaMember } from "@/lib/db/youth-records/cusa";
+import { createCusaMember, deleteCusaMember, listCusaPaged, updateCusaMember, type CusaRow } from "@/lib/db/youth-records/cusa";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,7 +28,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { TablePagination, usePagination } from "@/components/admin/composables/tables/table-pagination";
+import { TablePagination } from "@/components/admin/composables/tables/table-pagination";
 import {
   ColumnFilter,
   ColumnHeader,
@@ -61,13 +61,17 @@ const filterValueSchema = fallback(
 );
 
 const cusaSearchSchema = z.object({
+  // Server-side params
   q: fallback(z.string(), "").default(""),
+  institution: fallback(z.string(), "").default(""),
+  deanery_id: fallback(z.string(), "").default(""),
+  parish_id: fallback(z.string(), "").default(""),
+  year: fallback(z.number().int(), new Date().getFullYear()).default(new Date().getFullYear()),
+  page: fallback(z.number().int().min(1), 1).default(1),
+  size: fallback(z.number().int().min(1).max(100), 25).default(25),
+  // Client-side filters on current page
   f_cdm: filterValueSchema,
   f_name: filterValueSchema,
-  f_institution: filterValueSchema,
-  f_deanery: filterValueSchema,
-  f_parish: filterValueSchema,
-  f_outstation: filterValueSchema,
   f_gender: filterValueSchema,
   f_status: filterValueSchema,
 });
@@ -93,7 +97,22 @@ function CusaPage() {
   const [deleteTarget, setDeleteTarget] = useState<null | { id: string; name: string }>(null);
   const qc = useQueryClient();
   const { data: org } = useQuery({ queryKey: ["org"], queryFn: fetchOrg });
-  const { data: cusa = [], isLoading } = useQuery({ queryKey: ["cusa"], queryFn: () => listCusa() });
+  const { data: resp, isLoading } = useQuery({
+    queryKey: ["cusa", search.page - 1, search.size, search.q, search.institution, search.deanery_id, search.parish_id, search.year],
+    queryFn: () =>
+      listCusaPaged({
+        page: search.page - 1,
+        size: search.size,
+        q: search.q,
+        year: search.year || null,
+        institution: search.institution || null,
+        deaneryId: search.deanery_id || null,
+        parishId: search.parish_id || null,
+      }),
+    placeholderData: keepPreviousData,
+  });
+  const total = resp?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / search.size));
   const createMut = useMutation({
     mutationFn: (vals: {
       cdmId?: string | null; fullName: string; gender: "Female" | "Male";
@@ -136,25 +155,12 @@ function CusaPage() {
     onError: (e: Error) => toast.error(e.message),
   });
   const setFilter = (patch: Partial<CusaSearch>) => {
-    navigate({ search: (prev: CusaSearch) => ({ ...prev, ...patch }), replace: true });
-  };
-  const setDeaneryFilter = (v: ColumnFilterValue | undefined) => {
-    // changing deanery clears parish + outstation
-    navigate({
-      search: (prev: CusaSearch) => ({ ...prev, f_deanery: v, f_parish: undefined, f_outstation: undefined }),
-      replace: true,
-    });
-  };
-  const setParishFilter = (v: ColumnFilterValue | undefined) => {
-    navigate({
-      search: (prev: CusaSearch) => ({ ...prev, f_parish: v, f_outstation: undefined }),
-      replace: true,
-    });
+    navigate({ search: (prev: CusaSearch) => ({ ...prev, ...patch, page: 1 }), replace: true });
   };
 
   const allMembers = useMemo(
     () =>
-      cusa.map((m) => ({
+      (resp?.data ?? []).map((m) => ({
         id: m.id,
         cdmId: m.youth?.cdm_id ?? "",
         name: m.youth?.full_name ?? "",
@@ -164,61 +170,27 @@ function CusaPage() {
         year: m.year_of_study ?? "",
         deaneryName: m.youth?.deanery?.name ?? "",
         parishName: m.youth?.parish?.name ?? "",
-        churchName: "",
         status: m.leadership_role ? "active" : "reporting",
       })),
-    [cusa],
+    [resp],
   );
 
-  const filteredMembers = useMemo(() => {
-    const q = search.q.trim().toLowerCase();
-    return allMembers.filter((member) => {
-      if (!applyColumnFilter(member.cdmId, search.f_cdm)) return false;
-      if (!applyColumnFilter(member.name, search.f_name)) return false;
-      if (!applyColumnFilter(member.institution, search.f_institution)) return false;
-      if (!applyColumnFilter(member.deaneryName, search.f_deanery)) return false;
-      if (!applyColumnFilter(member.parishName, search.f_parish)) return false;
-      if (!applyColumnFilter(member.churchName, search.f_outstation)) return false;
-      if (!applyColumnFilter(member.gender, search.f_gender)) return false;
-      if (!applyColumnFilter(member.status, search.f_status)) return false;
-      if (q) {
-        const haystack = [
-          member.cdmId,
-          member.name,
-          member.institution,
-          member.deaneryName,
-          member.parishName,
-          member.churchName,
-          member.course,
-        ]
-          .join(" ")
-          .toLowerCase();
-        if (!haystack.includes(q)) return false;
-      }
+  // Client-side column filters on current page
+  const displayMembers = useMemo(() => {
+    if (!search.f_cdm && !search.f_name && !search.f_gender && !search.f_status) return allMembers;
+    return allMembers.filter((m) => {
+      if (!applyColumnFilter(m.cdmId, search.f_cdm)) return false;
+      if (!applyColumnFilter(m.name, search.f_name)) return false;
+      if (!applyColumnFilter(m.gender, search.f_gender)) return false;
+      if (!applyColumnFilter(m.status, search.f_status)) return false;
       return true;
     });
-  }, [allMembers, search]);
+  }, [allMembers, search.f_cdm, search.f_name, search.f_gender, search.f_status]);
 
-  const pagination = usePagination(filteredMembers, 15);
-
-  const deaneryOptions = ORGANIZATION.map((d) => ({ value: d.name, label: d.name }));
-  const selectedDeaneryName =
-    search.f_deanery?.operator === "equals" ? search.f_deanery.value : "";
-  const selectedParishName =
-    search.f_parish?.operator === "equals" ? search.f_parish.value : "";
-  const parishScope = selectedDeaneryName
-    ? ORGANIZATION.find((d) => d.name === selectedDeaneryName)?.parishes ?? []
-    : ORGANIZATION.flatMap((d) => d.parishes);
-  const parishOptions = Array.from(new Set(parishScope.map((p) => p.name))).map((name) => ({
-    value: name,
-    label: name,
-  }));
-  const outstationScope = selectedParishName
-    ? parishScope.filter((p) => p.name === selectedParishName)
-    : parishScope;
-  const outstationOptions = Array.from(
-    new Set(outstationScope.flatMap((p) => p.churches.map((c) => c.name))),
-  ).map((name) => ({ value: name, label: name }));
+  const deaneryOptions = (org?.deaneries ?? []).map((d) => ({ value: d.id, label: d.name }));
+  const parishOptions = (org?.parishes ?? [])
+    .filter((p) => !search.deanery_id || p.deanery_id === search.deanery_id)
+    .map((p) => ({ value: p.id, label: p.name }));
 
 const fc = (key: keyof CusaSearch, label: string, mode: "text" | "select" = "text", options?: { value: string; label: string }[]) => (
     <ColumnFilter
@@ -234,7 +206,7 @@ const fc = (key: keyof CusaSearch, label: string, mode: "text" | "select" = "tex
     <>
       <Topbar
         title="Colleges & Universities Students Association (CUSA)"
-        description={isLoading ? "Loading CUSA members…" : `${filteredMembers.length.toLocaleString()} of ${allMembers.length.toLocaleString()} members shown — share this URL to share the same view.`}
+        description={isLoading ? "Loading CUSA members…" : `${displayMembers.length.toLocaleString()} of ${allMembers.length.toLocaleString()} members shown — share this URL to share the same view.`}
         action={
           <button
             type="button"
@@ -252,7 +224,7 @@ const fc = (key: keyof CusaSearch, label: string, mode: "text" | "select" = "tex
             onSearchChange={(value) => setFilter({ q: value })}
             searchPlaceholder="Search name, CDM No., institution, parish…"
             onImport={() => toast.info("Import CUSA members — bring CSV soon")}
-            onExport={() => toast.success(`Exporting ${filteredMembers.length} CUSA members`)}
+            onExport={() => toast.success(`Exporting ${displayMembers.length} CUSA members`)}
           />
           <CardBody className="p-0">
             <Table>
@@ -267,7 +239,15 @@ const fc = (key: keyof CusaSearch, label: string, mode: "text" | "select" = "tex
                   <TableHead className="label-eyebrow px-3 py-2">
                     <ColumnHeader
                       label="Institution"
-                      filter={fc("f_institution", "Institution", "select", CUSA_INSTITUTIONS.map((i) => ({ value: i, label: i })))}
+                      filter={
+                        <ColumnFilter
+                          label="Institution"
+                          mode="select"
+                          options={CUSA_INSTITUTIONS.map((i) => ({ value: i, label: i }))}
+                          value={search.institution ? { operator: "equals", value: search.institution } : undefined}
+                          onChange={(v) => setFilter({ institution: v?.value ?? "" })}
+                        />
+                      }
                     />
                   </TableHead>
                   <TableHead className="label-eyebrow px-3 py-2">
@@ -278,8 +258,8 @@ const fc = (key: keyof CusaSearch, label: string, mode: "text" | "select" = "tex
                           label="Deanery"
                           mode="select"
                           options={deaneryOptions}
-                          value={search.f_deanery}
-                          onChange={setDeaneryFilter}
+                          value={search.deanery_id ? { operator: "equals", value: search.deanery_id } : undefined}
+                          onChange={(v) => setFilter({ deanery_id: v?.value ?? "", parish_id: "" })}
                         />
                       }
                     />
@@ -292,14 +272,11 @@ const fc = (key: keyof CusaSearch, label: string, mode: "text" | "select" = "tex
                           label="Parish"
                           mode="select"
                           options={parishOptions}
-                          value={search.f_parish}
-                          onChange={setParishFilter}
+                          value={search.parish_id ? { operator: "equals", value: search.parish_id } : undefined}
+                          onChange={(v) => setFilter({ parish_id: v?.value ?? "" })}
                         />
                       }
                     />
-                  </TableHead>
-                  <TableHead className="label-eyebrow px-3 py-2">
-                    <ColumnHeader label="Outstation" filter={fc("f_outstation", "Outstation", "select", outstationOptions)} />
                   </TableHead>
                   <TableHead className="label-eyebrow px-3 py-2">
                     <ColumnHeader
@@ -324,14 +301,13 @@ const fc = (key: keyof CusaSearch, label: string, mode: "text" | "select" = "tex
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {pagination.pageRows.map((member) => (
+                {displayMembers.map((member) => (
                   <TableRow key={member.id} className="border-border/30 hover:bg-bg-3">
                     <TableCell className="px-3 py-2 font-mono text-[10px] font-bold text-violet">{member.cdmId}</TableCell>
                     <TableCell className="px-3 py-2 text-[11px] font-semibold text-foreground">{member.name}</TableCell>
                     <TableCell className="px-3 py-2 text-[11px] text-text-1">{member.institution}</TableCell>
                     <TableCell className="px-3 py-2 text-[11px] text-text-2">{member.deaneryName}</TableCell>
                     <TableCell className="px-3 py-2 text-[11px] text-text-2">{member.parishName}</TableCell>
-                    <TableCell className="px-3 py-2 text-[11px] text-text-2">{member.churchName}</TableCell>
                     <TableCell className="px-3 py-2 text-[11px] text-text-2">{member.gender}</TableCell>
                     <TableCell className="px-3 py-2 text-[11px] text-text-2">{member.course} · {member.year}</TableCell>
                     <TableCell className="px-3 py-2"><Pill tone={member.status === "active" ? "success" : "violet"}>{member.status}</Pill></TableCell>
@@ -375,9 +351,9 @@ const fc = (key: keyof CusaSearch, label: string, mode: "text" | "select" = "tex
                     </TableCell>
                   </TableRow>
                 ))}
-                {pagination.pageRows.length === 0 && (
+                {displayMembers.length === 0 && !isLoading && (
                   <TableRow>
-                    <TableCell colSpan={10} className="px-3 py-6 text-center text-[11px] text-text-3">
+                    <TableCell colSpan={9} className="px-3 py-6 text-center text-[11px] text-text-3">
                       No CUSA members match your search.
                     </TableCell>
                   </TableRow>
@@ -385,12 +361,12 @@ const fc = (key: keyof CusaSearch, label: string, mode: "text" | "select" = "tex
               </TableBody>
             </Table>
             <TablePagination
-              page={pagination.page}
-              pageSize={pagination.pageSize}
-              total={pagination.total}
-              totalPages={pagination.totalPages}
-              onPageChange={pagination.setPage}
-              onPageSizeChange={pagination.setPageSize}
+              page={search.page}
+              pageSize={search.size}
+              total={total}
+              totalPages={totalPages}
+              onPageChange={(p) => navigate({ search: (prev: CusaSearch) => ({ ...prev, page: p }), replace: true })}
+              onPageSizeChange={(s) => navigate({ search: (prev: CusaSearch) => ({ ...prev, size: s, page: 1 }), replace: true })}
             />
           </CardBody>
         </Card>

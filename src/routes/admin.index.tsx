@@ -21,9 +21,19 @@ import {
 } from "@/components/admin/composables/ui-bits";
 import { Donut } from "@/components/admin/composables/donut";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { CUSA_INSTITUTIONS, buildCusaMembers, cusaGenderRows, cusaInstitutionRows, cusaMembersFor } from "@/lib/cusa-data";
-import { getDashboardCounts, getLiveAnalytics } from "@/lib/db/analytics";
-import { TablePagination, usePagination } from "@/components/admin/composables/tables/table-pagination";
+import { CUSA_INSTITUTIONS } from "@/lib/cusa-data";
+import { getLiveAnalytics } from "@/lib/db/analytics";
+import {
+  getAnalyticsSummary,
+  getYouthBreakdown,
+  getEnrollmentBreakdown,
+  getCusaBreakdown,
+  getLeaderBreakdown,
+  type GroupBy,
+  type LeaderBreakdownRow,
+} from "@/lib/db/analytics-rpc";
+import { fetchOrg } from "@/lib/db/org";
+import { useAdminScope } from "@/lib/hooks/use-admin-scope";
 import {
   ACTIVITY_FEED,
   ANALYTICS_UNITS,
@@ -50,11 +60,14 @@ export const Route = createFileRoute("/admin/")({
 const CURRENT_YEAR = new Date().getFullYear();
 const AVAILABLE_YEARS = Array.from({ length: CURRENT_YEAR - 2022 }, (_, i) => CURRENT_YEAR - i);
 
-type Tab = "general" | "enrollment" | "cusa" | "mission";
+type Tab = "general" | "enrollment" | "cusa" | "mission" | "leaders";
 type FilterState = { deaneryCode: string; parishId: string; churchId: string };
 type ChartDisplay = "count" | "percent";
 
 const emptyFilters: FilterState = { deaneryCode: "", parishId: "", churchId: "" };
+
+type RpcFilters = { deaneryId: string; parishId: string; outstationId: string };
+const emptyRpcFilters: RpcFilters = { deaneryId: "", parishId: "", outstationId: "" };
 
 function DashboardPage() {
   const [tab, setTab] = useState<Tab>("general");
@@ -78,6 +91,9 @@ function DashboardPage() {
             <TopbarTab active={tab === "mission"} onClick={() => setTab("mission")}>
               Mission Week
             </TopbarTab>
+            <TopbarTab active={tab === "leaders"} onClick={() => setTab("leaders")}>
+              Leaders
+            </TopbarTab>
           </>
         }
         action={
@@ -93,6 +109,7 @@ function DashboardPage() {
         {tab === "enrollment" && <EnrollmentTab chartDisplay={chartDisplay} />}
         {tab === "cusa" && <CusaTab chartDisplay={chartDisplay} />}
         {tab === "mission" && <MissionTab chartDisplay={chartDisplay} />}
+        {tab === "leaders" && <LeadersTab chartDisplay={chartDisplay} />}
       </div>
     </>
   );
@@ -132,6 +149,49 @@ function useFilteredAnalytics(year?: number) {
     scope: scope ?? "Diocese-wide",
     upcomingEvents: live?.upcomingEvents ?? null,
     pendingEnrollments: live?.pendingEnrollments ?? 0,
+  };
+}
+
+// Shared hook for tabs backed by the server-side analytics RPCs.
+// Replaces the old useFilteredAnalytics / ORGANIZATION static-data approach.
+function useRpcFilters() {
+  const adminScope = useAdminScope();
+  const [filters, setFilters] = useState<RpcFilters>(emptyRpcFilters);
+  const { data: org } = useQuery({ queryKey: ["org"], queryFn: fetchOrg, staleTime: 300_000 });
+
+  const effectiveDeaneryId    = adminScope.deaneryId || filters.deaneryId    || null;
+  const effectiveParishId     = adminScope.parishId  || filters.parishId     || null;
+  const effectiveOutstationId = filters.outstationId || null;
+
+  const deaneryOptions    = (org?.deaneries ?? []).map((d) => ({ value: d.id, label: d.name }));
+  const parishOptions     = (org?.parishes  ?? [])
+    .filter((p) => !effectiveDeaneryId || p.deanery_id === effectiveDeaneryId)
+    .map((p) => ({ value: p.id, label: p.name }));
+  const outstationOptions = (org?.outstations ?? [])
+    .filter((o) => !effectiveParishId || o.parish_id === effectiveParishId)
+    .map((o) => ({ value: o.id, label: o.name }));
+
+  const scopeLabel = effectiveParishId
+    ? (org?.parishes.find((p) => p.id === effectiveParishId)?.name ?? "Parish")
+    : effectiveDeaneryId
+    ? (org?.deaneries.find((d) => d.id === effectiveDeaneryId)?.name ?? "Deanery")
+    : "Diocese-wide";
+
+  const scopeParams = {
+    deaneryId:    effectiveDeaneryId,
+    parishId:     effectiveParishId,
+    outstationId: effectiveOutstationId,
+  };
+
+  const groupBy: GroupBy = effectiveParishId ? "outstation" : effectiveDeaneryId ? "parish" : "deanery";
+  const hasFilter = !!(filters.deaneryId || filters.parishId || filters.outstationId);
+  function clearFilters() { setFilters(emptyRpcFilters); }
+
+  return {
+    adminScope, filters, setFilters,
+    deaneryOptions, parishOptions, outstationOptions,
+    scopeLabel, scopeParams, hasFilter, clearFilters, groupBy,
+    effectiveDeaneryId, effectiveParishId, effectiveOutstationId,
   };
 }
 
@@ -184,29 +244,6 @@ function rollupRows(
   return [...groups.values()].sort((a, b) => b.value - a.value);
 }
 
-function cusaRollupRows(units: AnalyticsUnit[], filters: FilterState, institution = "") {
-  const groups = new Map<string, { label: string; value: number; max: number }>();
-  units.forEach((unit) => {
-    const key = filters.parishId ? unit.id : filters.deaneryCode ? unit.parishId : unit.deaneryCode;
-    const label = filters.parishId ? unit.name : filters.deaneryCode ? unit.parishName : unit.deaneryName;
-    const row = groups.get(key) ?? { label, value: 0, max: 0 };
-    const members = cusaMembersFor(unit, institution);
-    row.value += members;
-    row.max += members;
-    groups.set(key, row);
-  });
-  return [...groups.values()].filter((row) => row.value > 0).sort((a, b) => b.value - a.value);
-}
-
-function categorySplit(units: AnalyticsUnit[]) {
-  const totals = totalsFor(units);
-  return [
-    { label: "Primary", value: totals.primary, color: "var(--color-info)" },
-    { label: "Secondary", value: totals.secondary, color: "var(--color-success)" },
-    { label: "Tertiary / CUSA", value: totals.tertiary, color: "var(--color-violet)" },
-    { label: "Working Youth", value: totals.working, color: "var(--color-gold)" },
-  ];
-}
 
 function pct(value: number, max: number) {
   return max > 0 ? Math.round((value / max) * 100) : 0;
@@ -239,60 +276,77 @@ function genderRows(units: AnalyticsUnit[], metric: "enrolled" | "missionNominee
   ];
 }
 
-function enrollmentTrendRows(units: AnalyticsUnit[]) {
-  const total = totalsFor(units).enrolled;
-  const baseline = Math.max(1, Math.round(total * 0.58));
-  const multipliers = [0.72, 0.81, 0.9, 1, 1.12, 1.24];
-  return ["2021", "2022", "2023", "2024", "2025", "2026"].map((label, index) => {
-    const annual = index === 5 ? total : Math.round(baseline * multipliers[index]);
-    return {
-      label,
-      value: annual,
-      cumulative: Math.round(((annual - baseline) / baseline) * 100),
-    };
-  });
-}
 
 /* ---------- TAB: General ---------- */
 
 function GeneralTab({ chartDisplay }: { chartDisplay: ChartDisplay }) {
-  const analytics = useFilteredAnalytics();
-  const totals = totalsFor(analytics.units);
-  // Keep dashboard-counts subscription alive so other pages' invalidations still
-  // bubble up; values mirror the live unit roll-up at the diocese level.
-  useQuery({
-    queryKey: ["dashboard-counts"],
-    queryFn: () => getDashboardCounts(),
+  const rpc = useRpcFilters();
+  const { scopeParams, groupBy } = rpc;
+
+  const { data: summary } = useQuery({
+    queryKey: ["analytics-summary", CURRENT_YEAR, scopeParams.deaneryId, scopeParams.parishId, scopeParams.outstationId],
+    queryFn: () => getAnalyticsSummary(CURRENT_YEAR, scopeParams),
     staleTime: 30_000,
   });
-  const enrollmentRows = rollupRows(analytics.units, analytics.filters, "enrolled", "youths");
-  const topParishes = analytics.filters.deaneryCode
-    ? rollupRows(analytics.units, analytics.filters, "enrolled", "youths").slice(0, 4)
-    : TOP_PARISHES.slice(0, 4).map((p) => ({ label: p.name, value: p.enrolled, max: p.enrolled }));
-  const upcoming = analytics.upcomingEvents ?? UPCOMING_EVENTS.slice(0, 3).map((e) => ({
-    id: e.name, name: e.name, venue: "", parish: e.parish, day: e.day, month: e.month, registered: e.registered,
-  }));
+  const { data: youthBreakdown = [] } = useQuery({
+    queryKey: ["youth-breakdown", scopeParams.deaneryId, scopeParams.parishId, scopeParams.outstationId, groupBy],
+    queryFn: () => getYouthBreakdown(scopeParams, groupBy),
+    staleTime: 30_000,
+  });
+  const { data: enrollBreakdown = [] } = useQuery({
+    queryKey: ["enrollment-breakdown", CURRENT_YEAR, scopeParams.deaneryId, scopeParams.parishId, scopeParams.outstationId, groupBy],
+    queryFn: () => getEnrollmentBreakdown(CURRENT_YEAR, scopeParams, groupBy),
+    staleTime: 30_000,
+  });
+
+  const totalYouths   = summary?.total_youths ?? 0;
+  const totalEnrolled = summary?.enrolled ?? 0;
+  const upcomingCount = summary?.upcoming_events ?? 0;
+  const maxYouths     = Math.max(...enrollBreakdown.map((r) => r.total_youths), 1);
+
+  const catTotals = youthBreakdown.reduce(
+    (acc, r) => ({
+      primary: acc.primary + r.cat_primary, secondary: acc.secondary + r.cat_secondary,
+      tertiary: acc.tertiary + r.cat_tertiary, working: acc.working + r.cat_working,
+    }),
+    { primary: 0, secondary: 0, tertiary: 0, working: 0 },
+  );
+  const categoryData = [
+    { label: "Primary",         value: catTotals.primary,   color: "var(--color-info)" },
+    { label: "Secondary",       value: catTotals.secondary, color: "var(--color-success)" },
+    { label: "Tertiary / CUSA", value: catTotals.tertiary,  color: "var(--color-violet)" },
+    { label: "Working Youth",   value: catTotals.working,   color: "var(--color-gold)" },
+  ].filter((d) => d.value > 0);
+
+  const totalMale   = youthBreakdown.reduce((s, r) => s + r.male, 0);
+  const totalFemale = youthBreakdown.reduce((s, r) => s + r.female, 0);
+  const genderTotal = (totalMale + totalFemale) || 1;
+
+  const topParishes = [...enrollBreakdown].sort((a, b) => b.enrolled - a.enrolled).slice(0, 4);
 
   return (
     <>
-      <OrgFilterBar {...analytics} />
+      <RpcFilterBar rpc={rpc} />
 
       <div className="mb-3.5 grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-5">
-        <Kpi label="Total Youths" value={totals.youths.toLocaleString()} trend="selected scope" tone="info" sub={analytics.scope} />
-        <Kpi label="Enrolled" value={totals.enrolled.toLocaleString()} trend={`${pct(totals.enrolled, totals.youths)}% of target`} tone="up" />
-        <Kpi label="CUSA Members" value={totals.cusaMembers.toLocaleString()} trend={`${totals.cusaActive} active`} tone="up" />
-        <Kpi label="Mission Nominees" value={totals.missionNominees.toLocaleString()} trend={`${totals.missionReports} reports`} tone="info" />
-        <Kpi label="Upcoming Events" value="12" trend="next 30d" tone="info" sub="diocese-wide" />
+        <Kpi label="Total Youths"    value={totalYouths.toLocaleString()}                               trend="selected scope"               tone="info" sub={rpc.scopeLabel} />
+        <Kpi label="Enrolled"        value={totalEnrolled.toLocaleString()}                             trend={`${pct(totalEnrolled, totalYouths)}% of registered`} tone="up" />
+        <Kpi label="CUSA Members"    value={(summary?.cusa_members ?? 0).toLocaleString()}              trend={`${summary?.cusa_active ?? 0} active`}              tone="up" />
+        <Kpi label="Active Leaders"  value={(summary?.active_leaders ?? 0).toLocaleString()}            trend="in current term"              tone="info" />
+        <Kpi label="Upcoming Events" value={upcomingCount.toLocaleString()}                             trend="next 30 days"                 tone="info" sub="diocese-wide" />
       </div>
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.3fr_1fr]">
         <div className="flex flex-col gap-3">
           <Card>
-              <CardHead title="Enrollment Analytics" subtitle="Changes with deanery, parish, and outstation filters" />
+            <CardHead title="Enrollment Analytics" subtitle="Changes with deanery, parish, and outstation filters" />
             <CardBody>
-              {enrollmentRows.slice(0, 8).map((d) => (
-                <ProgressRow key={d.label} label={d.label} value={d.value} max={d.max} color="var(--color-success)" display={chartDisplay} />
+              {enrollBreakdown.slice(0, 8).map((d) => (
+                <ProgressRow key={d.label} label={d.label} value={d.enrolled} max={maxYouths} color="var(--color-success)" display={chartDisplay} />
               ))}
+              {enrollBreakdown.length === 0 && (
+                <p className="py-4 text-center text-[11px] text-text-2">No data for selected filters.</p>
+              )}
             </CardBody>
           </Card>
 
@@ -300,20 +354,20 @@ function GeneralTab({ chartDisplay }: { chartDisplay: ChartDisplay }) {
             <Card>
               <CardHead title="By Category" />
               <CardBody>
-                <Donut data={categorySplit(analytics.units)} display={chartDisplay} />
+                <Donut data={categoryData.length > 0 ? categoryData : [{ label: "No data", value: 1, color: "var(--color-border)" }]} display={chartDisplay} />
               </CardBody>
             </Card>
             <Card>
               <CardHead title="Gender Split" />
               <CardBody>
-                <ProgressRow label="Male" value={Math.round(totals.enrolled * 0.54)} max={totals.enrolled || 1} color="var(--color-info)" display={chartDisplay} />
-                <ProgressRow label="Female" value={Math.round(totals.enrolled * 0.46)} max={totals.enrolled || 1} color="var(--color-pink)" display={chartDisplay} />
+                <ProgressRow label="Male"   value={totalMale}   max={genderTotal} color="var(--color-info)"  display={chartDisplay} />
+                <ProgressRow label="Female" value={totalFemale} max={genderTotal} color="var(--color-pink)"  display={chartDisplay} />
                 <div className="my-2 h-px bg-border" />
                 <div className="label-eyebrow mb-2">Top Parishes</div>
                 {topParishes.map((p) => (
                   <div key={p.label} className="flex items-center justify-between border-b border-border/50 py-1 text-[10px] last:border-0">
                     <span className="text-text-1">{p.label}</span>
-                    <span className="font-bold text-danger">{p.value}</span>
+                    <span className="font-bold text-danger">{p.enrolled}</span>
                   </div>
                 ))}
               </CardBody>
@@ -325,32 +379,33 @@ function GeneralTab({ chartDisplay }: { chartDisplay: ChartDisplay }) {
           <Card>
             <CardHead title="Live Activity Feed" action="Audit log →" />
             <CardBody className="space-y-1.5">
-              {ACTIVITY_FEED.map((f, i) => (
-                <FeedItem key={i} {...f} />
-              ))}
+              {ACTIVITY_FEED.map((f, i) => <FeedItem key={i} {...f} />)}
             </CardBody>
           </Card>
           <Card>
             <CardHead title="Upcoming Events" action="View all →" />
             <CardBody className="space-y-2">
-              {upcoming.length === 0 && (
-                <div className="rounded-lg border border-dashed border-border bg-bg-2 p-3 text-center text-[10px] text-text-3">
-                  No upcoming events scheduled.
+              {upcomingCount > 0 && (
+                <div className="rounded-lg border border-border bg-bg-3 px-3 py-2 text-center text-[10px] text-text-1">
+                  {upcomingCount} event{upcomingCount !== 1 ? "s" : ""} coming up — <a href="/admin/events" className="text-danger hover:underline">view all →</a>
                 </div>
               )}
-              {upcoming.slice(0, 3).map((e) => (
-                <div key={e.id} className="flex items-center gap-3 rounded-lg border border-border bg-bg-2 p-2.5">
+              {UPCOMING_EVENTS.slice(0, upcomingCount > 0 ? 2 : 3).map((e) => (
+                <div key={e.name} className="flex items-center gap-3 rounded-lg border border-border bg-bg-2 p-2.5">
                   <div className="min-w-[44px] shrink-0 rounded-md bg-bg-4 px-2 py-1.5 text-center">
                     <div className="text-[7px] font-bold uppercase tracking-wide text-gold">{e.month}</div>
                     <div className="text-[18px] font-black leading-none text-foreground">{e.day}</div>
                   </div>
                   <div className="flex-1 leading-tight">
                     <div className="text-[11px] font-semibold text-text-1">{e.name}</div>
-                    <div className="text-[9px] text-text-3">{e.venue ? `${e.venue} · ${e.parish}` : e.parish}</div>
+                    <div className="text-[9px] text-text-3">{e.parish}</div>
                   </div>
                   <Pill tone="success">{e.registered} RSVP</Pill>
                 </div>
               ))}
+              {upcomingCount === 0 && UPCOMING_EVENTS.length === 0 && (
+                <div className="rounded-lg border border-dashed border-border bg-bg-2 p-3 text-center text-[10px] text-text-3">No upcoming events scheduled.</div>
+              )}
             </CardBody>
           </Card>
         </div>
@@ -455,6 +510,82 @@ function OrgFilterBar({
   );
 }
 
+const SEL_CLS = "min-w-[148px] rounded-md border border-black/20 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-black/70 outline-none transition-colors disabled:opacity-40 hover:border-gold-3/50 hover:text-black focus:border-gold-3 focus:text-black";
+
+function RpcFilterBar({
+  rpc,
+  institution,
+  onInstitutionChange,
+  year,
+  onYearChange,
+}: {
+  rpc: ReturnType<typeof useRpcFilters>;
+  institution?: string;
+  onInstitutionChange?: (v: string) => void;
+  year?: number;
+  onYearChange?: (y: number) => void;
+}) {
+  return (
+    <FilterBar>
+      <FilterLabel>Filter by</FilterLabel>
+      <FilterDivider />
+      {onYearChange !== undefined && (
+        <>
+          <select value={year ?? CURRENT_YEAR} onChange={(e) => onYearChange(Number(e.target.value))} className={SEL_CLS} style={{ minWidth: 80 }}>
+            {AVAILABLE_YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
+          </select>
+          <span className="text-text-4">›</span>
+        </>
+      )}
+      <select
+        value={rpc.filters.deaneryId}
+        disabled={!!rpc.adminScope.deaneryId}
+        onChange={(e) => rpc.setFilters({ deaneryId: e.target.value, parishId: "", outstationId: "" })}
+        className={SEL_CLS}
+      >
+        <option value="">All Deaneries</option>
+        {rpc.deaneryOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+      <span className="text-text-4">›</span>
+      <select
+        value={rpc.filters.parishId}
+        disabled={!!rpc.adminScope.parishId || !rpc.effectiveDeaneryId}
+        onChange={(e) => rpc.setFilters((f) => ({ ...f, parishId: e.target.value, outstationId: "" }))}
+        className={SEL_CLS}
+      >
+        <option value="">All Parishes</option>
+        {rpc.parishOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+      <span className="text-text-4">›</span>
+      <select
+        value={rpc.filters.outstationId}
+        disabled={!rpc.effectiveParishId}
+        onChange={(e) => rpc.setFilters((f) => ({ ...f, outstationId: e.target.value }))}
+        className={SEL_CLS}
+      >
+        <option value="">All Outstations</option>
+        {rpc.outstationOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+      {onInstitutionChange !== undefined && (
+        <>
+          <span className="text-text-4">›</span>
+          <select value={institution ?? ""} onChange={(e) => onInstitutionChange(e.target.value)} className={SEL_CLS} style={{ minWidth: 168 }}>
+            <option value="">All Institutions</option>
+            {CUSA_INSTITUTIONS.map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </>
+      )}
+      <button
+        onClick={() => { rpc.clearFilters(); onInstitutionChange?.(""); }}
+        className="rounded-md border border-border bg-transparent px-2.5 py-1 text-[9px] text-text-3 hover:border-danger hover:text-danger"
+      >
+        ✕ Clear
+      </button>
+      <FilterScope>{rpc.scopeLabel}</FilterScope>
+    </FilterBar>
+  );
+}
+
 const feedColor: Record<string, string> = {
   enroll: "var(--color-success-soft)",
   event: "var(--color-info-soft)",
@@ -483,52 +614,96 @@ function FeedItem({ kind, title, who, where, time }: { kind: string; title: stri
 
 function EnrollmentTab({ chartDisplay }: { chartDisplay: ChartDisplay }) {
   const [year, setYear] = useState(CURRENT_YEAR);
-  const analytics = useFilteredAnalytics(year);
-  const totals = totalsFor(analytics.units);
-  const completionPct = pct(totals.enrolled, totals.youths);
-  const rows = rollupRows(analytics.units, analytics.filters, "enrolled", "youths");
-  const trendRows = enrollmentTrendRows(analytics.units).map((row) => ({
-    ...row,
-    displayValue: chartDisplay === "percent" ? pct(row.value, totals.youths) : row.value,
-    displayTrend: chartDisplay === "percent" ? pct(row.value, totals.youths) : row.value,
-  }));
+  const rpc = useRpcFilters();
+  const { scopeParams, groupBy } = rpc;
+
+  const { data: summary } = useQuery({
+    queryKey: ["analytics-summary", year, scopeParams.deaneryId, scopeParams.parishId, scopeParams.outstationId],
+    queryFn: () => getAnalyticsSummary(year, scopeParams),
+    staleTime: 30_000,
+  });
+  const { data: enrollBreakdown = [] } = useQuery({
+    queryKey: ["enrollment-breakdown", year, scopeParams.deaneryId, scopeParams.parishId, scopeParams.outstationId, groupBy],
+    queryFn: () => getEnrollmentBreakdown(year, scopeParams, groupBy),
+    staleTime: 30_000,
+  });
+  const { data: youthBreakdown = [] } = useQuery({
+    queryKey: ["youth-breakdown", scopeParams.deaneryId, scopeParams.parishId, scopeParams.outstationId, groupBy],
+    queryFn: () => getYouthBreakdown(scopeParams, groupBy),
+    staleTime: 30_000,
+  });
+
+  const totalYouths   = summary?.total_youths       ?? 0;
+  const totalEnrolled = summary?.enrolled            ?? 0;
+  const totalPending  = summary?.pending_enrollments ?? 0;
+  const totalPaid     = enrollBreakdown.reduce((s, r) => s + r.paid, 0);
+  const totalWaived   = enrollBreakdown.reduce((s, r) => s + r.waived, 0);
+  const completionPct = pct(totalEnrolled, totalYouths);
+  const maxYouths     = Math.max(...enrollBreakdown.map((r) => r.total_youths), 1);
+
+  const catTotals = youthBreakdown.reduce(
+    (acc, r) => ({
+      primary: acc.primary + r.cat_primary, secondary: acc.secondary + r.cat_secondary,
+      tertiary: acc.tertiary + r.cat_tertiary, working: acc.working + r.cat_working,
+    }),
+    { primary: 0, secondary: 0, tertiary: 0, working: 0 },
+  );
+  const categoryData = [
+    { label: "Primary",         value: catTotals.primary,   color: "var(--color-info)" },
+    { label: "Secondary",       value: catTotals.secondary, color: "var(--color-success)" },
+    { label: "Tertiary / CUSA", value: catTotals.tertiary,  color: "var(--color-violet)" },
+    { label: "Working Youth",   value: catTotals.working,   color: "var(--color-gold)" },
+  ].filter((d) => d.value > 0);
+
+  const totalMale   = youthBreakdown.reduce((s, r) => s + r.male, 0);
+  const totalFemale = youthBreakdown.reduce((s, r) => s + r.female, 0);
+
+  const trendRows = (() => {
+    const baseline = Math.max(1, Math.round(totalEnrolled * 0.58));
+    const multipliers = [0.72, 0.81, 0.9, 1, 1.12, 1.24];
+    return ["2021", "2022", "2023", "2024", "2025", "2026"].map((label, i) => {
+      const val = i === 5 ? totalEnrolled : Math.round(baseline * multipliers[i]);
+      return { label, displayValue: chartDisplay === "percent" ? pct(val, totalYouths) : val, displayTrend: chartDisplay === "percent" ? pct(val, totalYouths) : val };
+    });
+  })();
 
   return (
     <>
-      <OrgFilterBar {...analytics} year={year} onYearChange={setYear} />
+      <RpcFilterBar rpc={rpc} year={year} onYearChange={setYear} />
 
       <div className="mb-3.5 flex flex-wrap items-start gap-3.5 rounded-xl border border-danger/20 bg-gradient-to-r from-danger-soft via-white to-warn-soft p-4">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-success-soft text-[20px]">🌱</div>
         <div className="min-w-[180px] flex-1">
           <div className="text-[13px] font-bold text-foreground">Enrollment Window — Year {year}</div>
-          <div className="text-[10px] text-text-3">Showing data for {year} · {totals.enrolled.toLocaleString()} enrolled of {totals.youths.toLocaleString()} registered</div>
+          <div className="text-[10px] text-text-3">Showing data for {year} · {totalEnrolled.toLocaleString()} enrolled of {totalYouths.toLocaleString()} registered</div>
         </div>
         <div className="flex flex-wrap gap-2">
           <Stat value={`${completionPct}%`} label="completion" />
-          <Stat value={totals.enrolled.toLocaleString()} label="enrolled" />
-          <Stat value={Math.max(0, totals.youths - totals.enrolled).toLocaleString()} label="remaining" tone="warn" />
+          <Stat value={totalEnrolled.toLocaleString()} label="enrolled" />
+          <Stat value={Math.max(0, totalYouths - totalEnrolled).toLocaleString()} label="remaining" tone="warn" />
         </div>
       </div>
 
       <div className="mb-3.5 grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-5">
-        <Kpi label={`Enrolled ${year}`} value={totals.enrolled.toLocaleString()} trend={`${completionPct}% of registered`} tone="up" sub={`of ${totals.youths.toLocaleString()}`} />
-        <Kpi label="Pending Payment" value={Math.round(totals.enrolled * 0.05).toLocaleString()} trend={`KES ${(Math.round(totals.enrolled * 0.05) * 500).toLocaleString()}`} tone="warn" sub="outstanding" />
-        <Kpi label="Self-Registered" value={Math.round(totals.enrolled * 0.39).toLocaleString()} trend="39% of total" tone="info" sub="via Youth Portal" />
-        <Kpi label="Pending Payment" value={analytics.pendingEnrollments.toLocaleString()} trend="awaiting confirmation" tone="warn" sub="this year" />
-        <Kpi label="Completion Rate" value={`${completionPct}%`} trend="enrolled ÷ registered" tone="up" sub={analytics.scope} />
+        <Kpi label={`Enrolled ${year}`} value={totalEnrolled.toLocaleString()} trend={`${completionPct}% of registered`} tone="up" sub={`of ${totalYouths.toLocaleString()}`} />
+        <Kpi label="Pending Payment"   value={totalPending.toLocaleString()}   trend="awaiting confirmation" tone="warn" sub="this year" />
+        <Kpi label="Paid"              value={totalPaid.toLocaleString()}       trend="payment confirmed"     tone="up"   sub="this year" />
+        <Kpi label="Waived"            value={totalWaived.toLocaleString()}     trend="fee waived"            tone="info" sub="this year" />
+        <Kpi label="Completion Rate"   value={`${completionPct}%`}             trend="enrolled ÷ registered" tone="up"   sub={rpc.scopeLabel} />
       </div>
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.25fr_1fr]">
         <Card>
-          <CardHead title="Enrollment Analytics" subtitle="Enrolled against selected scope target" />
+          <CardHead title="Enrollment Analytics" subtitle="Enrolled against scope target" />
           <CardBody>
-            {rows.map((d) => <ProgressRow key={d.label} label={d.label} value={d.value} max={d.max} display={chartDisplay} />)}
+            {enrollBreakdown.map((d) => <ProgressRow key={d.label} label={d.label} value={d.enrolled} max={maxYouths} display={chartDisplay} />)}
+            {enrollBreakdown.length === 0 && <p className="py-4 text-center text-[11px] text-text-2">No data for selected filters.</p>}
           </CardBody>
         </Card>
         <Card>
-          <CardHead title="Enrollment Category Mix" subtitle="Registered youths only" />
+          <CardHead title="Enrollment Category Mix" subtitle="Registered youths by category" />
           <CardBody>
-            <Donut data={categorySplit(analytics.units)} display={chartDisplay} />
+            <Donut data={categoryData.length > 0 ? categoryData : [{ label: "No data", value: 1, color: "var(--color-border)" }]} display={chartDisplay} />
           </CardBody>
         </Card>
       </div>
@@ -542,8 +717,8 @@ function EnrollmentTab({ chartDisplay }: { chartDisplay: ChartDisplay }) {
                 <CartesianGrid stroke="var(--color-border)" vertical={false} />
                 <XAxis dataKey="label" tick={{ fill: "var(--color-text-3)", fontSize: 10 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fill: "var(--color-text-3)", fontSize: 10 }} axisLine={false} tickLine={false} />
-                <Tooltip formatter={(value) => chartDisplay === "percent" ? `${value}%` : Number(value).toLocaleString()} contentStyle={{ background: "var(--color-bg-2)", border: "1px solid var(--color-border)", borderRadius: 8, color: "var(--color-text-1)" }} />
-                <Bar dataKey="displayValue" name="Monthly" fill="var(--color-success)" radius={[5, 5, 0, 0]} />
+                <Tooltip formatter={(v) => chartDisplay === "percent" ? `${v}%` : Number(v).toLocaleString()} contentStyle={{ background: "var(--color-bg-2)", border: "1px solid var(--color-border)", borderRadius: 8, color: "var(--color-text-1)" }} />
+                <Bar dataKey="displayValue" name="Enrolled" fill="var(--color-success)" radius={[5, 5, 0, 0]} />
                 <Line type="monotone" dataKey="displayTrend" name="Trend" stroke="var(--color-gold)" strokeWidth={2.5} dot={{ r: 2, fill: "var(--color-gold)" }} />
               </ComposedChart>
             </ResponsiveContainer>
@@ -552,7 +727,10 @@ function EnrollmentTab({ chartDisplay }: { chartDisplay: ChartDisplay }) {
         <Card>
           <CardHead title="Gender Split" subtitle="Enrolled youths within selected filters" />
           <CardBody>
-            {genderRows(analytics.units, "enrolled").map((row) => <ProgressRow key={row.label} label={row.label} value={row.value} max={totals.enrolled || 1} color={row.color} display={chartDisplay} />)}
+            {[
+              { label: "Male",   value: totalMale,   color: "var(--color-info)" },
+              { label: "Female", value: totalFemale, color: "var(--color-pink)" },
+            ].map((row) => <ProgressRow key={row.label} label={row.label} value={row.value} max={(totalMale + totalFemale) || 1} color={row.color} display={chartDisplay} />)}
           </CardBody>
         </Card>
       </div>
@@ -572,92 +750,291 @@ function Stat({ value, label, tone = "up" }: { value: string; label: string; ton
 /* ---------- TAB: CUSA ---------- */
 
 function CusaTab({ chartDisplay }: { chartDisplay: ChartDisplay }) {
-  const analytics = useFilteredAnalytics();
   const [institution, setInstitution] = useState("");
-  const totals = totalsFor(analytics.units);
-  const filteredMembers = analytics.units.reduce((sum, unit) => sum + cusaMembersFor(unit, institution), 0);
-  const memberRows = cusaRollupRows(analytics.units, analytics.filters, institution);
-  const institutionRows = cusaInstitutionRows(analytics.units);
-  const maxInstitution = Math.max(...institutionRows.map((row) => row.value), 1);
-  const gender = cusaGenderRows(analytics.units, institution);
+  const rpc = useRpcFilters();
+  const { scopeParams, groupBy } = rpc;
+
+  const { data: summary } = useQuery({
+    queryKey: ["analytics-summary", CURRENT_YEAR, scopeParams.deaneryId, scopeParams.parishId, scopeParams.outstationId],
+    queryFn: () => getAnalyticsSummary(CURRENT_YEAR, scopeParams),
+    staleTime: 30_000,
+  });
+  const { data: cusaBreakdown = [] } = useQuery({
+    queryKey: ["cusa-breakdown", scopeParams.deaneryId, scopeParams.parishId, scopeParams.outstationId, groupBy, institution],
+    queryFn: () => getCusaBreakdown(scopeParams, groupBy, institution || undefined),
+    staleTime: 30_000,
+  });
+
+  const totalMembers  = summary?.cusa_members ?? 0;
+  const totalActive   = summary?.cusa_active  ?? 0;
+  const activityPct   = pct(totalActive, totalMembers);
+  const maxTotal      = Math.max(...cusaBreakdown.map((r) => r.total), 1);
+  const totalMale     = cusaBreakdown.reduce((s, r) => s + r.male, 0);
+  const totalFemale   = cusaBreakdown.reduce((s, r) => s + r.female, 0);
+  const totalWithRole = cusaBreakdown.reduce((s, r) => s + r.with_role, 0);
 
   return (
     <>
-      <OrgFilterBar {...analytics} institution={institution} onInstitutionChange={setInstitution} />
+      <RpcFilterBar rpc={rpc} institution={institution} onInstitutionChange={setInstitution} />
 
       <div className="mb-3.5 grid grid-cols-2 gap-2.5 lg:grid-cols-4">
-        <Kpi label="CUSA Members" value={filteredMembers.toLocaleString()} trend={`${totals.cusaActive} active`} tone="up" accent="var(--color-violet)" sub={institution || analytics.scope} />
-        <Kpi label="Universities" value={String(institution ? 1 : institutionRows.length)} trend="represented" tone="info" accent="var(--color-violet)" />
-        <Kpi label="Active Chapters" value={String(Math.max(1, memberRows.length))} trend="reporting" tone="up" accent="var(--color-violet)" />
-        <Kpi label="Activity Rate" value={`${pct(totals.cusaActive, totals.cusaMembers)}%`} trend="active members" tone="up" accent="var(--color-violet)" />
+        <Kpi label="CUSA Members"  value={totalMembers.toLocaleString()}              trend={`${totalActive} active`}   tone="up"   accent="var(--color-violet)" sub={institution || rpc.scopeLabel} />
+        <Kpi label="Active Members" value={totalActive.toLocaleString()}              trend={`${activityPct}% activity`} tone="up"   accent="var(--color-violet)" />
+        <Kpi label="Chapters"       value={cusaBreakdown.length.toLocaleString()}     trend="reporting"                  tone="info" accent="var(--color-violet)" />
+        <Kpi label="Activity Rate"  value={`${activityPct}%`}                        trend="active members"             tone="up"   accent="var(--color-violet)" />
       </div>
+
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.25fr_1fr]">
         <Card>
-          <CardHead title="CUSA Members Analytics" subtitle="Members by parish or outstation" />
+          <CardHead title="CUSA Members Analytics" subtitle="Members by organisation" />
           <CardBody>
-            {memberRows.map((d) => <ProgressRow key={d.label} label={d.label} value={d.value} max={memberRows[0]?.value || 1} color="var(--color-violet)" display={chartDisplay} />)}
+            {cusaBreakdown.map((d) => (
+              <ProgressRow key={d.label} label={d.label} value={d.total} max={maxTotal} color="var(--color-violet)" display={chartDisplay} />
+            ))}
+            {cusaBreakdown.length === 0 && <p className="py-4 text-center text-[11px] text-text-2">No data for selected filters.</p>}
           </CardBody>
         </Card>
         <Card>
-          <CardHead title="Chapter Reporting" subtitle="Members by institution" />
+          <CardHead title="Active vs Total" subtitle="Members with an active role per unit" />
           <CardBody>
-            {(institution ? institutionRows.filter((row) => row.label === institution) : institutionRows).map((d) => <ProgressRow key={d.label} label={d.label} value={d.value} max={maxInstitution} color="var(--color-success)" display={chartDisplay} />)}
+            {cusaBreakdown.map((d) => (
+              <ProgressRow key={d.label} label={d.label} value={d.with_role} max={Math.max(d.total, 1)} color="var(--color-success)" display={chartDisplay} />
+            ))}
+            {cusaBreakdown.length === 0 && <p className="py-4 text-center text-[11px] text-text-2">No data for selected filters.</p>}
           </CardBody>
         </Card>
       </div>
+
       <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
         <Card>
           <CardHead title="Gender Split" subtitle="CUSA members within selected filters" />
           <CardBody>
-            {gender.map((row) => <ProgressRow key={row.label} label={row.label} value={row.value} max={filteredMembers || 1} color={row.color} display={chartDisplay} />)}
+            {[
+              { label: "Male",   value: totalMale,   color: "var(--color-info)" },
+              { label: "Female", value: totalFemale, color: "var(--color-pink)" },
+            ].map((row) => (
+              <ProgressRow key={row.label} label={row.label} value={row.value} max={(totalMale + totalFemale) || 1} color={row.color} display={chartDisplay} />
+            ))}
           </CardBody>
         </Card>
-        <CusaMemberTable units={analytics.units} institution={institution} />
+        <Card>
+          <CardHead title="With Active Role" subtitle="Members who hold a defined CUSA role" />
+          <CardBody>
+            <Donut
+              data={[
+                { label: "With Role", value: totalWithRole,                              color: "var(--color-violet)" },
+                { label: "No Role",   value: Math.max(0, totalMembers - totalWithRole),  color: "var(--color-bg-4)"  },
+              ].filter((d) => d.value > 0)}
+              display={chartDisplay}
+            />
+          </CardBody>
+        </Card>
       </div>
     </>
   );
 }
 
-function CusaMemberTable({ units, institution }: { units: AnalyticsUnit[]; institution: string }) {
-  const members = useMemo(() => buildCusaMembers(units, institution), [units, institution]);
-  const pagination = usePagination(members, 10);
+/* ---------- TAB: Leaders ---------- */
+
+const LEADER_LEVEL_LABELS: Record<string, string> = {
+  diocese:    "Diocese",
+  deanery:    "Deanery",
+  parish:     "Parish",
+  outstation: "Outstation",
+};
+
+const LEADER_LEVEL_COLORS: Record<string, string> = {
+  diocese:    "var(--color-danger)",
+  deanery:    "var(--color-gold)",
+  parish:     "var(--color-info)",
+  outstation: "var(--color-success)",
+};
+
+function LeadersTab({ chartDisplay }: { chartDisplay: ChartDisplay }) {
+  const rpc = useRpcFilters();
+  const { scopeParams } = rpc;
+  const [levelFilter, setLevelFilter] = useState<string>("");
+
+  const { data: summary } = useQuery({
+    queryKey: ["analytics-summary", CURRENT_YEAR, scopeParams.deaneryId, scopeParams.parishId, scopeParams.outstationId],
+    queryFn:  () => getAnalyticsSummary(CURRENT_YEAR, scopeParams),
+    staleTime: 30_000,
+  });
+
+  const { data: breakdown = [] } = useQuery({
+    queryKey: ["leader-breakdown", scopeParams.deaneryId, scopeParams.parishId, scopeParams.outstationId],
+    queryFn:  () => getLeaderBreakdown(scopeParams),
+    staleTime: 30_000,
+  });
+
+  const levelCounts = useMemo(() => {
+    const acc: Record<string, { active: number; total: number }> = {};
+    for (const row of breakdown) {
+      if (!acc[row.level]) acc[row.level] = { active: 0, total: 0 };
+      acc[row.level].active += row.active;
+      acc[row.level].total  += row.total;
+    }
+    return acc;
+  }, [breakdown]);
+
+  const displayRows: LeaderBreakdownRow[] = levelFilter
+    ? breakdown.filter((r) => r.level === levelFilter)
+    : breakdown;
+
+  const maxActive  = Math.max(...displayRows.map((r) => r.active), 1);
+  const totalActive = summary?.active_leaders ?? breakdown.reduce((s, r) => s + r.active, 0);
+
+  const donutData = Object.entries(levelCounts)
+    .filter(([, v]) => v.active > 0)
+    .map(([level, v]) => ({
+      label: LEADER_LEVEL_LABELS[level] ?? level,
+      value: v.active,
+      color: LEADER_LEVEL_COLORS[level] ?? "var(--color-text-2)",
+    }));
+
+  const hasFilter = rpc.hasFilter || !!levelFilter;
+  function clearAll() { rpc.clearFilters(); setLevelFilter(""); }
 
   return (
-    <Card>
-      <CardHead title="CUSA Members Table" subtitle="Filtered by organization and institution" />
-      <CardBody className="p-0">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {["Name", "Institution", "Parish", "Outstation", "Gender", "Course", "Status"].map((heading) => (
-                <TableHead key={heading} className="label-eyebrow px-3 py-2">{heading}</TableHead>
-              ))}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {pagination.pageRows.map((member) => (
-              <TableRow key={member.id} className="border-border/30 hover:bg-bg-3">
-                <TableCell className="px-3 py-2 text-[10px] font-semibold text-foreground">{member.name}</TableCell>
-                <TableCell className="px-3 py-2 text-[10px] text-text-1">{member.institution}</TableCell>
-                <TableCell className="px-3 py-2 text-[10px] text-text-2">{member.parishName}</TableCell>
-                <TableCell className="px-3 py-2 text-[10px] text-text-2">{member.churchName}</TableCell>
-                <TableCell className="px-3 py-2 text-[10px] text-text-2">{member.gender}</TableCell>
-                <TableCell className="px-3 py-2 text-[10px] text-text-2">{member.course} · {member.year}</TableCell>
-                <TableCell className="px-3 py-2"><Pill tone={member.status === "active" ? "success" : "violet"}>{member.status}</Pill></TableCell>
-              </TableRow>
+    <>
+      <FilterBar>
+        <FilterLabel>Filter by</FilterLabel>
+        <FilterDivider />
+        <select
+          className={SEL_CLS}
+          value={rpc.filters.deaneryId}
+          disabled={!!rpc.adminScope.deaneryId}
+          onChange={(e) => rpc.setFilters({ deaneryId: e.target.value, parishId: "", outstationId: "" })}
+        >
+          <option value="">All Deaneries</option>
+          {rpc.deaneryOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+        <select
+          className={SEL_CLS}
+          value={rpc.filters.parishId}
+          disabled={!!rpc.adminScope.parishId || !rpc.effectiveDeaneryId}
+          onChange={(e) => rpc.setFilters((f) => ({ ...f, parishId: e.target.value, outstationId: "" }))}
+        >
+          <option value="">All Parishes</option>
+          {rpc.parishOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+        <select
+          className={SEL_CLS}
+          value={rpc.filters.outstationId}
+          disabled={!rpc.effectiveParishId}
+          onChange={(e) => rpc.setFilters((f) => ({ ...f, outstationId: e.target.value }))}
+        >
+          <option value="">All Outstations</option>
+          {rpc.outstationOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+        <select className={SEL_CLS} value={levelFilter} onChange={(e) => setLevelFilter(e.target.value)} style={{ minWidth: 130 }}>
+          <option value="">All Levels</option>
+          {["diocese", "deanery", "parish", "outstation"].map((l) => (
+            <option key={l} value={l}>{LEADER_LEVEL_LABELS[l]}</option>
+          ))}
+        </select>
+        {hasFilter && (
+          <button className="rounded-md border border-border bg-transparent px-2.5 py-1 text-[9px] text-text-3 hover:border-danger hover:text-danger" onClick={clearAll}>
+            ✕ Clear
+          </button>
+        )}
+        <FilterScope>{rpc.scopeLabel}</FilterScope>
+      </FilterBar>
+
+      {/* KPIs */}
+      <div className="mb-3.5 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
+        <Kpi label="Active Leaders" value={totalActive.toLocaleString()} trend={rpc.scopeLabel} tone="info" />
+        {["diocese", "deanery", "parish", "outstation"].map((level) => (
+          <Kpi
+            key={level}
+            label={`${LEADER_LEVEL_LABELS[level]} Level`}
+            value={(levelCounts[level]?.active ?? 0).toLocaleString()}
+            trend={`of ${(levelCounts[level]?.total ?? 0)} total`}
+            tone={level === "parish" ? "info" : level === "outstation" ? "up" : "warn"}
+          />
+        ))}
+      </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.4fr_1fr]">
+        <Card>
+          <CardHead
+            title="Leaders by Organisation"
+            subtitle={levelFilter ? `${LEADER_LEVEL_LABELS[levelFilter]} level · ${displayRows.length} units` : `All levels · ${displayRows.length} units`}
+          />
+          <CardBody>
+            {displayRows.length === 0 && (
+              <p className="py-4 text-center text-[11px] text-text-2">No data for selected filters.</p>
+            )}
+            {displayRows.map((row) => (
+              <ProgressRow
+                key={`${row.level}-${row.org_label}`}
+                label={`${row.org_label} (${LEADER_LEVEL_LABELS[row.level] ?? row.level})`}
+                value={row.active}
+                max={maxActive}
+                color={LEADER_LEVEL_COLORS[row.level] ?? "var(--color-info)"}
+                display={chartDisplay}
+              />
             ))}
-          </TableBody>
-        </Table>
-        <TablePagination
-          page={pagination.page}
-          pageSize={pagination.pageSize}
-          total={pagination.total}
-          totalPages={pagination.totalPages}
-          onPageChange={pagination.setPage}
-          onPageSizeChange={pagination.setPageSize}
-        />
-      </CardBody>
-    </Card>
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHead title="Distribution by Level" subtitle="Active leaders per leadership tier" />
+          <CardBody>
+            {donutData.length > 0
+              ? <Donut data={donutData} display={chartDisplay} />
+              : <p className="py-4 text-center text-[11px] text-text-2">No data for selected filters.</p>
+            }
+          </CardBody>
+        </Card>
+      </div>
+
+      {/* Breakdown table */}
+      <div className="mt-3">
+        <Card>
+          <CardHead title="Leaders Summary" subtitle="Active vs. total leaders by unit" />
+          <CardBody className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {["Level", "Organisation", "Active", "Total", "Active %"].map((h) => (
+                    <TableHead key={h} className="label-eyebrow px-3 py-2">{h}</TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {displayRows.map((row) => {
+                  const pctVal = row.total > 0 ? Math.round((row.active / row.total) * 100) : 0;
+                  return (
+                    <TableRow key={`${row.level}-${row.org_label}`} className="border-border/30 hover:bg-bg-3">
+                      <TableCell className="px-3 py-2">
+                        <Pill
+                          tone={row.level === "diocese" ? "danger" : row.level === "deanery" ? "gold" : row.level === "parish" ? "info" : "success"}
+                        >
+                          {LEADER_LEVEL_LABELS[row.level] ?? row.level}
+                        </Pill>
+                      </TableCell>
+                      <TableCell className="px-3 py-2 text-[10px] font-semibold text-foreground">{row.org_label}</TableCell>
+                      <TableCell className="px-3 py-2 text-[10px] text-text-1">{row.active.toLocaleString()}</TableCell>
+                      <TableCell className="px-3 py-2 text-[10px] text-text-2">{row.total.toLocaleString()}</TableCell>
+                      <TableCell className="px-3 py-2 text-[10px] text-text-2">{pctVal}%</TableCell>
+                    </TableRow>
+                  );
+                })}
+                {displayRows.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="py-6 text-center text-[11px] text-text-2">
+                      No leader records match the selected filters.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </CardBody>
+        </Card>
+      </div>
+    </>
   );
 }
 
