@@ -12,7 +12,7 @@ import {
   enrollMeForYear,
   listMyEnrollments,
 } from "@/lib/db/portal";
-import type { YouthCategory, Gender } from "@/lib/db/youths";
+import type { YouthCategory, Gender } from "@/lib/db/youth-records/youths";
 
 export const Route = createFileRoute("/portal/enroll")({
   component: EnrollPage,
