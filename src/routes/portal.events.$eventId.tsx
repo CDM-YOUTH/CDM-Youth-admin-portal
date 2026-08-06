@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { CalendarDays, MapPin, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
-import { getEventFull } from "@/lib/db/events";
+import { getEventFull } from "@/lib/db/activities/events";
 import { getMyYouth, registerMeForEvent } from "@/lib/db/portal";
 
 export const Route = createFileRoute("/portal/events/$eventId")({

@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import type { YouthCategory, Gender } from "./youths";
+import type { YouthCategory, Gender } from "./youth-records/youths";
 
 export type MyYouth = {
   id: string;
