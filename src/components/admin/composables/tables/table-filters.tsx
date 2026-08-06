@@ -216,12 +216,14 @@ export function ColumnFilter({
   onChange,
   options,
   mode = "text",
+  disabled = false,
 }: {
   label: string;
   value?: ColumnFilterValue;
   onChange: (value: ColumnFilterValue | undefined) => void;
   options?: { value: string; label: string }[];
   mode?: "text" | "select";
+  disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<ColumnFilterValue>(
@@ -264,9 +266,10 @@ export function ColumnFilter({
     <span ref={ref} className="relative inline-flex">
       <button
         type="button"
-        onClick={() => setOpen((prev) => !prev)}
+        onClick={() => !disabled && setOpen((prev) => !prev)}
         aria-label={`Filter ${label}`}
-        className={`ml-1 inline-flex h-5 w-5 items-center justify-center rounded transition ${
+        disabled={disabled}
+        className={`ml-1 inline-flex h-5 w-5 items-center justify-center rounded transition disabled:cursor-not-allowed disabled:opacity-40 ${
           active
             ? "bg-primary text-primary-foreground"
             : "text-text-4 hover:bg-bg-3 hover:text-text-1"

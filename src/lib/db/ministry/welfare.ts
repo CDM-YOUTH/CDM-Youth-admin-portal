@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { likePattern } from "@/lib/utils";
 
 export type WelfareUrgency = "low" | "medium" | "high";
 export type WelfareStatus  = "open" | "in_progress" | "resolved" | "closed";
@@ -183,7 +184,7 @@ export async function listWelfareCasesPaged(opts: {
   if (opts.status)   query = query.eq("status",    opts.status);
   if (opts.urgency)  query = query.eq("urgency",   opts.urgency);
   if (opts.q?.trim()) {
-    const t = `%${opts.q.trim()}%`;
+    const t = likePattern(opts.q);
     query = query.or(`category.ilike.${t},assigned_to.ilike.${t},cdm_id.ilike.${t},parish_name.ilike.${t}`);
   }
 

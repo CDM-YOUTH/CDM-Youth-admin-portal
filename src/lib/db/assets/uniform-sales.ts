@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { likePattern } from "@/lib/utils";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
@@ -105,7 +106,7 @@ export async function listUniformSalesPaged(opts: {
   if (opts.from) query = query.gte("ordered_at", opts.from);
   if (opts.to)   query = query.lte("ordered_at", `${opts.to}T23:59:59Z`);
   if (opts.q?.trim()) {
-    const t = `%${opts.q.trim()}%`;
+    const t = likePattern(opts.q);
     query = query.or(`youth_name.ilike.${t},item_name.ilike.${t},parish_name.ilike.${t}`);
   }
 

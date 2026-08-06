@@ -29,6 +29,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { fetchOrg } from "@/lib/db/org";
+import { useAdminScope } from "@/lib/hooks/use-admin-scope";
 import {
   createWelfareCase,
   deleteWelfareCase,
@@ -81,6 +82,9 @@ function WelfarePage() {
     navigate({ search: (prev: WelfareSearch) => ({ ...prev, ...patch, page: 1 }), replace: true });
   };
 
+  const scope = useAdminScope();
+  const parishId = scope.parishId || search.parish_id;
+
   const { data: org } = useQuery({ queryKey: ["org"], queryFn: fetchOrg });
 
   const { data: kpis } = useQuery({
@@ -89,13 +93,13 @@ function WelfarePage() {
   });
 
   const { data: resp, isLoading } = useQuery({
-    queryKey: ["welfare-cases", search.page, search.size, search.q, search.parish_id, search.status, search.urgency],
+    queryKey: ["welfare-cases", search.page, search.size, search.q, parishId, search.status, search.urgency],
     queryFn: () =>
       listWelfareCasesPaged({
         page: search.page - 1,
         size: search.size,
         q: search.q,
-        parishId: search.parish_id || null,
+        parishId: parishId || null,
         status: search.status || null,
         urgency: search.urgency || null,
       }),
@@ -179,9 +183,10 @@ function WelfarePage() {
           />
           <FilterSelect
             label="Parish"
-            value={search.parish_id}
+            value={parishId}
             onChange={(v) => setFilter({ parish_id: v })}
             options={parishFilterOptions}
+            disabled={!!scope.parishId}
           />
           <FilterSelect
             label="Status"

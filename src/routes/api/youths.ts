@@ -1,5 +1,6 @@
 import { createAPIFileRoute } from "@tanstack/react-start/api";
-import { guardRequest, createServerClient, parsePagination, jsonOk, jsonError } from "@/lib/api/server-client";
+import { guardRequest, createServerClient, parsePagination, jsonOk, jsonError, applyCallerScope } from "@/lib/api/server-client";
+import { likePattern } from "@/lib/utils";
 
 export const APIRoute = createAPIFileRoute("/api/youths")({
   GET: async ({ request }) => {
@@ -10,11 +11,18 @@ export const APIRoute = createAPIFileRoute("/api/youths")({
     const { page, size } = parsePagination(url);
     const q = url.searchParams.get("q")?.trim() ?? "";
     const youthId = url.searchParams.get("youth_id");
-    const deaneryId = url.searchParams.get("deanery_id");
-    const parishId = url.searchParams.get("parish_id");
     const outstationId = url.searchParams.get("outstation_id");
     const category = url.searchParams.get("category");
     const status = url.searchParams.get("status");
+
+    // Enforce caller's assigned scope — a scoped user cannot query outside their org.
+    const { deaneryId, parishId } = applyCallerScope(
+      {
+        deaneryId: url.searchParams.get("deanery_id"),
+        parishId: url.searchParams.get("parish_id"),
+      },
+      guard,
+    );
 
     const db = createServerClient();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -34,7 +42,7 @@ export const APIRoute = createAPIFileRoute("/api/youths")({
     if (category) query = query.eq("category", category);
     if (status) query = query.eq("status", status);
     if (q) {
-      const term = `%${q}%`;
+      const term = likePattern(q);
       query = query.or(`full_name.ilike.${term},cdm_id.ilike.${term},phone.ilike.${term}`);
     }
 

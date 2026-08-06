@@ -24,6 +24,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { EventTabsForm } from "@/components/admin/events/event-tabs-form";
 import { createEvent, deleteEvent, getEventsAnalytics, listEventsPaged, type EventRow } from "@/lib/db/activities/events";
 import { fetchOrg } from "@/lib/db/org";
+import { useAdminScope } from "@/lib/hooks/use-admin-scope";
 
 type Row = Record<string, string>;
 const blankRow = (labels: string[]): Row => Object.fromEntries(labels.map((l) => [l, ""]));
@@ -68,32 +69,36 @@ function EventsPage() {
     navigate({ search: (prev: EventSearch) => ({ ...prev, ...patch }), replace: true });
   };
 
+  const scope = useAdminScope();
+  const deaneryId = scope.deaneryId || search.deanery_id;
+  const parishId  = scope.parishId  || search.parish_id;
+
   const { data: org } = useQuery({ queryKey: ["org"], queryFn: fetchOrg });
   const { data: analytics } = useQuery({ queryKey: ["events-analytics"], queryFn: getEventsAnalytics });
 
   const { data: upcomingResp } = useQuery({
-    queryKey: ["events", "upcoming", search.q, search.deanery_id, search.parish_id, search.upcoming_page, search.size],
+    queryKey: ["events", "upcoming", search.q, deaneryId, parishId, search.upcoming_page, search.size],
     queryFn: () =>
       listEventsPaged({
         page: search.upcoming_page - 1,
         size: search.size,
         q: search.q,
-        deaneryId: search.deanery_id || null,
-        parishId: search.parish_id || null,
+        deaneryId: deaneryId || null,
+        parishId:  parishId  || null,
         period: "upcoming",
       }),
     placeholderData: keepPreviousData,
   });
 
   const { data: doneResp } = useQuery({
-    queryKey: ["events", "done", search.q, search.deanery_id, search.parish_id, search.done_page, search.size],
+    queryKey: ["events", "done", search.q, deaneryId, parishId, search.done_page, search.size],
     queryFn: () =>
       listEventsPaged({
         page: search.done_page - 1,
         size: search.size,
         q: search.q,
-        deaneryId: search.deanery_id || null,
-        parishId: search.parish_id || null,
+        deaneryId: deaneryId || null,
+        parishId:  parishId  || null,
         period: "done",
       }),
     placeholderData: keepPreviousData,
@@ -129,7 +134,7 @@ function EventsPage() {
 
   const deaneryOptions = (org?.deaneries ?? []).map((d) => ({ value: d.id, label: d.name }));
   const parishOptions = (org?.parishes ?? [])
-    .filter((p) => !search.deanery_id || p.deanery_id === search.deanery_id)
+    .filter((p) => !deaneryId || p.deanery_id === deaneryId)
     .map((p) => ({ value: p.id, label: p.name }));
   const hasFilter = !!(search.q || search.deanery_id || search.parish_id);
 
@@ -149,16 +154,17 @@ function EventsPage() {
           />
           <FilterSelect
             label="Deanery"
-            value={search.deanery_id}
+            value={deaneryId}
             onChange={(v) => setFilter({ deanery_id: v, parish_id: "", upcoming_page: 1, done_page: 1 })}
             options={deaneryOptions}
+            disabled={!!scope.deaneryId}
           />
           <FilterSelect
             label="Parish"
-            value={search.parish_id}
+            value={parishId}
             onChange={(v) => setFilter({ parish_id: v, upcoming_page: 1, done_page: 1 })}
             options={parishOptions}
-            disabled={!search.deanery_id && parishOptions.length === 0}
+            disabled={!!scope.parishId || (!deaneryId && parishOptions.length === 0)}
           />
           <FilterClear
             visible={hasFilter}

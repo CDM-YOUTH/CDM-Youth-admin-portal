@@ -1,5 +1,6 @@
 import { createAPIFileRoute } from "@tanstack/react-start/api";
 import { guardRequest, createServerClient, parsePagination, jsonOk, jsonError } from "@/lib/api/server-client";
+import { likePattern } from "@/lib/utils";
 
 export const APIRoute = createAPIFileRoute("/api/cusa")({
   GET: async ({ request }) => {
@@ -20,51 +21,55 @@ export const APIRoute = createAPIFileRoute("/api/cusa")({
     let query = (db as any)
       .from("cusa_members")
       .select(
-        "*, youth:youths(cdm_id, full_name, gender, deanery:deaneries(name), parish:parishes(name), outstation:outstations(name))",
+        "*, youth:youths(cdm_id, full_name, gender, deanery_id, parish_id, outstation_id, deanery:deaneries(name), parish:parishes(name), outstation:outstations(name))",
         { count: "exact" },
       )
       .eq("year", year)
       .order("created_at", { ascending: false })
       .range(page * size, page * size + size - 1);
 
-    if (institution) query = query.ilike("institution", `%${institution}%`);
+    if (institution) query = query.ilike("institution", likePattern(institution));
     if (q) {
-      const term = `%${q}%`;
+      const term = likePattern(q);
       query = query.or(`institution.ilike.${term},course.ilike.${term}`);
     }
 
     const { data, error, count } = await query;
     if (error) return jsonError(error.message, 500);
 
-    // Apply org filters post-join (Supabase doesn't support filtering on joined columns directly in all versions)
-    let rows = (data ?? []) as Array<{
-      youth?: {
-        deanery?: { name: string } | null;
-        parish?: { name: string } | null;
-        outstation?: { name: string } | null;
-      } | null;
-    }>;
+    type YouthJoin = {
+      cdm_id?: string;
+      full_name?: string;
+      gender?: string;
+      deanery_id?: string | null;
+      parish_id?: string | null;
+      outstation_id?: string | null;
+      deanery?: { name: string } | null;
+      parish?: { name: string } | null;
+      outstation?: { name: string } | null;
+    };
+
+    let rows = (data ?? []) as Array<{ youth?: YouthJoin | null }>;
 
     if (q && !institution) {
-      // Also match against youth name/CDM in q
       const lower = q.toLowerCase();
       rows = rows.filter((r) => {
         const y = r.youth;
         return (
-          (y as { cdm_id?: string } | null | undefined)?.cdm_id?.toLowerCase().includes(lower) ||
-          (y as { full_name?: string } | null | undefined)?.full_name?.toLowerCase().includes(lower)
+          y?.cdm_id?.toLowerCase().includes(lower) ||
+          y?.full_name?.toLowerCase().includes(lower)
         );
       });
     }
 
-    // Filter by org UUID via joined youth record names would require a different query strategy.
-    // Instead, we filter by youth's org at query time using a subquery approach:
-    // This is applied here as a best-effort filter. For strict UUID filtering, consider
-    // adding deanery_id/parish_id columns to cusa_members or using an RPC.
+    // Enforce org scope: filter by the youth's org IDs (included in the select above).
     if (deaneryId || parishId || outstationId) {
       rows = rows.filter((r) => {
-        // cusa_members doesn't store org IDs directly — filter via youth record if possible
-        return true; // placeholder: org filter not yet enforced server-side for CUSA
+        const y = r.youth;
+        if (outstationId) return y?.outstation_id === outstationId;
+        if (parishId) return y?.parish_id === parishId;
+        if (deaneryId) return y?.deanery_id === deaneryId;
+        return true;
       });
     }
 

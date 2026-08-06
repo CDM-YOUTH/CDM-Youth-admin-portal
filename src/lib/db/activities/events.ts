@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { likePattern } from "@/lib/utils";
 
 export type EventRow = {
   id: string;
@@ -52,7 +53,10 @@ export type EventRegistration = {
   youth: {
     cdm_id: string;
     full_name: string;
+    phone: string | null;
+    deanery: { name: string } | null;
     parish: { name: string } | null;
+    outstation: { name: string } | null;
   } | null;
 };
 
@@ -269,7 +273,7 @@ export async function getEventFull(eventId: string): Promise<EventFull> {
       .order("position"),
     supabase
       .from("event_registrations")
-      .select("id, guest_name, guest_phone, guest_email, notes, created_at, youth:youths(cdm_id, full_name, parish:parishes(name))")
+      .select("id, guest_name, guest_phone, guest_email, notes, created_at, youth:youths(cdm_id, full_name, phone, deanery:deaneries(name), parish:parishes(name), outstation:outstations(name))")
       .eq("event_id", eventId)
       .order("created_at", { ascending: false })
       .limit(500),
@@ -406,7 +410,7 @@ export async function listEventsPaged(opts: {
   if (opts.period === "upcoming") query = query.gte("event_date", today);
   if (opts.period === "done")     query = query.lt("event_date",  today);
   if (opts.q?.trim()) {
-    const t = `%${opts.q.trim()}%`;
+    const t = likePattern(opts.q);
     query = query.or(`name.ilike.${t},venue.ilike.${t}`);
   }
 

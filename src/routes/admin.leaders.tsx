@@ -45,6 +45,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { fetchOrg, type OrgTree } from "@/lib/db/org";
+import { useAdminScope } from "@/lib/hooks/use-admin-scope";
 import {
   appointLeader,
   bulkImportLeaders,
@@ -99,6 +100,11 @@ function LeadersPage() {
   const setFilter = (patch: Partial<LeadersSearch>) =>
     navigate({ search: (prev: LeadersSearch) => ({ ...prev, ...patch }), replace: true });
 
+  const scope = useAdminScope();
+  const deaneryId    = scope.deaneryId || search.deanery_id;
+  const parishId     = scope.parishId  || search.parish_id;
+  const outstationId = search.outstation_id;
+
   const { data: org } = useQuery({ queryKey: ["org"], queryFn: fetchOrg });
   const { data: roleTypes = [] } = useQuery({ queryKey: ["role-types"], queryFn: listRoleTypes });
   // Fetch a summary of active leader counts across all levels (small query, unfiltered)
@@ -112,7 +118,7 @@ function LeadersPage() {
   const { data: resp, isLoading } = useQuery({
     queryKey: [
       "leadership-roles", tab,
-      search.q, search.deanery_id, search.parish_id, search.outstation_id,
+      search.q, deaneryId, parishId, outstationId,
       page - 1, pageSize,
     ],
     queryFn: () =>
@@ -120,10 +126,10 @@ function LeadersPage() {
         level:         tab,
         page:          page - 1,
         size:          pageSize,
-        q:             search.q         || undefined,
-        deaneryId:     search.deanery_id    || null,
-        parishId:      search.parish_id     || null,
-        outstationId:  search.outstation_id || null,
+        q:             search.q     || undefined,
+        deaneryId:     deaneryId    || null,
+        parishId:      parishId     || null,
+        outstationId:  outstationId || null,
       }),
     placeholderData: keepPreviousData,
   });
@@ -222,9 +228,11 @@ function LeadersPage() {
             onEndTerm={setEndTarget}
             onDelete={setDeleteTarget}
             q={search.q}
-            deaneryId={search.deanery_id}
-            parishId={search.parish_id}
-            outstationId={search.outstation_id}
+            deaneryId={deaneryId}
+            parishId={parishId}
+            outstationId={outstationId}
+            scopeDeaneryId={scope.deaneryId}
+            scopeParishId={scope.parishId}
             onFilterChange={(patch) => { setFilter(patch); setPage(1); }}
           />
         </Card>
@@ -326,6 +334,8 @@ function LeadersTable({
   deaneryId,
   parishId,
   outstationId,
+  scopeDeaneryId,
+  scopeParishId,
   onFilterChange,
 }: {
   rows: LeadershipRoleRow[];
@@ -345,6 +355,8 @@ function LeadersTable({
   deaneryId: string;
   parishId: string;
   outstationId: string;
+  scopeDeaneryId: string | null;
+  scopeParishId: string | null;
   onFilterChange: (patch: Partial<LeadersSearch>) => void;
 }) {
   const [showHistory, setShowHistory] = useState(false);
@@ -486,6 +498,7 @@ function LeadersTable({
                         onChange={(v) =>
                           onFilterChange({ deanery_id: v?.value ?? "", parish_id: "", outstation_id: "" })
                         }
+                        disabled={!!scopeDeaneryId}
                       />
                     }
                   />
@@ -502,6 +515,7 @@ function LeadersTable({
                         onChange={(v) =>
                           onFilterChange({ parish_id: v?.value ?? "", outstation_id: "" })
                         }
+                        disabled={!!scopeParishId}
                       />
                     }
                   />

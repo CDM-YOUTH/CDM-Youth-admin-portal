@@ -43,11 +43,31 @@ export function authError(fail: AuthFail): Response {
   return jsonError(fail.message, fail.status);
 }
 
+// If the calling user has an assigned org scope, override the requested org
+// params to match their scope — preventing a scoped user from querying outside
+// their assigned deanery/parish.
+export function applyCallerScope(
+  requested: { deaneryId?: string | null; parishId?: string | null },
+  caller: { scopeDeaneryId: string | null; scopeParishId: string | null },
+): { deaneryId: string | null; parishId: string | null } {
+  return {
+    deaneryId: caller.scopeDeaneryId ?? requested.deaneryId ?? null,
+    parishId: caller.scopeParishId ?? requested.parishId ?? null,
+  };
+}
+
+export const STAFF_ROLES = ["admin", "office", "moderator"] as const;
+export type StaffRole = (typeof STAFF_ROLES)[number];
+
+export function isStaff(role: string): boolean {
+  return (STAFF_ROLES as readonly string[]).includes(role);
+}
+
 // Convenience: verify auth + rate-limit in one call.
-// Returns { error: Response } when blocked, or { userId } when clear.
+// Returns { error: Response } when blocked, or { userId, role, scopeDeaneryId, scopeParishId } when clear.
 export async function guardRequest(
   request: Request,
-): Promise<{ error: Response } | { userId: string }> {
+): Promise<{ error: Response } | { userId: string; role: string; scopeDeaneryId: string | null; scopeParishId: string | null }> {
   const auth = await verifyAuth(request);
   if (!auth.ok) return { error: authError(auth) };
 
@@ -60,5 +80,16 @@ export async function guardRequest(
     };
   }
 
-  return { userId: auth.userId };
+  // Fetch role + org scope in parallel for downstream authorization checks.
+  const db = createServerClient();
+  const [roleResult, profileResult] = await Promise.all([
+    db.from("user_roles").select("role").eq("user_id", auth.userId).maybeSingle(),
+    db.from("profiles").select("deanery_id, parish_id").eq("id", auth.userId).maybeSingle(),
+  ]);
+  const role = (roleResult.data as { role?: string } | null)?.role ?? "user";
+  const profileData = profileResult.data as { deanery_id?: string | null; parish_id?: string | null } | null;
+  const scopeDeaneryId = profileData?.deanery_id ?? null;
+  const scopeParishId = profileData?.parish_id ?? null;
+
+  return { userId: auth.userId, role, scopeDeaneryId, scopeParishId };
 }
