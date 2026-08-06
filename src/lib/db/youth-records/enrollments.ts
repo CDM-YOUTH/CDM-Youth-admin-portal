@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { logEnrollmentAudit } from "../audit";
+import { likePattern } from "@/lib/utils";
 
 export type EnrollmentRow = {
   id: string;
@@ -68,7 +69,7 @@ export async function listEnrollmentsPaged(opts: {
 
   // Text search on youth name / CDM (own columns of the joined table)
   if (opts.q?.trim()) {
-    const t = `%${opts.q.trim()}%`;
+    const t = likePattern(opts.q);
     query = query.or(`cdm_id.ilike.${t},full_name.ilike.${t}`, { referencedTable: "youths" });
   }
 

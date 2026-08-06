@@ -1,10 +1,12 @@
 import { createAPIFileRoute } from "@tanstack/react-start/api";
-import { guardRequest, createServerClient, parsePagination, jsonOk, jsonError } from "@/lib/api/server-client";
+import { guardRequest, createServerClient, parsePagination, jsonOk, jsonError, isStaff } from "@/lib/api/server-client";
+import { likePattern } from "@/lib/utils";
 
 export const APIRoute = createAPIFileRoute("/api/welfare")({
   GET: async ({ request }) => {
     const guard = await guardRequest(request);
     if ("error" in guard) return guard.error;
+    if (!isStaff(guard.role)) return jsonError("Forbidden", 403);
 
     const url = new URL(request.url);
     const { page, size } = parsePagination(url);
@@ -23,7 +25,7 @@ export const APIRoute = createAPIFileRoute("/api/welfare")({
     if (status) query = query.eq("status", status);
     if (urgency) query = query.eq("urgency", urgency);
     if (q) {
-      const term = `%${q}%`;
+      const term = likePattern(q);
       query = query.or(
         `case_ref.ilike.${term},category.ilike.${term},cdm_id.ilike.${term},parish_name.ilike.${term}`,
       );

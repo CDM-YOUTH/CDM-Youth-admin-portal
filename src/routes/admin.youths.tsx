@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { MoreVertical, Pencil, Trash2, BadgeCheck, Download, Plus } from "lucide-react";
 import { downloadXlsx } from "@/lib/export-xlsx";
 import { fetchOrg } from "@/lib/db/org";
+import { useAdminScope } from "@/lib/hooks/use-admin-scope";
 import { CUSA_INSTITUTIONS } from "@/lib/cusa-data";
 import { type PagedResponse } from "@/lib/api/fetch-api";
 import { Topbar } from "@/components/admin/layout/topbar";
@@ -103,6 +104,11 @@ function YouthsPage() {
   const qc = useQueryClient();
 
   const { data: org } = useQuery({ queryKey: ["org"], queryFn: fetchOrg });
+  const scope = useAdminScope();
+
+  // Scope takes precedence over URL params — scoped users can't widen their view
+  const deaneryId = scope.deaneryId || search.deanery_id;
+  const parishId  = scope.parishId  || search.parish_id;
 
   const { data: resp, isLoading } = useQuery({
     queryKey: [
@@ -110,8 +116,8 @@ function YouthsPage() {
       search.page - 1,
       search.size,
       search.q,
-      search.deanery_id,
-      search.parish_id,
+      deaneryId,
+      parishId,
       search.outstation_id,
       search.category,
       search.status,
@@ -121,8 +127,8 @@ function YouthsPage() {
         page: search.page - 1,
         size: search.size,
         q: search.q,
-        deaneryId: search.deanery_id || null,
-        parishId: search.parish_id || null,
+        deaneryId: deaneryId || null,
+        parishId:  parishId  || null,
         outstationId: search.outstation_id || null,
         category: search.category || null,
         status: search.status || null,
@@ -221,10 +227,10 @@ function YouthsPage() {
   // Org dropdowns use UUIDs as values (from live Supabase org tree)
   const deaneryOptions = (org?.deaneries ?? []).map((d) => ({ value: d.id, label: d.name }));
   const parishOptions = (org?.parishes ?? [])
-    .filter((p) => !search.deanery_id || p.deanery_id === search.deanery_id)
+    .filter((p) => !deaneryId || p.deanery_id === deaneryId)
     .map((p) => ({ value: p.id, label: p.name }));
   const outstationOptions = (org?.outstations ?? [])
-    .filter((o) => !search.parish_id || o.parish_id === search.parish_id)
+    .filter((o) => !parishId || o.parish_id === parishId)
     .map((o) => ({ value: o.id, label: o.name }));
 
   const youthFields: FieldDef[] = [
@@ -473,8 +479,9 @@ function YouthsPage() {
                           label="Deanery"
                           mode="select"
                           options={deaneryOptions}
-                          value={search.deanery_id ? { operator: "equals", value: search.deanery_id } : undefined}
+                          value={deaneryId ? { operator: "equals", value: deaneryId } : undefined}
                           onChange={(v) => setFilter({ deanery_id: v?.value ?? "", parish_id: "", outstation_id: "" })}
+                          disabled={!!scope.deaneryId}
                         />
                       }
                     />
@@ -487,8 +494,9 @@ function YouthsPage() {
                           label="Parish"
                           mode="select"
                           options={parishOptions}
-                          value={search.parish_id ? { operator: "equals", value: search.parish_id } : undefined}
+                          value={parishId ? { operator: "equals", value: parishId } : undefined}
                           onChange={(v) => setFilter({ parish_id: v?.value ?? "", outstation_id: "" })}
+                          disabled={!!scope.parishId}
                         />
                       }
                     />

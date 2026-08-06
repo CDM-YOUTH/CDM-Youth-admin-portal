@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { likePattern } from "@/lib/utils";
 import { fetchOrg, resolveOrgIds } from "../org";
 import { createYouth } from "./youths";
 
@@ -64,7 +65,7 @@ export async function listCusaPaged(opts: {
   // Own-table filters
   if (opts.institution) query = query.eq("institution", opts.institution);
   if (opts.q?.trim()) {
-    const t = `%${opts.q.trim()}%`;
+    const t = likePattern(opts.q);
     query = query.or(`institution.ilike.${t},course.ilike.${t}`);
   }
 

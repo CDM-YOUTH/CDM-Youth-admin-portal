@@ -22,6 +22,7 @@ import { RecordFormDialog, type FieldDef } from "@/components/admin/composables/
 import { ORGANIZATION } from "@/lib/mock-data";
 import { YouthSearchInput, type PickedYouth } from "@/components/admin/composables/pickers/youth-search-input";
 import { fetchOrg, type OrgTree } from "@/lib/db/org";
+import { useAdminScope } from "@/lib/hooks/use-admin-scope";
 import {
   Dialog,
   DialogContent,
@@ -116,9 +117,12 @@ function EnrollmentPage() {
   const [statusTarget, setStatusTarget] = useState<null | { id: string; name: string; nextStatus: "paid" | "pending" }>(null);
   const [importResult, setImportResult] = useState<null | { inserted: number; missing: string[]; total: number }>(null);
   const qc = useQueryClient();
+  const scope = useAdminScope();
+  const deaneryId = scope.deaneryId || search.deanery_id;
+  const parishId  = scope.parishId  || search.parish_id;
   const { data: org } = useQuery({ queryKey: ["org"], queryFn: fetchOrg });
   const { data: resp, isLoading } = useQuery({
-    queryKey: ["enrollments", search.year, search.page - 1, search.size, search.q, search.status, search.deanery_id, search.parish_id],
+    queryKey: ["enrollments", search.year, search.page - 1, search.size, search.q, search.status, deaneryId, parishId],
     queryFn: () =>
       listEnrollmentsPaged({
         page: search.page - 1,
@@ -126,8 +130,8 @@ function EnrollmentPage() {
         year: search.year || null,
         q: search.q,
         status: search.status || null,
-        deaneryId: search.deanery_id || null,
-        parishId: search.parish_id || null,
+        deaneryId: deaneryId || null,
+        parishId:  parishId  || null,
       }),
     placeholderData: keepPreviousData,
   });
@@ -208,7 +212,7 @@ function EnrollmentPage() {
 
   const deaneryOptions = (org?.deaneries ?? []).map((d) => ({ value: d.id, label: d.name }));
   const parishOptions = (org?.parishes ?? [])
-    .filter((p) => !search.deanery_id || p.deanery_id === search.deanery_id)
+    .filter((p) => !deaneryId || p.deanery_id === deaneryId)
     .map((p) => ({ value: p.id, label: p.name }));
 
   const enrollFields: FieldDef[] = [
@@ -393,8 +397,9 @@ function EnrollmentPage() {
                           label="Deanery"
                           mode="select"
                           options={deaneryOptions}
-                          value={search.deanery_id ? { operator: "equals", value: search.deanery_id } : undefined}
+                          value={deaneryId ? { operator: "equals", value: deaneryId } : undefined}
                           onChange={(v) => setFilter({ deanery_id: v?.value ?? "", parish_id: "" })}
+                          disabled={!!scope.deaneryId}
                         />
                       }
                     />
@@ -407,8 +412,9 @@ function EnrollmentPage() {
                           label="Parish"
                           mode="select"
                           options={parishOptions}
-                          value={search.parish_id ? { operator: "equals", value: search.parish_id } : undefined}
+                          value={parishId ? { operator: "equals", value: parishId } : undefined}
                           onChange={(v) => setFilter({ parish_id: v?.value ?? "" })}
+                          disabled={!!scope.parishId}
                         />
                       }
                     />

@@ -1,5 +1,6 @@
 import { createAPIFileRoute } from "@tanstack/react-start/api";
-import { guardRequest, createServerClient, parsePagination, jsonOk, jsonError } from "@/lib/api/server-client";
+import { guardRequest, createServerClient, parsePagination, jsonOk, jsonError, applyCallerScope } from "@/lib/api/server-client";
+import { likePattern } from "@/lib/utils";
 
 export const APIRoute = createAPIFileRoute("/api/events")({
   GET: async ({ request }) => {
@@ -9,8 +10,15 @@ export const APIRoute = createAPIFileRoute("/api/events")({
     const url = new URL(request.url);
     const { page, size } = parsePagination(url);
     const q = url.searchParams.get("q")?.trim() ?? "";
-    const deaneryId = url.searchParams.get("deanery_id");
-    const parishId = url.searchParams.get("parish_id");
+
+    // Enforce caller's assigned scope.
+    const { deaneryId, parishId } = applyCallerScope(
+      {
+        deaneryId: url.searchParams.get("deanery_id"),
+        parishId: url.searchParams.get("parish_id"),
+      },
+      guard,
+    );
 
     const db = createServerClient();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -26,7 +34,7 @@ export const APIRoute = createAPIFileRoute("/api/events")({
     if (deaneryId) query = query.eq("deanery_id", deaneryId);
     if (parishId) query = query.eq("parish_id", parishId);
     if (q) {
-      const term = `%${q}%`;
+      const term = likePattern(q);
       query = query.or(`name.ilike.${term},venue.ilike.${term},description.ilike.${term}`);
     }
 

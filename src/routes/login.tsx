@@ -1,10 +1,17 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { zodValidator, fallback } from "@tanstack/zod-adapter";
+import { z } from "zod";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import cdmLogo from "@/assets/cdm-logo.jpeg";
 
+const loginSearchSchema = z.object({
+  redirect: fallback(z.string(), "/admin").default("/admin"),
+});
+
 export const Route = createFileRoute("/login")({
+  validateSearch: zodValidator(loginSearchSchema),
   head: () => ({
     meta: [{ title: "Login — CDM Youth Office" }],
   }),
@@ -13,6 +20,7 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const navigate = useNavigate();
+  const { redirect: redirectTo } = Route.useSearch();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -28,7 +36,8 @@ function LoginPage() {
         password,
       });
       if (authError) throw authError;
-      await navigate({ to: "/admin" });
+      // Navigate to the page the user was trying to reach, or /admin by default
+      await navigate({ to: (redirectTo || "/admin") as "/" });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed. Please check your credentials.");
     } finally {

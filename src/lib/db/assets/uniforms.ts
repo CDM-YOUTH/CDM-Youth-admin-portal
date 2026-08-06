@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { likePattern } from "@/lib/utils";
 
 export type UniformSku = {
   id: string;
@@ -83,7 +84,7 @@ export async function listUniformSkusPaged(opts: {
     .order("name")
     .range(page * size, page * size + size - 1);
 
-  if (opts.q?.trim()) query = query.ilike("name", `%${opts.q.trim()}%`);
+  if (opts.q?.trim()) query = query.ilike("name", likePattern(opts.q));
 
   const { data, error, count } = await query;
   if (error) throw error;

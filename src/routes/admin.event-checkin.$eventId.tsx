@@ -1,14 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type ComponentType } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, QrCode, Search, UserPlus, X, BadgeCheck, Download } from "lucide-react";
+import { ArrowLeft, QrCode, Search, UserPlus, X, BadgeCheck, Download, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Topbar } from "@/components/admin/layout/topbar";
 import { Kpi } from "@/components/admin/composables/ui-bits";
 import { usePagination, TablePagination } from "@/components/admin/composables/tables/table-pagination";
 import { getEventFull, registerForEvent, deleteRegistration } from "@/lib/db/activities/events";
-import { listYouths, type YouthRow } from "@/lib/db/youth-records/youths";
-import { ORGANIZATION } from "@/lib/mock-data";
+import { listYouthsPaged, fetchYouthByCdmId, type YouthRow } from "@/lib/db/youth-records/youths";
+import { fetchOrg, type OrgTree } from "@/lib/db/org";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 
@@ -57,6 +57,13 @@ function EventCheckinPage() {
     queryFn: () => getEventFull(eventId),
   });
 
+  // Org tree: loaded once, cached for the session — no re-fetching needed.
+  const { data: org } = useQuery({
+    queryKey: ["org"],
+    queryFn: fetchOrg,
+    staleTime: Infinity,
+  });
+
   const registerMut = useMutation({
     mutationFn: registerForEvent,
     onSuccess: (_data, variables) => {
@@ -70,44 +77,30 @@ function EventCheckinPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["event-full", eventId] }),
     onError: (e: Error) => toast.error(e.message),
   });
-  const { data: allYouths = [] } = useQuery({
-    queryKey: ["youths"],
-    queryFn: listYouths,
-  });
-
-  const youthByCdm = useMemo(() => {
-    const m: Record<string, YouthRow> = {};
-    allYouths.forEach((y) => { m[y.cdm_id] = y; });
-    return m;
-  }, [allYouths]);
 
   const [attendees, setAttendees] = useState<AttendeeEntry[]>([]);
 
   useEffect(() => {
     if (!event) return;
     setAttendees(
-      event.registrations.map((reg) => {
-        const cdm = reg.youth?.cdm_id ?? "";
-        const yFull = cdm ? youthByCdm[cdm] : null;
-        return {
-          id: reg.id,
-          cdmId: cdm || "—",
-          name: reg.youth?.full_name ?? reg.guest_name ?? "—",
-          phone: yFull?.phone ?? "",
-          deanery: yFull?.deanery?.name ?? "",
-          parish: reg.youth?.parish?.name ?? yFull?.parish?.name ?? "",
-          outstation: yFull?.outstation?.name ?? "",
-          time: new Date(reg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          kind: reg.youth ? "member" : "guest",
-        };
-      }),
+      event.registrations.map((reg) => ({
+        id: reg.id,
+        cdmId: reg.youth?.cdm_id ?? "—",
+        name: reg.youth?.full_name ?? reg.guest_name ?? "—",
+        phone: reg.youth?.phone ?? "",
+        deanery: reg.youth?.deanery?.name ?? "",
+        parish: reg.youth?.parish?.name ?? "",
+        outstation: reg.youth?.outstation?.name ?? "",
+        time: new Date(reg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        kind: reg.youth ? "member" : "guest",
+      })),
     );
-  }, [event, youthByCdm]);
+  }, [event]);
 
-  /* page-level filters */
-  const [deanery, setDeanery] = useState("");
-  const [parish, setParish] = useState("");
-  const [outstation, setOutstation] = useState("");
+  /* ── page-level filters (filter the already-loaded attendee list) ── */
+  const [deaneryId, setDeaneryId] = useState("");
+  const [parishId, setParishId] = useState("");
+  const [outstationId, setOutstationId] = useState("");
   const [q, setQ] = useState("");
 
   /* dialog state */
@@ -115,33 +108,34 @@ function EventCheckinPage() {
   const [walkInOpen, setWalkInOpen] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
 
-  /* cascading filter options */
-  const deaneryOptions = ORGANIZATION.map((d) => d.name);
+  /* cascading filter options from real org data — pure JS, zero DB calls */
   const parishOptions = useMemo(() => {
-    const scope = deanery
-      ? ORGANIZATION.find((d) => d.name === deanery)?.parishes ?? []
-      : ORGANIZATION.flatMap((d) => d.parishes);
-    return [...new Set(scope.map((p) => p.name))];
-  }, [deanery]);
-  const outstationOptions = useMemo(() => {
-    const parishes = deanery
-      ? (ORGANIZATION.find((d) => d.name === deanery)?.parishes ?? [])
-      : ORGANIZATION.flatMap((d) => d.parishes);
-    const scope = parish ? parishes.filter((p) => p.name === parish) : parishes;
-    return [...new Set(scope.flatMap((p) => p.churches.map((c) => c.name)))];
-  }, [deanery, parish]);
+    if (!org) return [];
+    return deaneryId ? org.parishes.filter((p) => p.deanery_id === deaneryId) : org.parishes;
+  }, [org, deaneryId]);
 
-  /* filtered attendees */
+  const outstationOptions = useMemo(() => {
+    if (!org) return [];
+    if (parishId) return org.outstations.filter((o) => o.parish_id === parishId);
+    if (deaneryId) return org.outstations.filter((o) => parishOptions.some((p) => p.id === o.parish_id));
+    return org.outstations;
+  }, [org, deaneryId, parishId, parishOptions]);
+
+  /* resolve selected IDs → names for attendee filtering */
+  const selectedDeaneryName = org?.deaneries.find((d) => d.id === deaneryId)?.name ?? "";
+  const selectedParishName = org?.parishes.find((p) => p.id === parishId)?.name ?? "";
+  const selectedOutstationName = org?.outstations.find((o) => o.id === outstationId)?.name ?? "";
+
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
     return attendees.filter((a) => {
-      if (deanery && a.deanery !== deanery) return false;
-      if (parish && a.parish !== parish) return false;
-      if (outstation && a.outstation !== outstation) return false;
+      if (deaneryId && a.deanery !== selectedDeaneryName) return false;
+      if (parishId && a.parish !== selectedParishName) return false;
+      if (outstationId && a.outstation !== selectedOutstationName) return false;
       if (term && ![a.name, a.cdmId, a.phone, a.parish, a.outstation].join(" ").toLowerCase().includes(term)) return false;
       return true;
     });
-  }, [attendees, deanery, parish, outstation, q]);
+  }, [attendees, deaneryId, parishId, outstationId, selectedDeaneryName, selectedParishName, selectedOutstationName, q]);
 
   const pagination = usePagination(filtered, 25);
 
@@ -160,6 +154,7 @@ function EventCheckinPage() {
   const guestCount = attendees.filter((a) => a.kind === "guest").length;
   const filteredMemberCount = filtered.filter((a) => a.kind === "member").length;
   const filteredGuestCount = filtered.filter((a) => a.kind === "guest").length;
+  const hasFilter = !!(deaneryId || parishId || outstationId || q);
 
   return (
     <>
@@ -183,19 +178,19 @@ function EventCheckinPage() {
           <Kpi
             label="Registrations"
             value={String(filtered.length)}
-            trend={filtered.length !== attendees.length ? "after filters" : "total registered"}
+            trend={hasFilter ? "after filters" : "total registered"}
             tone="info"
           />
           <Kpi
             label="Members"
             value={String(filteredMemberCount)}
-            trend={filtered.length !== attendees.length ? `of ${memberCount} total` : "CDM youth"}
+            trend={hasFilter ? `of ${memberCount} total` : "CDM youth"}
             tone="up"
           />
           <Kpi
             label="Guests"
             value={String(filteredGuestCount)}
-            trend={filtered.length !== attendees.length ? `of ${guestCount} total` : "walk-in / external"}
+            trend={hasFilter ? `of ${guestCount} total` : "walk-in / external"}
             tone="warn"
           />
           <Kpi
@@ -209,30 +204,38 @@ function EventCheckinPage() {
         {/* ── filter + action bar ── */}
         <div className="flex flex-wrap items-center gap-2 border-b border-border bg-bg-2 px-4 py-2.5">
           <select
-            value={deanery}
-            onChange={(e) => { setDeanery(e.target.value); setParish(""); setOutstation(""); }}
+            value={deaneryId}
+            onChange={(e) => { setDeaneryId(e.target.value); setParishId(""); setOutstationId(""); }}
             className={selectCls("max-w-[160px]")}
           >
             <option value="">All Deaneries</option>
-            {deaneryOptions.map((d) => <option key={d} value={d}>{d}</option>)}
+            {(org?.deaneries ?? []).map((d) => (
+              <option key={d.id} value={d.id}>{d.name}</option>
+            ))}
           </select>
 
           <select
-            value={parish}
-            onChange={(e) => { setParish(e.target.value); setOutstation(""); }}
+            value={parishId}
+            onChange={(e) => { setParishId(e.target.value); setOutstationId(""); }}
             className={selectCls("max-w-[160px]")}
+            disabled={parishOptions.length === 0}
           >
             <option value="">All Parishes</option>
-            {parishOptions.map((p) => <option key={p} value={p}>{p}</option>)}
+            {parishOptions.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
           </select>
 
           <select
-            value={outstation}
-            onChange={(e) => setOutstation(e.target.value)}
+            value={outstationId}
+            onChange={(e) => setOutstationId(e.target.value)}
             className={selectCls("max-w-[160px]")}
+            disabled={outstationOptions.length === 0}
           >
             <option value="">All Outstations</option>
-            {outstationOptions.map((o) => <option key={o} value={o}>{o}</option>)}
+            {outstationOptions.map((o) => (
+              <option key={o.id} value={o.id}>{o.name}</option>
+            ))}
           </select>
 
           <div className="relative min-w-[180px] flex-1">
@@ -253,9 +256,9 @@ function EventCheckinPage() {
             )}
           </div>
 
-          {(deanery || parish || outstation || q) && (
+          {hasFilter && (
             <button
-              onClick={() => { setDeanery(""); setParish(""); setOutstation(""); setQ(""); }}
+              onClick={() => { setDeaneryId(""); setParishId(""); setOutstationId(""); setQ(""); }}
               className="text-[10px] font-semibold text-text-3 hover:text-danger"
             >
               Clear filters
@@ -344,16 +347,17 @@ function EventCheckinPage() {
       </div>
 
       {/* ── dialogs ── */}
-      <RegisterDialog
-        open={registerOpen}
-        onClose={() => setRegisterOpen(false)}
-        allYouths={allYouths}
-        youthByCdm={youthByCdm}
-        defaultDeanery={deanery}
-        defaultParish={parish}
-        defaultOutstation={outstation}
-        onAdd={(cdmId) => registerMut.mutate({ eventId, cdmId })}
-      />
+      {org && (
+        <RegisterDialog
+          open={registerOpen}
+          onClose={() => setRegisterOpen(false)}
+          org={org}
+          defaultDeaneryId={deaneryId}
+          defaultParishId={parishId}
+          defaultOutstationId={outstationId}
+          onAdd={(cdmId) => registerMut.mutate({ eventId, cdmId })}
+        />
+      )}
       <WalkInDialog
         open={walkInOpen}
         onClose={() => setWalkInOpen(false)}
@@ -371,72 +375,89 @@ function EventCheckinPage() {
 
 /* ─── Register dialog ─── */
 function RegisterDialog({
-  open, onClose, allYouths, youthByCdm, defaultDeanery, defaultParish, defaultOutstation, onAdd,
+  open, onClose, org, defaultDeaneryId, defaultParishId, defaultOutstationId, onAdd,
 }: {
   open: boolean;
   onClose: () => void;
-  allYouths: YouthRow[];
-  youthByCdm: Record<string, YouthRow>;
-  defaultDeanery: string;
-  defaultParish: string;
-  defaultOutstation: string;
+  org: OrgTree;
+  defaultDeaneryId: string;
+  defaultParishId: string;
+  defaultOutstationId: string;
   onAdd: (cdmId: string) => void;
 }) {
   const [mode, setMode] = useState<"cdm" | "browse">("cdm");
 
-  /* CDM mode */
+  /* ── CDM mode ── */
   const [cdmInput, setCdmInput] = useState("");
-  const [preview, setPreview] = useState<YouthRow | null>(null);
-  const [cdmError, setCdmError] = useState("");
+  const [lookupKey, setLookupKey] = useState(""); // set on button click to trigger query
 
-  const lookupCdm = () => {
-    const key = cdmInput.trim().toUpperCase();
-    const y = youthByCdm[key];
-    if (y) { setPreview(y); setCdmError(""); }
-    else { setPreview(null); setCdmError(`No youth found with CDM No. "${cdmInput.trim()}"`); }
-  };
+  const { data: preview, isFetching: lookingUp } = useQuery({
+    queryKey: ["youth-by-cdm", lookupKey],
+    queryFn: () => fetchYouthByCdmId(lookupKey),
+    enabled: !!lookupKey,
+    staleTime: 60_000,
+    retry: false,
+  });
 
-  /* Browse mode */
-  const [bDeanery, setBDeanery] = useState(defaultDeanery);
-  const [bParish, setBParish] = useState(defaultParish);
-  const [bOutstation, setBOutstation] = useState(defaultOutstation);
+  const cdmError = lookupKey && !lookingUp && preview === null
+    ? `No youth found with CDM No. "${lookupKey}"`
+    : "";
+
+  /* ── Browse mode ── */
+  const [bDeaneryId, setBDeaneryId] = useState(defaultDeaneryId);
+  const [bParishId, setBParishId] = useState(defaultParishId);
+  const [bOutstationId, setBOutstationId] = useState(defaultOutstationId);
   const [bSearch, setBSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
 
+  // Seed from page-level filters when dialog opens
   useEffect(() => {
-    if (open) { setBDeanery(defaultDeanery); setBParish(defaultParish); setBOutstation(defaultOutstation); }
-  }, [open, defaultDeanery, defaultParish, defaultOutstation]);
+    if (open) {
+      setBDeaneryId(defaultDeaneryId);
+      setBParishId(defaultParishId);
+      setBOutstationId(defaultOutstationId);
+    }
+  }, [open, defaultDeaneryId, defaultParishId, defaultOutstationId]);
 
-  const browseParishes = useMemo(() => {
-    const scope = bDeanery
-      ? ORGANIZATION.find((d) => d.name === bDeanery)?.parishes ?? []
-      : ORGANIZATION.flatMap((d) => d.parishes);
-    return [...new Set(scope.map((p) => p.name))];
-  }, [bDeanery]);
+  // Debounce the search input (250 ms) to avoid a query per keystroke
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(bSearch), 250);
+    return () => clearTimeout(t);
+  }, [bSearch]);
 
-  const browseOutstations = useMemo(() => {
-    const parishes = bDeanery
-      ? (ORGANIZATION.find((d) => d.name === bDeanery)?.parishes ?? [])
-      : ORGANIZATION.flatMap((d) => d.parishes);
-    const scope = bParish ? parishes.filter((p) => p.name === bParish) : parishes;
-    return [...new Set(scope.flatMap((p) => p.churches.map((c) => c.name)))];
-  }, [bDeanery, bParish]);
+  /* Cascade options — pure JS from the cached org tree, zero DB calls */
+  const browseParishes = bDeaneryId
+    ? org.parishes.filter((p) => p.deanery_id === bDeaneryId)
+    : org.parishes;
 
-  const browseResults = useMemo(() => {
-    const term = bSearch.trim().toLowerCase();
-    if (!term) return [];
-    return allYouths
-      .filter((y) => {
-        if (bDeanery && y.deanery?.name !== bDeanery) return false;
-        if (bParish && y.parish?.name !== bParish) return false;
-        if (bOutstation && y.outstation?.name !== bOutstation) return false;
-        if (![y.full_name, y.cdm_id].join(" ").toLowerCase().includes(term)) return false;
-        return true;
-      })
-      .slice(0, 50);
-  }, [allYouths, bDeanery, bParish, bOutstation, bSearch]);
+  const browseOutstations = bParishId
+    ? org.outstations.filter((o) => o.parish_id === bParishId)
+    : bDeaneryId
+      ? org.outstations.filter((o) => browseParishes.some((p) => p.id === o.parish_id))
+      : org.outstations;
+
+  /* Youth search — one debounced query combining name + all org filters */
+  const { data: browseData, isFetching: searching } = useQuery({
+    queryKey: ["youth-search", debouncedSearch, bDeaneryId, bParishId, bOutstationId],
+    queryFn: () =>
+      listYouthsPaged({
+        q: debouncedSearch,
+        deaneryId: bDeaneryId || null,
+        parishId: bParishId || null,
+        outstationId: bOutstationId || null,
+        size: 50,
+      }),
+    enabled: debouncedSearch.trim().length >= 1,
+    staleTime: 30_000,
+    placeholderData: (prev) => prev,
+  });
+  const browseResults: YouthRow[] = browseData?.data ?? [];
 
   const reset = () => {
-    setCdmInput(""); setPreview(null); setCdmError(""); setBSearch("");
+    setCdmInput("");
+    setLookupKey("");
+    setBSearch("");
+    setDebouncedSearch("");
   };
 
   return (
@@ -461,19 +482,26 @@ function RegisterDialog({
           ))}
         </div>
 
-        {/* CDM mode */}
+        {/* ── CDM mode ── */}
         {mode === "cdm" && (
           <div className="space-y-3">
             <div className="flex gap-2">
               <Input
                 value={cdmInput}
-                onChange={(e) => { setCdmInput(e.target.value); setPreview(null); setCdmError(""); }}
-                onKeyDown={(e) => e.key === "Enter" && lookupCdm()}
+                onChange={(e) => { setCdmInput(e.target.value); setLookupKey(""); }}
+                onKeyDown={(e) => e.key === "Enter" && setLookupKey(cdmInput.trim().toUpperCase())}
                 placeholder="CDM-2026-00001"
                 className="flex-1"
               />
-              <button onClick={lookupCdm} className={btnCls("primary")}>
-                <Search className="h-3.5 w-3.5" /> Look up
+              <button
+                onClick={() => setLookupKey(cdmInput.trim().toUpperCase())}
+                disabled={!cdmInput.trim() || lookingUp}
+                className={btnCls("primary")}
+              >
+                {lookingUp
+                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  : <Search className="h-3.5 w-3.5" />}
+                Look up
               </button>
             </div>
             {cdmError && <p className="text-[11px] text-danger">{cdmError}</p>}
@@ -481,7 +509,7 @@ function RegisterDialog({
               <div className="rounded-lg border border-border bg-bg-2 p-3 space-y-1">
                 <div className="font-bold text-[13px] text-text-1">{preview.full_name}</div>
                 <div className="text-[11px] text-text-3">
-                  {preview.cdm_id} · {preview.parish?.name ?? "—"} · {preview.category}
+                  {preview.cdm_id} · {preview.outstation?.name ?? preview.parish?.name ?? "—"} · {preview.category}
                 </div>
                 {preview.phone && <div className="text-[11px] text-text-3">{preview.phone}</div>}
                 <button
@@ -495,53 +523,68 @@ function RegisterDialog({
           </div>
         )}
 
-        {/* Browse mode */}
+        {/* ── Browse mode ── */}
         {mode === "browse" && (
           <div className="space-y-3">
+            {/* Cascading location selects — no DB calls, cascade from cached org tree */}
             <div className="flex flex-wrap gap-2">
               <select
-                value={bDeanery}
-                onChange={(e) => { setBDeanery(e.target.value); setBParish(""); setBOutstation(""); }}
+                value={bDeaneryId}
+                onChange={(e) => { setBDeaneryId(e.target.value); setBParishId(""); setBOutstationId(""); }}
                 className={selectCls("flex-1 min-w-[120px]")}
               >
                 <option value="">All Deaneries</option>
-                {ORGANIZATION.map((d) => <option key={d.name} value={d.name}>{d.name}</option>)}
+                {org.deaneries.map((d) => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
               </select>
+
               <select
-                value={bParish}
-                onChange={(e) => { setBParish(e.target.value); setBOutstation(""); }}
+                value={bParishId}
+                onChange={(e) => { setBParishId(e.target.value); setBOutstationId(""); }}
                 className={selectCls("flex-1 min-w-[120px]")}
+                disabled={browseParishes.length === 0}
               >
                 <option value="">All Parishes</option>
-                {browseParishes.map((p) => <option key={p} value={p}>{p}</option>)}
+                {browseParishes.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
               </select>
+
               <select
-                value={bOutstation}
-                onChange={(e) => setBOutstation(e.target.value)}
+                value={bOutstationId}
+                onChange={(e) => setBOutstationId(e.target.value)}
                 className={selectCls("flex-1 min-w-[120px]")}
+                disabled={browseOutstations.length === 0}
               >
                 <option value="">All Outstations</option>
-                {browseOutstations.map((o) => <option key={o} value={o}>{o}</option>)}
+                {browseOutstations.map((o) => (
+                  <option key={o.id} value={o.id}>{o.name}</option>
+                ))}
               </select>
             </div>
 
+            {/* Name search — debounced, one call covers name + all org filters */}
             <div className="relative">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-4" />
               <Input
                 value={bSearch}
                 onChange={(e) => setBSearch(e.target.value)}
                 placeholder="Search name or CDM No."
-                className="pl-8"
+                className="pl-8 pr-8"
               />
+              {searching && (
+                <Loader2 className="absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 animate-spin text-text-4" />
+              )}
             </div>
 
             <div className="max-h-64 overflow-y-auto rounded-lg border border-border divide-y divide-border">
-              {!bSearch.trim() ? (
+              {!debouncedSearch.trim() ? (
                 <div className="p-4 text-center text-[11px] text-text-3">
                   Type a name or CDM No. above to search
-                  {(bDeanery || bParish || bOutstation) && " within the selected location"}.
+                  {(bDeaneryId || bParishId || bOutstationId) && " within the selected location"}.
                 </div>
-              ) : browseResults.length === 0 ? (
+              ) : browseResults.length === 0 && !searching ? (
                 <div className="p-4 text-center text-[11px] text-text-3">
                   No youth found — try a different name or widen the location filters.
                 </div>
@@ -552,6 +595,7 @@ function RegisterDialog({
                       <div className="text-[12px] font-semibold text-text-1">{y.full_name}</div>
                       <div className="text-[10px] text-text-3">
                         {y.cdm_id} · {y.outstation?.name ?? y.parish?.name ?? "—"}
+                        {y.deanery?.name ? ` · ${y.deanery.name}` : ""}
                       </div>
                     </div>
                     <button
@@ -564,7 +608,8 @@ function RegisterDialog({
                 ))
               )}
             </div>
-            {bSearch.trim() && browseResults.length > 0 && (
+
+            {debouncedSearch.trim() && browseResults.length > 0 && (
               <p className="text-[10px] text-text-3">
                 {browseResults.length === 50
                   ? "Showing first 50 — narrow the name or location to see fewer."

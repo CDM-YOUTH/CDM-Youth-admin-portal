@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { fetchOrg, resolveOrgIds } from "../org";
+import { likePattern } from "@/lib/utils";
 
 export type LeadershipLevel = "diocese" | "deanery" | "parish" | "outstation";
 
@@ -112,7 +113,7 @@ export async function listLeadersPaged(opts: {
   if (opts.parishId)     query = query.eq("parish_id", opts.parishId);
   if (opts.outstationId) query = query.eq("outstation_id", opts.outstationId);
   if (opts.q?.trim()) {
-    const t = `%${opts.q.trim()}%`;
+    const t = likePattern(opts.q);
     query = query.or(`cdm_id.ilike.${t},full_name.ilike.${t},phone.ilike.${t}`, { referencedTable: "youths" });
   }
 
