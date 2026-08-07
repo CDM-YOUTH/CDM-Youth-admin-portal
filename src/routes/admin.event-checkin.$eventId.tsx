@@ -1,16 +1,44 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type ComponentType } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, QrCode, Search, UserPlus, X, BadgeCheck, Download, Loader2 } from "lucide-react";
+import { ArrowLeft, QrCode, Search, UserPlus, X, BadgeCheck, Download, Loader2, UserCog, MoreVertical, Trash2, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { Topbar } from "@/components/admin/layout/topbar";
-import { Kpi } from "@/components/admin/composables/ui-bits";
+import { Card, CardBody, Kpi } from "@/components/admin/composables/ui-bits";
 import { usePagination, TablePagination } from "@/components/admin/composables/tables/table-pagination";
+import {
+  ColumnFilter,
+  ColumnHeader,
+  FilterClear,
+  FilterRow,
+  FilterSelect,
+  TableToolbar,
+  applyColumnFilter,
+  type ColumnFilterValue,
+} from "@/components/admin/composables/tables/table-filters";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { getEventFull, registerForEvent, deleteRegistration } from "@/lib/db/activities/events";
 import { listYouthsPaged, fetchYouthByCdmId, type YouthRow } from "@/lib/db/youth-records/youths";
 import { fetchOrg, type OrgTree } from "@/lib/db/org";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { AddYouthDialog, type AddYouthResult } from "@/components/admin/youth/add-youth-dialog";
 
 export const Route = createFileRoute("/admin/event-checkin/$eventId")({
   head: () => ({
@@ -35,9 +63,6 @@ type AttendeeEntry = {
   kind: AttendeeKind;
 };
 
-function selectCls(extra = "") {
-  return `h-8 rounded-md border border-border bg-bg-2 px-2 text-[11px] font-medium text-text-1 outline-none transition hover:border-gold-3 focus:border-gold-3 ${extra}`;
-}
 function btnCls(variant: "primary" | "ghost" = "primary", extra = "") {
   const base = "inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-[11px] font-bold transition";
   const vars = {
@@ -107,6 +132,12 @@ function EventCheckinPage() {
   const [registerOpen, setRegisterOpen] = useState(false);
   const [walkInOpen, setWalkInOpen] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
+  const [addYouthOpen, setAddYouthOpen] = useState(false);
+  const [removeTarget, setRemoveTarget] = useState<{ id: string; name: string } | null>(null);
+
+  /* per-column filters */
+  const [fCdm, setFCdm] = useState<ColumnFilterValue | undefined>(undefined);
+  const [fName, setFName] = useState<ColumnFilterValue | undefined>(undefined);
 
   /* cascading filter options from real org data — pure JS, zero DB calls */
   const parishOptions = useMemo(() => {
@@ -133,9 +164,11 @@ function EventCheckinPage() {
       if (parishId && a.parish !== selectedParishName) return false;
       if (outstationId && a.outstation !== selectedOutstationName) return false;
       if (term && ![a.name, a.cdmId, a.phone, a.parish, a.outstation].join(" ").toLowerCase().includes(term)) return false;
+      if (!applyColumnFilter(a.cdmId, fCdm)) return false;
+      if (!applyColumnFilter(a.name, fName)) return false;
       return true;
     });
-  }, [attendees, deaneryId, parishId, outstationId, selectedDeaneryName, selectedParishName, selectedOutstationName, q]);
+  }, [attendees, deaneryId, parishId, outstationId, selectedDeaneryName, selectedParishName, selectedOutstationName, q, fCdm, fName]);
 
   const pagination = usePagination(filtered, 25);
 
@@ -154,7 +187,40 @@ function EventCheckinPage() {
   const guestCount = attendees.filter((a) => a.kind === "guest").length;
   const filteredMemberCount = filtered.filter((a) => a.kind === "member").length;
   const filteredGuestCount = filtered.filter((a) => a.kind === "guest").length;
-  const hasFilter = !!(deaneryId || parishId || outstationId || q);
+  const hasFilter = !!(deaneryId || parishId || outstationId || q || fCdm?.value || fName?.value);
+
+  const exportPdf = async (rows: typeof filtered) => {
+    const { default: jsPDF } = await import("jspdf");
+    const { default: autoTable } = await import("jspdf-autotable");
+    const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+    const dateStr = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+    doc.setFontSize(13);
+    doc.setFont("helvetica", "bold");
+    doc.text(event.name, 14, 14);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Registrations & Check-in · Exported ${dateStr} · ${rows.length} attendee${rows.length !== 1 ? "s" : ""}`, 14, 20);
+    autoTable(doc, {
+      startY: 26,
+      head: [["CDM No.", "Name", "Type", "Phone", "Deanery", "Parish", "Outstation", "Registered At"]],
+      body: rows.map((a) => [
+        a.cdmId === "—" ? "" : a.cdmId,
+        a.name,
+        a.kind === "guest" ? "Guest" : "Member",
+        a.phone || "",
+        a.deanery || "",
+        a.parish || "",
+        a.outstation || "",
+        a.time,
+      ]),
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: [185, 28, 28], textColor: 255, fontStyle: "bold" },
+      alternateRowStyles: { fillColor: [250, 250, 250] },
+      columnStyles: { 0: { cellWidth: 28 }, 1: { cellWidth: 40 }, 2: { cellWidth: 16 } },
+    });
+    doc.save(`${event.name.replace(/\s+/g, "-")}-registrations.pdf`);
+    toast.success(`Exported ${rows.length} registrations`);
+  };
 
   return (
     <>
@@ -172,9 +238,9 @@ function EventCheckinPage() {
         }
       />
 
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex-1 overflow-y-auto px-5 py-4">
         {/* ── KPI cards ── */}
-        <div className="grid grid-cols-2 gap-2.5 border-b border-border px-4 py-3 sm:grid-cols-4">
+        <div className="mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
           <Kpi
             label="Registrations"
             value={String(filtered.length)}
@@ -201,162 +267,175 @@ function EventCheckinPage() {
           />
         </div>
 
-        {/* ── filter + action bar ── */}
-        <div className="flex flex-wrap items-center gap-2 border-b border-border bg-bg-2 px-4 py-2.5">
-          <select
-            value={deaneryId}
-            onChange={(e) => { setDeaneryId(e.target.value); setParishId(""); setOutstationId(""); }}
-            className={selectCls("max-w-[160px]")}
-          >
-            <option value="">All Deaneries</option>
-            {(org?.deaneries ?? []).map((d) => (
-              <option key={d.id} value={d.id}>{d.name}</option>
-            ))}
-          </select>
-
-          <select
-            value={parishId}
-            onChange={(e) => { setParishId(e.target.value); setOutstationId(""); }}
-            className={selectCls("max-w-[160px]")}
-            disabled={parishOptions.length === 0}
-          >
-            <option value="">All Parishes</option>
-            {parishOptions.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
-          </select>
-
-          <select
-            value={outstationId}
-            onChange={(e) => setOutstationId(e.target.value)}
-            className={selectCls("max-w-[160px]")}
-            disabled={outstationOptions.length === 0}
-          >
-            <option value="">All Outstations</option>
-            {outstationOptions.map((o) => (
-              <option key={o.id} value={o.id}>{o.name}</option>
-            ))}
-          </select>
-
-          <div className="relative min-w-[180px] flex-1">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-4" />
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Search name, CDM No., phone…"
-              className="h-8 w-full rounded-md border border-border bg-white pl-8 pr-7 text-[11px] text-black/70 placeholder:text-gray-400 outline-none transition hover:border-gold-3/50 focus:border-gold-3"
+        <Card>
+          {/* ── org filter row ── */}
+          <FilterRow>
+            <FilterSelect
+              label="All Deaneries"
+              value={deaneryId}
+              onChange={(v) => { setDeaneryId(v); setParishId(""); setOutstationId(""); }}
+              options={(org?.deaneries ?? []).map((d) => ({ value: d.id, label: d.name }))}
             />
-            {q && (
-              <button
-                onClick={() => setQ("")}
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-text-3 hover:text-foreground"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            )}
-          </div>
+            <FilterSelect
+              label="All Parishes"
+              value={parishId}
+              onChange={(v) => { setParishId(v); setOutstationId(""); }}
+              options={parishOptions.map((p) => ({ value: p.id, label: p.name }))}
+              disabled={parishOptions.length === 0}
+            />
+            <FilterSelect
+              label="All Outstations"
+              value={outstationId}
+              onChange={(v) => setOutstationId(v)}
+              options={outstationOptions.map((o) => ({ value: o.id, label: o.name }))}
+              disabled={outstationOptions.length === 0}
+            />
+            <FilterClear
+              onClick={() => {
+                setDeaneryId(""); setParishId(""); setOutstationId(""); setQ("");
+                setFCdm(undefined); setFName(undefined);
+              }}
+              visible={hasFilter}
+            />
+          </FilterRow>
 
-          {hasFilter && (
-            <button
-              onClick={() => { setDeaneryId(""); setParishId(""); setOutstationId(""); setQ(""); }}
-              className="text-[10px] font-semibold text-text-3 hover:text-danger"
-            >
-              Clear filters
-            </button>
-          )}
-
-          <div className="ml-auto flex items-center gap-1.5">
-            <button onClick={() => setRegisterOpen(true)} className={btnCls("primary")}>
-              <BadgeCheck className="h-3.5 w-3.5" /> Register
-            </button>
-            <button onClick={() => setWalkInOpen(true)} className={btnCls("primary")}>
-              <UserPlus className="h-3.5 w-3.5" /> Walk-in
-            </button>
-            <button onClick={() => setScanOpen(true)} className={btnCls("ghost")}>
-              <QrCode className="h-3.5 w-3.5" /> Show QR
-            </button>
-          </div>
-        </div>
-
-        {/* ── attendance table ── */}
-        <div className="flex-1 overflow-auto">
-          <table className="w-full text-[11px]">
-            <thead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_hsl(var(--border))]">
-              <tr className="text-left text-[9px] font-bold uppercase tracking-wide text-text-3">
-                <th className="px-3 py-2.5">CDM No.</th>
-                <th className="px-3 py-2.5">Name</th>
-                <th className="px-3 py-2.5">Phone</th>
-                <th className="px-3 py-2.5">Deanery</th>
-                <th className="px-3 py-2.5">Parish</th>
-                <th className="px-3 py-2.5">Outstation</th>
-                <th className="px-3 py-2.5">Time</th>
-                <th className="px-3 py-2.5 w-8"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="px-3 py-10 text-center text-[12px] text-text-3">
-                    {attendees.length === 0
-                      ? "No registrations yet — use Register, Walk-in, or Scan to add attendees."
-                      : "No attendees match the current filters."}
-                  </td>
-                </tr>
-              )}
-              {pagination.pageRows.map((a) => (
-                <tr key={a.id} className="hover:bg-bg-2">
-                  <td className="px-3 py-2 font-mono text-[10px] text-text-3">{a.cdmId}</td>
-                  <td className="px-3 py-2 font-semibold text-text-1">
-                    {a.name}
-                    {a.kind === "guest" && (
-                      <span className="ml-1.5 rounded bg-warn-soft px-1 py-0.5 text-[8px] font-black uppercase tracking-wide text-gold">
-                        guest
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2 text-text-3">{a.phone || "—"}</td>
-                  <td className="px-3 py-2 text-text-3">{a.deanery || "—"}</td>
-                  <td className="px-3 py-2 text-text-3">{a.parish || "—"}</td>
-                  <td className="px-3 py-2 text-text-3">{a.outstation || "—"}</td>
-                  <td className="px-3 py-2 text-text-4">{a.time}</td>
-                  <td className="px-3 py-2">
-                    <button
-                      onClick={() => removeMut.mutate(a.id)}
-                      disabled={removeMut.isPending}
-                      className="rounded p-0.5 text-text-4 hover:bg-danger-soft hover:text-danger disabled:opacity-50"
-                      title="Remove"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        {filtered.length > 0 && (
-          <TablePagination
-            page={pagination.page}
-            pageSize={pagination.pageSize}
-            total={pagination.total}
-            totalPages={pagination.totalPages}
-            onPageChange={pagination.setPage}
-            onPageSizeChange={pagination.setPageSize}
+          {/* ── search + action buttons ── */}
+          <TableToolbar
+            searchValue={q}
+            onSearchChange={setQ}
+            searchPlaceholder="Search name, CDM No., phone…"
+            extra={
+              <>
+                <button onClick={() => setRegisterOpen(true)} className={btnCls("primary")}>
+                  <BadgeCheck className="h-3.5 w-3.5" /> Register
+                </button>
+                <button onClick={() => setWalkInOpen(true)} className={btnCls("primary")}>
+                  <UserPlus className="h-3.5 w-3.5" /> Walk-in
+                </button>
+                <button onClick={() => setAddYouthOpen(true)} className={btnCls("ghost")}>
+                  <UserCog className="h-3.5 w-3.5" /> New Youth
+                </button>
+                <button onClick={() => exportPdf(filtered)} className={btnCls("ghost")} title="Export current view as PDF">
+                  <FileText className="h-3.5 w-3.5" /> Export PDF
+                </button>
+                <button onClick={() => setScanOpen(true)} className={btnCls("ghost")}>
+                  <QrCode className="h-3.5 w-3.5" /> Show QR
+                </button>
+              </>
+            }
           />
-        )}
+
+          <CardBody className="p-0">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
+                    <ColumnHeader
+                      label="CDM No."
+                      filter={<ColumnFilter label="CDM No." value={fCdm} onChange={setFCdm} />}
+                    />
+                  </th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
+                    <ColumnHeader
+                      label="Name"
+                      filter={<ColumnFilter label="Name" value={fName} onChange={setFName} />}
+                    />
+                  </th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">Phone</th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">Deanery</th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">Parish</th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">Outstation</th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">Time</th>
+                  <th className="label-eyebrow px-3.5 py-2.5 w-8"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={8} className="px-3.5 py-10 text-center text-[12px] text-text-3">
+                      {attendees.length === 0
+                        ? "No registrations yet — use Register, Walk-in, or Scan to add attendees."
+                        : "No attendees match the current filters."}
+                    </td>
+                  </tr>
+                )}
+                {pagination.pageRows.map((a) => (
+                  <tr key={a.id} className="border-b border-border/30 last:border-0 hover:bg-bg-3">
+                    <td className="px-3.5 py-2.5 font-mono text-[10px] font-bold text-gold">{a.cdmId}</td>
+                    <td className="px-3.5 py-2.5 text-[11px] font-semibold text-foreground">
+                      {a.name}
+                      {a.kind === "guest" && (
+                        <span className="ml-1.5 rounded bg-warn-soft px-1 py-0.5 text-[8px] font-black uppercase tracking-wide text-gold">
+                          guest
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3.5 py-2.5 text-[11px] text-text-3">{a.phone || "—"}</td>
+                    <td className="px-3.5 py-2.5 text-[11px] text-text-2">{a.deanery || "—"}</td>
+                    <td className="px-3.5 py-2.5 text-[11px] text-text-1">{a.parish || "—"}</td>
+                    <td className="px-3.5 py-2.5 text-[11px] text-text-2">{a.outstation || "—"}</td>
+                    <td className="px-3.5 py-2.5 text-[11px] text-text-4">{a.time}</td>
+                    <td className="px-3.5 py-2.5 text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            type="button"
+                            aria-label="Row actions"
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-bg-2 text-text-2 hover:border-gold-3 hover:text-gold"
+                          >
+                            <MoreVertical className="h-3.5 w-3.5" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-40">
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-danger focus:text-danger"
+                            onClick={() => setRemoveTarget({ id: a.id, name: a.name })}
+                          >
+                            <Trash2 className="mr-2 h-3.5 w-3.5" /> Remove
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <TablePagination
+              page={pagination.page}
+              pageSize={pagination.pageSize}
+              total={pagination.total}
+              totalPages={pagination.totalPages}
+              onPageChange={pagination.setPage}
+              onPageSizeChange={pagination.setPageSize}
+            />
+          </CardBody>
+        </Card>
       </div>
 
       {/* ── dialogs ── */}
       {org && (
-        <RegisterDialog
-          open={registerOpen}
-          onClose={() => setRegisterOpen(false)}
-          org={org}
-          defaultDeaneryId={deaneryId}
-          defaultParishId={parishId}
-          defaultOutstationId={outstationId}
-          onAdd={(cdmId) => registerMut.mutate({ eventId, cdmId })}
-        />
+        <>
+          <RegisterDialog
+            open={registerOpen}
+            onClose={() => setRegisterOpen(false)}
+            org={org}
+            defaultDeaneryId={deaneryId}
+            defaultParishId={parishId}
+            defaultOutstationId={outstationId}
+            onAdd={(cdmId) => registerMut.mutate({ eventId, cdmId })}
+          />
+          <AddYouthDialog
+            open={addYouthOpen}
+            onClose={() => setAddYouthOpen(false)}
+            org={org}
+            title="Add Youth & Register"
+            onSuccess={(youth: AddYouthResult) => {
+              setAddYouthOpen(false);
+              registerMut.mutate({ eventId, cdmId: youth.cdm_id });
+            }}
+          />
+        </>
       )}
       <WalkInDialog
         open={walkInOpen}
@@ -369,9 +448,34 @@ function EventCheckinPage() {
         eventId={eventId}
         eventName={event.name}
       />
+
+      <AlertDialog open={removeTarget !== null} onOpenChange={(o) => !o && setRemoveTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove from event?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes <strong>{removeTarget?.name}</strong> from this event's registration list.
+              Their youth record and all other data remain unchanged.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (removeTarget) removeMut.mutate(removeTarget.id);
+                setRemoveTarget(null);
+              }}
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
+
+const SEL_CLS = "h-8 flex-1 min-w-[120px] rounded-md border border-border bg-bg-2 px-2 text-[11px] font-medium text-text-1 outline-none transition hover:border-gold-3 focus:border-gold-3 disabled:opacity-40";
 
 /* ─── Register dialog ─── */
 function RegisterDialog({
@@ -531,7 +635,7 @@ function RegisterDialog({
               <select
                 value={bDeaneryId}
                 onChange={(e) => { setBDeaneryId(e.target.value); setBParishId(""); setBOutstationId(""); }}
-                className={selectCls("flex-1 min-w-[120px]")}
+                className={SEL_CLS}
               >
                 <option value="">All Deaneries</option>
                 {org.deaneries.map((d) => (
@@ -542,7 +646,7 @@ function RegisterDialog({
               <select
                 value={bParishId}
                 onChange={(e) => { setBParishId(e.target.value); setBOutstationId(""); }}
-                className={selectCls("flex-1 min-w-[120px]")}
+                className={SEL_CLS}
                 disabled={browseParishes.length === 0}
               >
                 <option value="">All Parishes</option>
@@ -554,7 +658,7 @@ function RegisterDialog({
               <select
                 value={bOutstationId}
                 onChange={(e) => setBOutstationId(e.target.value)}
-                className={selectCls("flex-1 min-w-[120px]")}
+                className={SEL_CLS}
                 disabled={browseOutstations.length === 0}
               >
                 <option value="">All Outstations</option>
@@ -694,7 +798,10 @@ function ScanDialog({
   useEffect(() => {
     if (!open) return;
     setOrigin(window.location.origin);
-    import("qrcode.react").then((m) => setQRCodeSVG(() => m.QRCodeSVG));
+    import("qrcode.react").then((m) => setQRCodeSVG(m.QRCodeSVG as ComponentType<{
+      id?: string; value: string; size?: number; bgColor?: string;
+      fgColor?: string; level?: string; includeMargin?: boolean;
+    }>));
   }, [open]);
 
   const registrationUrl = `${origin}/checkin/${eventId}`;
