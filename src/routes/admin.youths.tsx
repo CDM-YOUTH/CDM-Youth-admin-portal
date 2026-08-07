@@ -39,19 +39,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ORGANIZATION } from "@/lib/mock-data";
 import { YOUTH_CATEGORIES, YOUTH_GENDERS } from "@/lib/youth-data";
 import {
   bulkInsertYouths,
-  createYouth,
   deleteYouth,
   listYouthsPaged,
-  updateYouth,
   type YouthCategory,
   type YouthInput,
   type YouthRow,
 } from "@/lib/db/youth-records/youths";
 import { createEnrollment } from "@/lib/db/youth-records/enrollments";
+import { AddYouthDialog, type YouthFormInitial } from "@/components/admin/youth/add-youth-dialog";
 
 const filterValueSchema = fallback(
   z
@@ -96,7 +94,7 @@ function YouthsPage() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const [addOpen, setAddOpen] = useState(false);
-  const [editing, setEditing] = useState<null | { id: string; values: Record<string, string> }>(null);
+  const [editing, setEditing] = useState<null | { id: string; initial: YouthFormInitial }>(null);
   const [deleteTarget, setDeleteTarget] = useState<null | { id: string; name: string; cdmId: string }>(null);
   const [enrollTarget, setEnrollTarget] = useState<null | { cdmId: string; name: string }>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -150,6 +148,9 @@ function YouthsPage() {
         phone: y.phone ?? "",
         altPhone: y.alt_phone ?? "",
         email: y.email ?? "",
+        deaneryId: y.deanery_id ?? "",
+        parishId: y.parish_id ?? "",
+        outstationId: y.outstation_id ?? "",
         deaneryName: y.deanery?.name ?? "",
         parishName: y.parish?.name ?? "",
         churchName: y.outstation?.name ?? "",
@@ -178,25 +179,10 @@ function YouthsPage() {
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["youths"] });
 
-  const createMut = useMutation({
-    mutationFn: (input: YouthInput) => createYouth(input),
-    onSuccess: (data: { cdm_id?: string } | unknown) => {
-      const cdm = (data as { cdm_id?: string })?.cdm_id ?? "";
-      toast.success(`Youth registered${cdm ? ` · ${cdm}` : ""}`);
-      invalidate();
-      qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
-      qc.invalidateQueries({ queryKey: ["live-analytics"] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-  const updateMut = useMutation({
-    mutationFn: ({ id, input }: { id: string; input: YouthInput }) => updateYouth(id, input),
-    onSuccess: () => {
-      toast.success("Youth updated");
-      invalidate();
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
+  const onEditSuccess = () => {
+    toast.success("Youth updated");
+    invalidate();
+  };
   const deleteMut = useMutation({
     mutationFn: (id: string) => deleteYouth(id),
     onSuccess: () => {
@@ -242,19 +228,17 @@ function YouthsPage() {
     { key: "email", label: "Email (optional)", type: "email", placeholder: "name@example.com" },
     {
       key: "deanery", label: "Deanery", type: "select", required: true,
-      options: ORGANIZATION.map((d) => d.name),
+      options: (org?.deaneries ?? []).map((d) => d.name),
     },
     {
       key: "parish", label: "Parish", type: "select", required: true,
-      dynamicOptions: (v) => ORGANIZATION.find((d) => d.name === v.deanery)?.parishes.map((p) => p.name) ?? [],
+      dynamicOptions: (v) =>
+        (org?.parishesByDeaneryName.get(v.deanery) ?? []).map((p) => p.name),
     },
     {
-      key: "outstation", label: "Outstation / Local church", type: "select", required: true,
-      dynamicOptions: (v) => {
-        const d = ORGANIZATION.find((d) => d.name === v.deanery);
-        const p = d?.parishes.find((p) => p.name === v.parish);
-        return p?.churches.map((c) => c.name) ?? [];
-      },
+      key: "outstation", label: "Outstation / Local church", type: "select",
+      dynamicOptions: (v) =>
+        (org?.outstationsByParishName.get(v.parish) ?? []).map((o) => o.name),
     },
     { key: "category", label: "Category", type: "select", options: [...YOUTH_CATEGORIES], required: true },
     { key: "institution", label: "Institution (if Tertiary)", placeholder: "e.g. Murang'a University" },
@@ -576,21 +560,20 @@ function YouthsPage() {
                             onClick={() =>
                               setEditing({
                                 id: row.id,
-                                values: {
+                                initial: {
                                   fullName: row.name,
-                                  gender: row.gender,
+                                  gender: row.gender as import("@/lib/db/youth-records/youths").Gender,
                                   age: String(row.age),
                                   phone: row.phone,
                                   altPhone: row.altPhone,
                                   email: row.email,
-                                  deanery: row.deaneryName,
-                                  parish: row.parishName,
-                                  outstation: row.churchName,
+                                  deaneryId: row.deaneryId,
+                                  parishId: row.parishId,
+                                  outstationId: row.outstationId,
                                   category: row.category,
                                   institution: row.institution,
                                   yearOfStudy: row.yearOfStudy,
                                   notes: row.notes,
-                                  passportUrl: row.passportUrl,
                                 },
                               })
                             }
@@ -634,28 +617,32 @@ function YouthsPage() {
           </CardBody>
         </Card>
       </div>
-      <RecordFormDialog
-        open={addOpen}
-        onOpenChange={setAddOpen}
-        title="Register Youth"
-        description="A unique CDM No. is assigned automatically on save."
-        fields={youthFields}
-        submitLabel="Register Youth"
-        onSubmit={(values) => createMut.mutate(toYouthInput(values))}
-      />
-      <RecordFormDialog
-        open={editing !== null}
-        onOpenChange={(o) => !o && setEditing(null)}
-        title="Edit Youth"
-        description="All fields are editable. Unique CDM No. is permanent."
-        fields={youthFields}
-        initial={editing?.values}
-        submitLabel="Save changes"
-        onSubmit={(values) => {
-          if (editing) updateMut.mutate({ id: editing.id, input: toYouthInput(values) });
-          setEditing(null);
-        }}
-      />
+      {org && (
+        <>
+          <AddYouthDialog
+            open={addOpen}
+            onClose={() => setAddOpen(false)}
+            org={org}
+            onSuccess={() => {
+              setAddOpen(false);
+              invalidate();
+              qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
+              qc.invalidateQueries({ queryKey: ["live-analytics"] });
+            }}
+          />
+          <AddYouthDialog
+            open={editing !== null}
+            onClose={() => setEditing(null)}
+            org={org}
+            youthId={editing?.id}
+            initial={editing?.initial}
+            onSuccess={() => {
+              setEditing(null);
+              onEditSuccess();
+            }}
+          />
+        </>
+      )}
       <RecordFormDialog
         open={enrollTarget !== null}
         onOpenChange={(o) => !o && setEnrollTarget(null)}
