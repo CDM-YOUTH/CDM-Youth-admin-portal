@@ -77,10 +77,17 @@ export type CusaBreakdownRow = {
 };
 
 export type LeaderBreakdownRow = {
-  level:     string;
-  org_label: string;
-  active:    number;
-  total:     number;
+  id:               string | null;
+  label:            string;
+  deanery_id:       string | null;
+  deanery_name:     string | null;
+  parish_id:        string | null;
+  parish_name:      string | null;
+  diocese_active:   number;
+  deanery_active:   number;
+  parish_active:    number;
+  outstation_active: number;
+  total_active:     number;
 };
 
 export type WelfareBreakdownRow = {
@@ -236,18 +243,27 @@ export async function getCusaBreakdown(
 
 export async function getLeaderBreakdown(
   scope: ScopeParams = {},
+  groupBy: GroupBy = "deanery",
 ): Promise<LeaderBreakdownRow[]> {
   const { data, error } = await rpc<unknown[]>("get_leader_breakdown", {
     p_deanery_id:     scope.deaneryId    ?? null,
     p_parish_id:      scope.parishId     ?? null,
     p_outstation_id:  scope.outstationId ?? null,
+    p_group_by:       groupBy,
   });
   if (error) throw new Error(error.message);
   return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
-    level:     (r.level as string) ?? "—",
-    org_label: (r.org_label as string) ?? "—",
-    active:    n(r.active),
-    total:     n(r.total),
+    id:               (r.id as string | null) ?? null,
+    label:            (r.label as string) ?? "—",
+    deanery_id:       (r.deanery_id as string | null) ?? null,
+    deanery_name:     (r.deanery_name as string | null) ?? null,
+    parish_id:        (r.parish_id as string | null) ?? null,
+    parish_name:      (r.parish_name as string | null) ?? null,
+    diocese_active:   n(r.diocese_active),
+    deanery_active:   n(r.deanery_active),
+    parish_active:    n(r.parish_active),
+    outstation_active: n(r.outstation_active),
+    total_active:     n(r.total_active),
   }));
 }
 

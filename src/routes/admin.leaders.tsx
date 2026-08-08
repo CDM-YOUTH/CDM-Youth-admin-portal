@@ -5,11 +5,11 @@ import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { History, MoreVertical, Upload } from "lucide-react";
+import { History, MoreVertical, Plus, Upload } from "lucide-react";
 import { type PagedResponse } from "@/lib/api/fetch-api";
 import { YouthSearchInput, type PickedYouth } from "@/components/admin/composables/pickers/youth-search-input";
 import { Topbar, TopbarButton, TopbarTab } from "@/components/admin/layout/topbar";
-import { Card, CardBody, Kpi } from "@/components/admin/composables/ui-bits";
+import { Card, CardBody } from "@/components/admin/composables/ui-bits";
 import { TablePagination } from "@/components/admin/composables/tables/table-pagination";
 import {
   ColumnFilter,
@@ -62,6 +62,7 @@ import {
   type LeadershipRoleUpdate,
   type RoleTypeRow,
 } from "@/lib/db/youth-records/leaders";
+import { AddYouthDialog, type AddYouthResult } from "@/components/admin/youth/add-youth-dialog";
 
 const leadersSearchSchema = z.object({
   q:             fallback(z.string(), "").default(""),
@@ -88,6 +89,7 @@ export const Route = createFileRoute("/admin/leaders")({
 
 function LeadersPage() {
   const [tab, setTab]             = useState<LeadershipLevel>("diocese");
+  const [addYouthOpen, setAddYouthOpen] = useState(false);
   const [appointOpen, setAppointOpen] = useState(false);
   const [importOpen, setImportOpen]   = useState(false);
   const [editTarget, setEditTarget]   = useState<LeadershipRoleRow | null>(null);
@@ -107,14 +109,8 @@ function LeadersPage() {
 
   const { data: org } = useQuery({ queryKey: ["org"], queryFn: fetchOrg });
   const { data: roleTypes = [] } = useQuery({ queryKey: ["role-types"], queryFn: listRoleTypes });
-  // Fetch a summary of active leader counts across all levels (small query, unfiltered)
-  const { data: allActiveResp } = useQuery({
-    queryKey: ["leadership-roles-counts"],
-    queryFn: () => listLeadersPaged({ page: 0, size: 500, active: true }),
-    placeholderData: keepPreviousData,
-  });
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
+  const [pageSize, setPageSize] = useState(10);
   const { data: resp, isLoading } = useQuery({
     queryKey: [
       "leadership-roles", tab,
@@ -137,13 +133,8 @@ function LeadersPage() {
   const total = resp?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
-  const allActive = allActiveResp?.data ?? [];
-  const activeCount = (lvl: LeadershipLevel) =>
-    allActive.filter((r) => r.level === lvl && !r.end_date).length;
-
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ["leadership-roles"] });
-    qc.invalidateQueries({ queryKey: ["leadership-roles-counts"] });
   };
 
   const appointMut = useMutation({
@@ -185,13 +176,16 @@ function LeadersPage() {
           <>
             {LEVELS.map((lvl) => (
               <TopbarTab key={lvl} active={tab === lvl} onClick={() => { setTab(lvl); setPage(1); }}>
-                {LEVEL_LABELS[lvl]} ({activeCount(lvl)})
+                {LEVEL_LABELS[lvl]}
               </TopbarTab>
             ))}
           </>
         }
         action={
           <>
+            <TopbarButton onClick={() => setAddYouthOpen(true)}>
+              <Plus className="mr-1 h-3.5 w-3.5" />Add Youth
+            </TopbarButton>
             <TopbarButton onClick={() => setImportOpen(true)}>Import CSV</TopbarButton>
             <TopbarButton onClick={() => setAppointOpen(true)}>+ Appoint</TopbarButton>
           </>
@@ -199,18 +193,6 @@ function LeadersPage() {
       />
 
       <div className="flex-1 overflow-y-auto px-5 py-4">
-        <div className="mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-          {LEVELS.map((lvl) => (
-            <Kpi
-              key={lvl}
-              label={LEVEL_LABELS[lvl]}
-              value={String(activeCount(lvl))}
-              trend="active leaders"
-              tone="info"
-            />
-          ))}
-        </div>
-
         <Card>
           <LeadersTable
             key={tab}
@@ -237,6 +219,19 @@ function LeadersPage() {
           />
         </Card>
       </div>
+
+      {org && (
+        <AddYouthDialog
+          open={addYouthOpen}
+          onClose={() => setAddYouthOpen(false)}
+          org={org}
+          onSuccess={(_youth: AddYouthResult) => {
+            setAddYouthOpen(false);
+            invalidate();
+            qc.invalidateQueries({ queryKey: ["youths"] });
+          }}
+        />
+      )}
 
       <AppointDialog
         open={appointOpen}
@@ -561,13 +556,13 @@ function LeadersTable({
                     {row.youth?.phone ?? "—"}
                   </td>
                   <td className="px-3.5 py-2.5 text-[11px] text-text-2">
-                    {row.deanery?.name ?? "—"}
+                    {row.youth?.deanery?.name ?? "—"}
                   </td>
                   <td className="px-3.5 py-2.5 text-[11px] text-text-1">
-                    {row.parish?.name ?? "—"}
+                    {row.youth?.parish?.name ?? "—"}
                   </td>
                   <td className="px-3.5 py-2.5 text-[11px] text-text-2">
-                    {row.outstation?.name ?? "—"}
+                    {row.youth?.outstation?.name ?? "—"}
                   </td>
                   <td className="px-3.5 py-2.5 text-[11px] text-text-1">{row.role_type?.name ?? "—"}</td>
                   {showEndDate && (
@@ -629,7 +624,7 @@ function LeadersTable({
           totalPages={totalPages}
           onPageChange={onPageChange}
           onPageSizeChange={onPageSizeChange}
-          pageSizes={[15, 30, 50]}
+          pageSizes={[5, 10, 25, 50, 100]}
         />
       )}
     </>

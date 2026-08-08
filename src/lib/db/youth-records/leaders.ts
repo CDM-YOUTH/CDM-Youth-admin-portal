@@ -22,7 +22,14 @@ export type LeadershipRoleRow = {
   end_date: string | null;
   notes: string | null;
   created_at: string;
-  youth?: { full_name: string; cdm_id: string; phone: string | null } | null;
+  youth?: {
+    full_name: string;
+    cdm_id: string;
+    phone: string | null;
+    deanery?: { name: string } | null;
+    parish?: { name: string } | null;
+    outstation?: { name: string } | null;
+  } | null;
   role_type?: { name: string } | null;
   deanery?: { name: string } | null;
   parish?: { name: string } | null;
@@ -50,7 +57,7 @@ export type BulkLeaderRow = {
 };
 
 const SEL =
-  "*, youth:youths(full_name,cdm_id,phone), role_type:leadership_role_types(name), deanery:deaneries(name), parish:parishes(name), outstation:outstations(name)";
+  "*, youth:youths(full_name,cdm_id,phone,deanery:deaneries(name),parish:parishes(name),outstation:outstations(name)), role_type:leadership_role_types(name), deanery:deaneries(name), parish:parishes(name), outstation:outstations(name)";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = () => (supabase as any).from("youth_leadership_roles");
@@ -98,8 +105,8 @@ export async function listLeadersPaged(opts: {
   // Use !inner join on youths when doing a text search so unmatched rows are excluded
   const needsInner = !!(opts.q?.trim());
   const youthJoin = needsInner
-    ? "youth:youths!inner(full_name,cdm_id,phone)"
-    : "youth:youths(full_name,cdm_id,phone)";
+    ? "youth:youths!inner(full_name,cdm_id,phone,deanery:deaneries(name),parish:parishes(name),outstation:outstations(name))"
+    : "youth:youths(full_name,cdm_id,phone,deanery:deaneries(name),parish:parishes(name),outstation:outstations(name))";
   const sel = `*, ${youthJoin}, role_type:leadership_role_types(name), deanery:deaneries(name), parish:parishes(name), outstation:outstations(name)`;
 
   let query = db()

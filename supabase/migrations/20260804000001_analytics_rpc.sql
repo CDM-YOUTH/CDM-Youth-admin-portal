@@ -84,8 +84,8 @@ AS $$
        AND (p_outstation_id IS NULL OR y.outstation_id = p_outstation_id)
     )::bigint AS cusa_active,
 
-    -- Active leadership roles (scoped by the role's own org unit, not the youth's)
-    (SELECT COUNT(*) FROM youth_leadership_roles lr
+    -- Distinct individuals with at least one active leadership role in scope
+    (SELECT COUNT(DISTINCT lr.youth_id) FROM youth_leadership_roles lr
      LEFT JOIN parishes    p  ON p.id  = lr.parish_id
      LEFT JOIN outstations o  ON o.id  = lr.outstation_id
      LEFT JOIN parishes    p2 ON p2.id = o.parish_id

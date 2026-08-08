@@ -31,6 +31,7 @@ import {
   listRoleTypes,
   type LeadershipLevel,
 } from "@/lib/db/youth-records/leaders";
+import { createCusaMember } from "@/lib/db/youth-records/cusa";
 import type { OrgTree } from "@/lib/db/org";
 
 /* ── constants ─────────────────────────────────────────────────── */
@@ -187,6 +188,15 @@ export function AddYouthDialog({
       const youth = isEdit
         ? ((await updateYouth(youthId!, input)) as AddYouthResult)
         : ((await createYouth(input)) as AddYouthResult);
+
+      /* auto-create CUSA entry for new Tertiary youth with institution */
+      if (!isEdit && category === "Tertiary" && institution.trim()) {
+        await createCusaMember({
+          cdmId: youth.cdm_id,
+          institution: institution.trim(),
+          yearOfStudy: yearOfStudy.trim() || undefined,
+        });
+      }
 
       /* appoint leadership roles (add mode only — or when new levels are selected) */
       if (isLeader && selectedLevels.size > 0) {
