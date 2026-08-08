@@ -70,7 +70,7 @@ const youthSearchSchema = z.object({
   category: fallback(z.string(), "").default(""),
   status: fallback(z.string(), "").default(""),
   page: fallback(z.number().int().min(1), 1).default(1),
-  size: fallback(z.number().int().min(1).max(100), 25).default(25),
+  size: fallback(z.number().int().min(1).max(100), 10).default(10),
   // Client-side column filters (applied on current page rows only)
   f_cdm: filterValueSchema,
   f_name: filterValueSchema,
