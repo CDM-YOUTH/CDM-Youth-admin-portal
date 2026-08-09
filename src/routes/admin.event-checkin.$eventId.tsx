@@ -34,6 +34,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { getEventFull, registerForEvent, deleteRegistration } from "@/lib/db/activities/events";
+import { apiFetch } from "@/lib/api/fetch-api";
 import { listYouthsPaged, fetchYouthByCdmId, type YouthRow } from "@/lib/db/youth-records/youths";
 import { fetchOrg, type OrgTree } from "@/lib/db/org";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -89,11 +90,32 @@ function EventCheckinPage() {
     staleTime: Infinity,
   });
 
+  const LEADERSHIP_WORKSHOP_ID = "391508e3-b057-48ef-aad0-2992046a91ff";
+
   const registerMut = useMutation({
     mutationFn: registerForEvent,
     onSuccess: (_data, variables) => {
       toast.success(`${variables.guestName ?? variables.cdmId ?? "Attendee"} registered`);
       qc.invalidateQueries({ queryKey: ["event-full", eventId] });
+      // Sync to Google Sheets for Leadership Workshop
+      if (eventId === LEADERSHIP_WORKSHOP_ID) {
+        apiFetch("/api/leadership-sheet", {
+          method: "POST",
+          body: JSON.stringify({
+            eventId,
+            cdmId: variables.cdmId ?? null,
+            guestName: variables.guestName ?? null,
+            guestPhone: variables.guestPhone ?? null,
+          }),
+        })
+          .then(async (res) => {
+            if (!res.ok) {
+              const body = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+              toast.warning(`Registered but sheet sync failed: ${(body as { error?: string }).error ?? res.status}`);
+            }
+          })
+          .catch((err) => toast.warning(`Registered but sheet sync failed: ${err.message}`));
+      }
     },
     onError: (e: Error) => toast.error(e.message),
   });
