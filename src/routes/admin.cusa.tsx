@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MoreVertical, Pencil, Trash2, Plus } from "lucide-react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
@@ -10,7 +10,7 @@ import { Topbar } from "@/components/admin/layout/topbar";
 import { Card, CardBody, Pill } from "@/components/admin/composables/ui-bits";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { CUSA_INSTITUTIONS } from "@/lib/cusa-data";
-import { createCusaMember, deleteCusaMember, listCusaPaged, updateCusaMember, type CusaRow } from "@/lib/db/youth-records/cusa";
+import { createCusaMember, deleteCusaMember, listCusaPaged, syncTertiaryYouthsToCusa, updateCusaMember, type CusaRow } from "@/lib/db/youth-records/cusa";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,6 +39,7 @@ import {
 import { RecordFormDialog } from "@/components/admin/composables/forms/record-form-dialog";
 import { YouthSearchInput, type PickedYouth } from "@/components/admin/composables/pickers/youth-search-input";
 import { fetchOrg, type OrgTree } from "@/lib/db/org";
+import { AddYouthDialog, type AddYouthResult } from "@/components/admin/youth/add-youth-dialog";
 import {
   Dialog,
   DialogContent,
@@ -68,7 +69,7 @@ const cusaSearchSchema = z.object({
   parish_id: fallback(z.string(), "").default(""),
   year: fallback(z.number().int(), new Date().getFullYear()).default(new Date().getFullYear()),
   page: fallback(z.number().int().min(1), 1).default(1),
-  size: fallback(z.number().int().min(1).max(100), 25).default(25),
+  size: fallback(z.number().int().min(1).max(100), 10).default(10),
   // Client-side filters on current page
   f_cdm: filterValueSchema,
   f_name: filterValueSchema,
@@ -93,9 +94,20 @@ function CusaPage() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const [addOpen, setAddOpen] = useState(false);
+  const [addYouthOpen, setAddYouthOpen] = useState(false);
   const [editing, setEditing] = useState<null | { id: string; name: string; values: Record<string, string> }>(null);
   const [deleteTarget, setDeleteTarget] = useState<null | { id: string; name: string }>(null);
   const qc = useQueryClient();
+  const syncedRef = useRef(false);
+  useEffect(() => {
+    if (syncedRef.current) return;
+    syncedRef.current = true;
+    syncTertiaryYouthsToCusa()
+      .then(() => qc.invalidateQueries({ queryKey: ["cusa"] }))
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const { data: org } = useQuery({ queryKey: ["org"], queryFn: fetchOrg });
   const { data: resp, isLoading } = useQuery({
     queryKey: ["cusa", search.page - 1, search.size, search.q, search.institution, search.deanery_id, search.parish_id, search.year],
@@ -208,13 +220,22 @@ const fc = (key: keyof CusaSearch, label: string, mode: "text" | "select" = "tex
         title="Colleges & Universities Students Association (CUSA)"
         description={isLoading ? "Loading CUSA members…" : `${displayMembers.length.toLocaleString()} of ${allMembers.length.toLocaleString()} members shown — share this URL to share the same view.`}
         action={
-          <button
-            type="button"
-            onClick={() => setAddOpen(true)}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-danger px-3 text-[11px] font-bold text-white transition hover:opacity-90"
-          >
-            <Plus className="h-3.5 w-3.5" /> Add Member
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setAddYouthOpen(true)}
+              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-bg-2 px-3 text-[11px] font-bold text-text-1 transition hover:border-gold-3 hover:text-gold"
+            >
+              <Plus className="h-3.5 w-3.5" /> Add Youth
+            </button>
+            <button
+              type="button"
+              onClick={() => setAddOpen(true)}
+              className="inline-flex h-8 items-center gap-1.5 rounded-md bg-danger px-3 text-[11px] font-bold text-white transition hover:opacity-90"
+            >
+              <Plus className="h-3.5 w-3.5" /> Add Member
+            </button>
+          </div>
         }
       />
       <div className="flex-1 overflow-y-auto px-5 py-4">
@@ -371,6 +392,18 @@ const fc = (key: keyof CusaSearch, label: string, mode: "text" | "select" = "tex
           </CardBody>
         </Card>
       </div>
+      {org && (
+        <AddYouthDialog
+          open={addYouthOpen}
+          onClose={() => setAddYouthOpen(false)}
+          org={org}
+          onSuccess={(_youth: AddYouthResult) => {
+            setAddYouthOpen(false);
+            qc.invalidateQueries({ queryKey: ["cusa"] });
+            qc.invalidateQueries({ queryKey: ["youths"] });
+          }}
+        />
+      )}
       <AddCusaDialog
         open={addOpen}
         onOpenChange={setAddOpen}

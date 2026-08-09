@@ -1,5 +1,4 @@
 import { useMemo, useRef, useState } from "react";
-import Papa from "papaparse";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
@@ -9,7 +8,7 @@ import { MoreVertical, Pencil, Trash2, BadgeCheck, Download, Plus } from "lucide
 import { downloadXlsx } from "@/lib/export-xlsx";
 import { fetchOrg } from "@/lib/db/org";
 import { useAdminScope } from "@/lib/hooks/use-admin-scope";
-import { CUSA_INSTITUTIONS } from "@/lib/cusa-data";
+import { importYouths, buildTemplateOpts, type ImportResult } from "@/lib/db/youth-records/import";
 import { type PagedResponse } from "@/lib/api/fetch-api";
 import { Topbar } from "@/components/admin/layout/topbar";
 import { Card, CardBody, Pill } from "@/components/admin/composables/ui-bits";
@@ -39,19 +38,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ORGANIZATION } from "@/lib/mock-data";
 import { YOUTH_CATEGORIES, YOUTH_GENDERS } from "@/lib/youth-data";
 import {
-  bulkInsertYouths,
-  createYouth,
   deleteYouth,
   listYouthsPaged,
-  updateYouth,
   type YouthCategory,
   type YouthInput,
   type YouthRow,
 } from "@/lib/db/youth-records/youths";
 import { createEnrollment } from "@/lib/db/youth-records/enrollments";
+import { AddYouthDialog, type YouthFormInitial } from "@/components/admin/youth/add-youth-dialog";
 
 const filterValueSchema = fallback(
   z
@@ -72,7 +68,7 @@ const youthSearchSchema = z.object({
   category: fallback(z.string(), "").default(""),
   status: fallback(z.string(), "").default(""),
   page: fallback(z.number().int().min(1), 1).default(1),
-  size: fallback(z.number().int().min(1).max(100), 25).default(25),
+  size: fallback(z.number().int().min(1).max(100), 10).default(10),
   // Client-side column filters (applied on current page rows only)
   f_cdm: filterValueSchema,
   f_name: filterValueSchema,
@@ -96,11 +92,12 @@ function YouthsPage() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const [addOpen, setAddOpen] = useState(false);
-  const [editing, setEditing] = useState<null | { id: string; values: Record<string, string> }>(null);
+  const [editing, setEditing] = useState<null | { id: string; initial: YouthFormInitial }>(null);
   const [deleteTarget, setDeleteTarget] = useState<null | { id: string; name: string; cdmId: string }>(null);
   const [enrollTarget, setEnrollTarget] = useState<null | { cdmId: string; name: string }>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [importResult, setImportResult] = useState<null | { inserted: number; skipped: number; total: number; firstCdms: string[] }>(null);
+  const [importResult, setImportResult] = useState<null | ImportResult>(null);
+  const [importProgress, setImportProgress] = useState<null | { current: number; total: number }>(null);
   const qc = useQueryClient();
 
   const { data: org } = useQuery({ queryKey: ["org"], queryFn: fetchOrg });
@@ -150,6 +147,9 @@ function YouthsPage() {
         phone: y.phone ?? "",
         altPhone: y.alt_phone ?? "",
         email: y.email ?? "",
+        deaneryId: y.deanery_id ?? "",
+        parishId: y.parish_id ?? "",
+        outstationId: y.outstation_id ?? "",
         deaneryName: y.deanery?.name ?? "",
         parishName: y.parish?.name ?? "",
         churchName: y.outstation?.name ?? "",
@@ -178,25 +178,10 @@ function YouthsPage() {
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["youths"] });
 
-  const createMut = useMutation({
-    mutationFn: (input: YouthInput) => createYouth(input),
-    onSuccess: (data: { cdm_id?: string } | unknown) => {
-      const cdm = (data as { cdm_id?: string })?.cdm_id ?? "";
-      toast.success(`Youth registered${cdm ? ` · ${cdm}` : ""}`);
-      invalidate();
-      qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
-      qc.invalidateQueries({ queryKey: ["live-analytics"] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-  const updateMut = useMutation({
-    mutationFn: ({ id, input }: { id: string; input: YouthInput }) => updateYouth(id, input),
-    onSuccess: () => {
-      toast.success("Youth updated");
-      invalidate();
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
+  const onEditSuccess = () => {
+    toast.success("Youth updated");
+    invalidate();
+  };
   const deleteMut = useMutation({
     mutationFn: (id: string) => deleteYouth(id),
     onSuccess: () => {
@@ -242,19 +227,17 @@ function YouthsPage() {
     { key: "email", label: "Email (optional)", type: "email", placeholder: "name@example.com" },
     {
       key: "deanery", label: "Deanery", type: "select", required: true,
-      options: ORGANIZATION.map((d) => d.name),
+      options: (org?.deaneries ?? []).map((d) => d.name),
     },
     {
       key: "parish", label: "Parish", type: "select", required: true,
-      dynamicOptions: (v) => ORGANIZATION.find((d) => d.name === v.deanery)?.parishes.map((p) => p.name) ?? [],
+      dynamicOptions: (v) =>
+        (org?.parishesByDeaneryName.get(v.deanery) ?? []).map((p) => p.name),
     },
     {
-      key: "outstation", label: "Outstation / Local church", type: "select", required: true,
-      dynamicOptions: (v) => {
-        const d = ORGANIZATION.find((d) => d.name === v.deanery);
-        const p = d?.parishes.find((p) => p.name === v.parish);
-        return p?.churches.map((c) => c.name) ?? [];
-      },
+      key: "outstation", label: "Outstation / Local church", type: "select",
+      dynamicOptions: (v) =>
+        (org?.outstationsByParishName.get(v.parish) ?? []).map((o) => o.name),
     },
     { key: "category", label: "Category", type: "select", options: [...YOUTH_CATEGORIES], required: true },
     { key: "institution", label: "Institution (if Tertiary)", placeholder: "e.g. Murang'a University" },
@@ -269,116 +252,76 @@ function YouthsPage() {
     { key: "paymentRef", label: "Payment reference (optional)", placeholder: "Bank slip / transaction ref" },
   ];
 
-  const SAMPLE_HEADERS = [
-    "FULL NAME","GENDER","AGE","PHONE","ALT PHONE","EMAIL",
-    "DEANERY","PARISH","OUTSTATION","CATEGORY","INSTITUTION","YEAR OF STUDY","NOTES",
+  const IMPORT_HEADERS = [
+    "full_name", "gender", "age", "phone", "alt_phone", "email",
+    "deanery", "parish", "outstation",
+    "category", "institution", "year_of_study", "course", "notes",
+    "Diocese", "Deanery", "Parish", "Outstation",
   ];
+
   const downloadSample = async () => {
-    const sampleRows: (string | number | null)[][] = [
-      ["Grace Wanjiku","Female","16","+254700000000","","grace@example.com","Murang’a Deanery","Cathedral","St. Mary Cathedral Outstation","Secondary","","",""],
-      ["Peter Mwangi","Male","20","+254711000000","","","Mwea Deanery","Mwea","Holy Family Mwea Outstation","Tertiary","Murang’a University","Year 2",""],
-    ];
     try {
-      const org = await fetchOrg();
-      const deaneryNames = org.deaneries.map((d) => d.name);
-      const parishByDeanery: Record<string, string[]> = {};
-      for (const [deaneryName, parishes] of org.parishesByDeaneryName) {
-        parishByDeanery[deaneryName] = parishes.map((p) => p.name);
-      }
-      const outstationByParish: Record<string, string[]> = {};
-      for (const [parishName, outstations] of org.outstationsByParishName) {
-        outstationByParish[parishName] = outstations.map((o) => o.name);
-      }
-      await downloadXlsx("youths-import-sample", "Youth Import Sample", SAMPLE_HEADERS, sampleRows, {
-        flat: {
-          "GENDER": ["Female", "Male"],
-          "DEANERY": deaneryNames,
-          "CATEGORY": ["Primary", "Secondary", "Tertiary", "Working"],
-          "INSTITUTION": [...CUSA_INSTITUTIONS],
-          "YEAR OF STUDY": ["Year 1", "Year 2", "Year 3", "Year 4", "Postgraduate", "Alumni"],
+      const opts = await buildTemplateOpts();
+      const sampleRows: (string | number | null)[][] = [
+        [
+          "Grace Wanjiku Kamau", "Female", 16, "+254700000000", "", "grace@example.com",
+          "Gaichanjiru Deanery", "St. Pius X, Mariira", "Mariira", "Secondary", "", "", "", "",
+          "", "", "", "",
+        ],
+        [
+          "Peter Mwangi Njoroge", "Male", 22, "+254711000000", "", "",
+          "Mwea Deanery", "Our Lady of Consolata, Sagana", "", "Tertiary",
+          "Murang’a University of Technology", "Year 2", "Computer Science", "",
+          "Coordinator", "Secretary", "", "",
+        ],
+      ];
+      await downloadXlsx(
+        "youth-import-template",
+        "Youth Import",
+        IMPORT_HEADERS,
+        sampleRows,
+        {
+          flat: {
+            gender:      ["Female", "Male"],
+            deanery:     opts.deaneryNames,
+            category:    ["Primary", "Secondary", "Tertiary", "Working"],
+            year_of_study: ["Year 1", "Year 2", "Year 3", "Year 4", "Postgraduate", "Alumni"],
+            Diocese:     opts.roleTypeNames,
+            Deanery:     opts.roleTypeNames,
+            Parish:      opts.roleTypeNames,
+            Outstation:  opts.roleTypeNames,
+          },
+          cascade: {
+            parish:     { parent: "deanery", map: opts.parishByDeanery },
+            outstation: { parent: "parish",  map: opts.outstationByParish },
+          },
         },
-        cascade: {
-          "PARISH": { parent: "DEANERY", map: parishByDeanery },
-          "OUTSTATION": { parent: "PARISH", map: outstationByParish },
-        },
-      }, { headerTextColor: "FFAAAA" });
-      toast.success("Import sample downloaded");
+      );
+      toast.success("Import template downloaded");
     } catch (e) {
       toast.error((e as Error).message);
     }
   };
-  const handleImportFile = (file: File) => {
-    Papa.parse<Record<string, string>>(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: async (res) => {
-        try {
-          const rawFields = res.meta.fields ?? [];
-          // Normalize: lowercase, strip spaces/underscores/dots for flexible matching
-          const nk = (h: string) => h.trim().toLowerCase().replace(/[\s_.-]+/g, "");
-          const fieldMap: Record<string, string> = {};
-          rawFields.forEach(h => { fieldMap[nk(h)] = h; });
-          const normHeaders = rawFields.map(nk);
-          const get = (r: Record<string, string>, ...keys: string[]) =>
-            keys.map(k => r[fieldMap[nk(k)]] ?? "").find(v => v) ?? "";
 
-          const required = ["fullname", "gender", "age", "phone", "deanery", "parish", "outstation", "category"];
-          const aliases: Record<string, string[]> = { fullname: ["name"], phone: ["phonenumber", "mobile"] };
-          const missing = required.filter(
-            (col) => !normHeaders.includes(col) && !(aliases[col] ?? []).some((a) => normHeaders.includes(a)),
-          );
-          if (missing.length) {
-            toast.error(`CSV is missing required column${missing.length > 1 ? "s" : ""}: ${missing.join(", ")}`, {
-              description: `Found columns: ${rawFields.join(", ") || "(none)"} — download the sample for the expected header row.`,
-            });
-            return;
-          }
-          const known = new Set(["fullname", "name", "gender", "age", "phone", "phonenumber", "mobile", "altphone", "email", "deanery", "parish", "outstation", "category", "institution", "yearofstudy", "notes"]);
-          const unknown = rawFields.filter((h) => !known.has(nk(h)));
-          if (unknown.length) {
-            toast.message(`Ignoring unknown columns: ${unknown.join(", ")}`, {
-              description: "Recognised optional columns: alt phone, email, institution, year of study, notes.",
-            });
-          }
-          const inputs: YouthInput[] = res.data
-            .map((r) => ({
-              fullName: get(r, "FULL NAME", "fullName", "name").trim(),
-              gender: ((get(r, "gender") || "Female").trim() as "Female" | "Male"),
-              age: parseInt(get(r, "age") || "0", 10) || 0,
-              phone: get(r, "phone") || null,
-              altPhone: get(r, "ALT PHONE", "altPhone") || null,
-              email: get(r, "email") || null,
-              deaneryName: get(r, "deanery") || null,
-              parishName: get(r, "parish") || null,
-              outstationName: get(r, "outstation") || null,
-              category: ((get(r, "category") || "Secondary").trim() as YouthCategory),
-              institution: get(r, "institution") || null,
-              yearOfStudy: get(r, "YEAR OF STUDY", "yearOfStudy") || null,
-              notes: get(r, "notes") || null,
-            }))
-            .filter((r) => r.fullName && r.age > 0);
-          const total = res.data.length;
-          if (!inputs.length) {
-            toast.error("CSV has the right columns but no rows with a valid full name + age");
-            return;
-          }
-          const inserted = await bulkInsertYouths(inputs);
-          setImportResult({
-            inserted: inserted.length,
-            skipped: total - inputs.length,
-            total,
-            firstCdms: inserted.slice(0, 10).map((r) => (r as { cdm_id?: string }).cdm_id ?? ""),
-          });
-          invalidate();
-          qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
+  const handleImportFile = async (file: File) => {
+    if (!file.name.toLowerCase().endsWith(".xlsx")) {
+      toast.error("Please select an Excel (.xlsx) file");
+      return;
+    }
+    setImportProgress({ current: 0, total: 0 });
+    try {
+      const result = await importYouths(file, (current, total) =>
+        setImportProgress({ current, total }),
+      );
+      setImportProgress(null);
+      setImportResult(result);
+      invalidate();
+      qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
       qc.invalidateQueries({ queryKey: ["live-analytics"] });
-          qc.invalidateQueries({ queryKey: ["live-analytics"] });
-        } catch (e) {
-          toast.error((e as Error).message);
-        }
-      },
-      error: (err) => toast.error(err.message),
-    });
+    } catch (e) {
+      setImportProgress(null);
+      toast.error((e as Error).message);
+    }
   };
 
   const fc = (key: keyof YouthSearch, label: string, mode: "text" | "select" = "text", options?: { value: string; label: string }[]) => (
@@ -446,7 +389,7 @@ function YouthsPage() {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".csv,text/csv"
+            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             className="hidden"
             onChange={(e) => {
               const f = e.target.files?.[0];
@@ -454,6 +397,12 @@ function YouthsPage() {
               e.target.value = "";
             }}
           />
+          {importProgress !== null && (
+            <div className="flex items-center gap-2 px-3.5 py-2 text-[11px] text-text-2 border-b border-border bg-bg-2">
+              <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-gold border-t-transparent" />
+              Importing… {importProgress.total > 0 ? `${importProgress.current} / ${importProgress.total}` : "preparing"}
+            </div>
+          )}
           <CardBody className="p-0">
             <table className="w-full">
               <thead>
@@ -576,21 +525,20 @@ function YouthsPage() {
                             onClick={() =>
                               setEditing({
                                 id: row.id,
-                                values: {
+                                initial: {
                                   fullName: row.name,
-                                  gender: row.gender,
+                                  gender: row.gender as import("@/lib/db/youth-records/youths").Gender,
                                   age: String(row.age),
                                   phone: row.phone,
                                   altPhone: row.altPhone,
                                   email: row.email,
-                                  deanery: row.deaneryName,
-                                  parish: row.parishName,
-                                  outstation: row.churchName,
+                                  deaneryId: row.deaneryId,
+                                  parishId: row.parishId,
+                                  outstationId: row.outstationId,
                                   category: row.category,
                                   institution: row.institution,
                                   yearOfStudy: row.yearOfStudy,
                                   notes: row.notes,
-                                  passportUrl: row.passportUrl,
                                 },
                               })
                             }
@@ -634,28 +582,32 @@ function YouthsPage() {
           </CardBody>
         </Card>
       </div>
-      <RecordFormDialog
-        open={addOpen}
-        onOpenChange={setAddOpen}
-        title="Register Youth"
-        description="A unique CDM No. is assigned automatically on save."
-        fields={youthFields}
-        submitLabel="Register Youth"
-        onSubmit={(values) => createMut.mutate(toYouthInput(values))}
-      />
-      <RecordFormDialog
-        open={editing !== null}
-        onOpenChange={(o) => !o && setEditing(null)}
-        title="Edit Youth"
-        description="All fields are editable. Unique CDM No. is permanent."
-        fields={youthFields}
-        initial={editing?.values}
-        submitLabel="Save changes"
-        onSubmit={(values) => {
-          if (editing) updateMut.mutate({ id: editing.id, input: toYouthInput(values) });
-          setEditing(null);
-        }}
-      />
+      {org && (
+        <>
+          <AddYouthDialog
+            open={addOpen}
+            onClose={() => setAddOpen(false)}
+            org={org}
+            onSuccess={() => {
+              setAddOpen(false);
+              invalidate();
+              qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
+              qc.invalidateQueries({ queryKey: ["live-analytics"] });
+            }}
+          />
+          <AddYouthDialog
+            open={editing !== null}
+            onClose={() => setEditing(null)}
+            org={org}
+            youthId={editing?.id}
+            initial={editing?.initial}
+            onSuccess={() => {
+              setEditing(null);
+              onEditSuccess();
+            }}
+          />
+        </>
+      )}
       <RecordFormDialog
         open={enrollTarget !== null}
         onOpenChange={(o) => !o && setEnrollTarget(null)}
@@ -691,22 +643,61 @@ function YouthsPage() {
         </AlertDialogContent>
       </AlertDialog>
       <AlertDialog open={importResult !== null} onOpenChange={(o) => !o && setImportResult(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-w-lg">
           <AlertDialogHeader>
-            <AlertDialogTitle>Import results</AlertDialogTitle>
+            <AlertDialogTitle>Import Complete</AlertDialogTitle>
             <AlertDialogDescription asChild>
-              <div className="space-y-2 text-[12px] text-text-1">
-                <div>
-                  Saved <strong>{importResult?.inserted ?? 0}</strong> of {importResult?.total ?? 0} rows.
-                  {importResult && importResult.skipped > 0 && (
-                    <> {importResult.skipped} skipped (missing name or age).</>
-                  )}
+              <div className="space-y-3 text-[12px] text-text-1">
+                {/* Summary row */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-lg border border-border bg-bg-2 p-3 text-center">
+                    <div className="text-2xl font-black text-gold">{importResult?.inserted ?? 0}</div>
+                    <div className="text-[10px] text-text-3">Youth records inserted</div>
+                  </div>
+                  <div className="rounded-lg border border-border bg-bg-2 p-3 text-center">
+                    <div className="text-2xl font-black text-text-2">{importResult?.skipped ?? 0}</div>
+                    <div className="text-[10px] text-text-3">Skipped (already exist)</div>
+                  </div>
                 </div>
-                {importResult && importResult.firstCdms.length > 0 && (
-                  <div>
-                    <div className="font-semibold">First assigned CDM No(s):</div>
-                    <div className="mt-1 max-h-40 overflow-y-auto rounded border border-border bg-bg-2 p-2 font-mono text-[10px]">
-                      {importResult.firstCdms.filter(Boolean).join(", ")}
+
+                {/* Auto-created orgs */}
+                {(importResult?.createdParishes.length ?? 0) > 0 && (
+                  <div className="rounded-lg border border-yellow-300 bg-yellow-50 p-2.5">
+                    <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-yellow-700">
+                      New parishes created ({importResult!.createdParishes.length})
+                    </div>
+                    <div className="text-[10px] text-yellow-800">{importResult!.createdParishes.join(", ")}</div>
+                  </div>
+                )}
+                {(importResult?.createdOutstations.length ?? 0) > 0 && (
+                  <div className="rounded-lg border border-blue-200 bg-blue-50 p-2.5">
+                    <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-blue-700">
+                      New outstations created ({importResult!.createdOutstations.length})
+                    </div>
+                    <div className="text-[10px] text-blue-800">{importResult!.createdOutstations.join(", ")}</div>
+                  </div>
+                )}
+                {(importResult?.createdRoleTypes.length ?? 0) > 0 && (
+                  <div className="rounded-lg border border-purple-200 bg-purple-50 p-2.5">
+                    <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-purple-700">
+                      New leadership roles created ({importResult!.createdRoleTypes.length})
+                    </div>
+                    <div className="text-[10px] text-purple-800">{importResult!.createdRoleTypes.join(", ")}</div>
+                  </div>
+                )}
+
+                {/* Errors */}
+                {(importResult?.errors.length ?? 0) > 0 && (
+                  <div className="rounded-lg border border-red-200 bg-red-50 p-2.5">
+                    <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-red-700">
+                      Errors / warnings ({importResult!.errors.length})
+                    </div>
+                    <div className="max-h-40 overflow-y-auto space-y-1">
+                      {importResult!.errors.map((e, i) => (
+                        <div key={i} className="text-[10px] text-red-800">
+                          <span className="font-mono text-red-500">Row {e.row}</span> — {e.reason}
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
@@ -714,7 +705,7 @@ function YouthsPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setImportResult(null)}>Close</AlertDialogAction>
+            <AlertDialogAction onClick={() => setImportResult(null)}>Done</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -283,10 +283,11 @@ function GeneralTab({ chartDisplay }: { chartDisplay: ChartDisplay }) {
   const rpc = useRpcFilters();
   const { scopeParams, groupBy } = rpc;
 
-  const { data: summary } = useQuery({
+  const { data: summary, isLoading: summaryLoading } = useQuery({
     queryKey: ["analytics-summary", CURRENT_YEAR, scopeParams.deaneryId, scopeParams.parishId, scopeParams.outstationId],
     queryFn: () => getAnalyticsSummary(CURRENT_YEAR, scopeParams),
     staleTime: 30_000,
+    refetchOnMount: "always",
   });
   const { data: youthBreakdown = [] } = useQuery({
     queryKey: ["youth-breakdown", scopeParams.deaneryId, scopeParams.parishId, scopeParams.outstationId, groupBy],
@@ -329,11 +330,11 @@ function GeneralTab({ chartDisplay }: { chartDisplay: ChartDisplay }) {
       <RpcFilterBar rpc={rpc} />
 
       <div className="mb-3.5 grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-5">
-        <Kpi label="Total Youths"    value={totalYouths.toLocaleString()}                               trend="selected scope"               tone="info" sub={rpc.scopeLabel} />
-        <Kpi label="Enrolled"        value={totalEnrolled.toLocaleString()}                             trend={`${pct(totalEnrolled, totalYouths)}% of registered`} tone="up" />
-        <Kpi label="CUSA Members"    value={(summary?.cusa_members ?? 0).toLocaleString()}              trend={`${summary?.cusa_active ?? 0} active`}              tone="up" />
-        <Kpi label="Active Leaders"  value={(summary?.active_leaders ?? 0).toLocaleString()}            trend="in current term"              tone="info" />
-        <Kpi label="Upcoming Events" value={upcomingCount.toLocaleString()}                             trend="next 30 days"                 tone="info" sub="diocese-wide" />
+        <Kpi label="Total Youths"    value={summaryLoading ? "—" : totalYouths.toLocaleString()}                               trend="selected scope"               tone="info" sub={rpc.scopeLabel} />
+        <Kpi label="Enrolled"        value={summaryLoading ? "—" : totalEnrolled.toLocaleString()}                             trend={summaryLoading ? "loading…" : `${pct(totalEnrolled, totalYouths)}% of registered`} tone="up" />
+        <Kpi label="CUSA Members"    value={summaryLoading ? "—" : (summary?.cusa_members ?? 0).toLocaleString()}              trend={summaryLoading ? "loading…" : `${summary?.cusa_active ?? 0} active`}              tone="up" />
+        <Kpi label="Active Leaders"  value={summaryLoading ? "—" : (summary?.active_leaders ?? 0).toLocaleString()}            trend="in current term"              tone="info" />
+        <Kpi label="Upcoming Events" value={summaryLoading ? "—" : upcomingCount.toLocaleString()}                             trend="next 30 days"                 tone="info" sub="diocese-wide" />
       </div>
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.3fr_1fr]">
@@ -852,104 +853,56 @@ const LEADER_LEVEL_COLORS: Record<string, string> = {
 
 function LeadersTab({ chartDisplay }: { chartDisplay: ChartDisplay }) {
   const rpc = useRpcFilters();
-  const { scopeParams } = rpc;
-  const [levelFilter, setLevelFilter] = useState<string>("");
+  const { scopeParams, groupBy } = rpc;
 
-  const { data: summary } = useQuery({
+  const { data: summary, isLoading: summaryLoading } = useQuery({
     queryKey: ["analytics-summary", CURRENT_YEAR, scopeParams.deaneryId, scopeParams.parishId, scopeParams.outstationId],
     queryFn:  () => getAnalyticsSummary(CURRENT_YEAR, scopeParams),
     staleTime: 30_000,
+    refetchOnMount: "always",
   });
 
-  const { data: breakdown = [] } = useQuery({
-    queryKey: ["leader-breakdown", scopeParams.deaneryId, scopeParams.parishId, scopeParams.outstationId],
-    queryFn:  () => getLeaderBreakdown(scopeParams),
+  const { data: breakdown = [], isLoading: breakdownLoading } = useQuery({
+    queryKey: ["leader-breakdown", scopeParams.deaneryId, scopeParams.parishId, scopeParams.outstationId, groupBy],
+    queryFn:  () => getLeaderBreakdown(scopeParams, groupBy),
     staleTime: 30_000,
+    refetchOnMount: "always",
   });
 
-  const levelCounts = useMemo(() => {
-    const acc: Record<string, { active: number; total: number }> = {};
-    for (const row of breakdown) {
-      if (!acc[row.level]) acc[row.level] = { active: 0, total: 0 };
-      acc[row.level].active += row.active;
-      acc[row.level].total  += row.total;
-    }
-    return acc;
-  }, [breakdown]);
+  const isLoading = summaryLoading || breakdownLoading;
+  const totalActive = summary?.active_leaders ?? 0;
+  const maxActive = Math.max(...breakdown.map((r) => r.total_active), 1);
 
-  const displayRows: LeaderBreakdownRow[] = levelFilter
-    ? breakdown.filter((r) => r.level === levelFilter)
-    : breakdown;
+  const levelTotals = useMemo(() => ({
+    diocese:    breakdown.reduce((s, r) => s + r.diocese_active, 0),
+    deanery:    breakdown.reduce((s, r) => s + r.deanery_active, 0),
+    parish:     breakdown.reduce((s, r) => s + r.parish_active, 0),
+    outstation: breakdown.reduce((s, r) => s + r.outstation_active, 0),
+  }), [breakdown]);
 
-  const maxActive  = Math.max(...displayRows.map((r) => r.active), 1);
-  const totalActive = summary?.active_leaders ?? breakdown.reduce((s, r) => s + r.active, 0);
+  const donutData = (["diocese", "deanery", "parish", "outstation"] as const)
+    .map((level) => ({
+      label: LEADER_LEVEL_LABELS[level],
+      value: levelTotals[level],
+      color: LEADER_LEVEL_COLORS[level],
+    }))
+    .filter((d) => d.value > 0);
 
-  const donutData = Object.entries(levelCounts)
-    .filter(([, v]) => v.active > 0)
-    .map(([level, v]) => ({
-      label: LEADER_LEVEL_LABELS[level] ?? level,
-      value: v.active,
-      color: LEADER_LEVEL_COLORS[level] ?? "var(--color-text-2)",
-    }));
-
-  const hasFilter = rpc.hasFilter || !!levelFilter;
-  function clearAll() { rpc.clearFilters(); setLevelFilter(""); }
+  const orgColLabel = groupBy === "parish" ? "Parish" : groupBy === "outstation" ? "Outstation" : "Deanery";
 
   return (
     <>
-      <FilterBar>
-        <FilterLabel>Filter by</FilterLabel>
-        <FilterDivider />
-        <select
-          className={SEL_CLS}
-          value={rpc.filters.deaneryId}
-          disabled={!!rpc.adminScope.deaneryId}
-          onChange={(e) => rpc.setFilters({ deaneryId: e.target.value, parishId: "", outstationId: "" })}
-        >
-          <option value="">All Deaneries</option>
-          {rpc.deaneryOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
-        <select
-          className={SEL_CLS}
-          value={rpc.filters.parishId}
-          disabled={!!rpc.adminScope.parishId || !rpc.effectiveDeaneryId}
-          onChange={(e) => rpc.setFilters((f) => ({ ...f, parishId: e.target.value, outstationId: "" }))}
-        >
-          <option value="">All Parishes</option>
-          {rpc.parishOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
-        <select
-          className={SEL_CLS}
-          value={rpc.filters.outstationId}
-          disabled={!rpc.effectiveParishId}
-          onChange={(e) => rpc.setFilters((f) => ({ ...f, outstationId: e.target.value }))}
-        >
-          <option value="">All Outstations</option>
-          {rpc.outstationOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
-        <select className={SEL_CLS} value={levelFilter} onChange={(e) => setLevelFilter(e.target.value)} style={{ minWidth: 130 }}>
-          <option value="">All Levels</option>
-          {["diocese", "deanery", "parish", "outstation"].map((l) => (
-            <option key={l} value={l}>{LEADER_LEVEL_LABELS[l]}</option>
-          ))}
-        </select>
-        {hasFilter && (
-          <button className="rounded-md border border-border bg-transparent px-2.5 py-1 text-[9px] text-text-3 hover:border-danger hover:text-danger" onClick={clearAll}>
-            ✕ Clear
-          </button>
-        )}
-        <FilterScope>{rpc.scopeLabel}</FilterScope>
-      </FilterBar>
+      <RpcFilterBar rpc={rpc} />
 
       {/* KPIs */}
       <div className="mb-3.5 grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
-        <Kpi label="Active Leaders" value={totalActive.toLocaleString()} trend={rpc.scopeLabel} tone="info" />
-        {["diocese", "deanery", "parish", "outstation"].map((level) => (
+        <Kpi label="Active Leaders" value={isLoading ? "—" : totalActive.toLocaleString()} trend={rpc.scopeLabel} tone="info" />
+        {(["diocese", "deanery", "parish", "outstation"] as const).map((level) => (
           <Kpi
             key={level}
             label={`${LEADER_LEVEL_LABELS[level]} Level`}
-            value={(levelCounts[level]?.active ?? 0).toLocaleString()}
-            trend={`of ${(levelCounts[level]?.total ?? 0)} total`}
+            value={isLoading ? "—" : levelTotals[level].toLocaleString()}
+            trend="active at this level"
             tone={level === "parish" ? "info" : level === "outstation" ? "up" : "warn"}
           />
         ))}
@@ -959,20 +912,20 @@ function LeadersTab({ chartDisplay }: { chartDisplay: ChartDisplay }) {
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.4fr_1fr]">
         <Card>
           <CardHead
-            title="Leaders by Organisation"
-            subtitle={levelFilter ? `${LEADER_LEVEL_LABELS[levelFilter]} level · ${displayRows.length} units` : `All levels · ${displayRows.length} units`}
+            title={`Leaders by ${orgColLabel}`}
+            subtitle={`${breakdown.length} ${orgColLabel.toLowerCase()}${breakdown.length !== 1 ? "s" : ""} · ${rpc.scopeLabel}`}
           />
           <CardBody>
-            {displayRows.length === 0 && (
+            {breakdown.length === 0 && !isLoading && (
               <p className="py-4 text-center text-[11px] text-text-2">No data for selected filters.</p>
             )}
-            {displayRows.map((row) => (
+            {breakdown.map((row) => (
               <ProgressRow
-                key={`${row.level}-${row.org_label}`}
-                label={`${row.org_label} (${LEADER_LEVEL_LABELS[row.level] ?? row.level})`}
-                value={row.active}
+                key={row.id ?? row.label}
+                label={row.label}
+                value={row.total_active}
                 max={maxActive}
-                color={LEADER_LEVEL_COLORS[row.level] ?? "var(--color-info)"}
+                color="var(--color-info)"
                 display={chartDisplay}
               />
             ))}
@@ -990,41 +943,49 @@ function LeadersTab({ chartDisplay }: { chartDisplay: ChartDisplay }) {
         </Card>
       </div>
 
-      {/* Breakdown table */}
+      {/* Summary table */}
       <div className="mt-3">
         <Card>
-          <CardHead title="Leaders Summary" subtitle="Active vs. total leaders by unit" />
+          <CardHead title="Leaders Summary" subtitle={`Active leaders by ${orgColLabel.toLowerCase()} and role level`} />
           <CardBody className="p-0">
             <Table>
               <TableHeader>
                 <TableRow>
-                  {["Level", "Organisation", "Active", "Total", "Active %"].map((h) => (
+                  {[orgColLabel, "Diocese", "Deanery", "Parish", "Outstation", "Total"].map((h) => (
                     <TableHead key={h} className="label-eyebrow px-3 py-2">{h}</TableHead>
                   ))}
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {displayRows.map((row) => {
-                  const pctVal = row.total > 0 ? Math.round((row.active / row.total) * 100) : 0;
-                  return (
-                    <TableRow key={`${row.level}-${row.org_label}`} className="border-border/30 hover:bg-bg-3">
-                      <TableCell className="px-3 py-2">
-                        <Pill
-                          tone={row.level === "diocese" ? "danger" : row.level === "deanery" ? "gold" : row.level === "parish" ? "info" : "success"}
-                        >
-                          {LEADER_LEVEL_LABELS[row.level] ?? row.level}
-                        </Pill>
-                      </TableCell>
-                      <TableCell className="px-3 py-2 text-[10px] font-semibold text-foreground">{row.org_label}</TableCell>
-                      <TableCell className="px-3 py-2 text-[10px] text-text-1">{row.active.toLocaleString()}</TableCell>
-                      <TableCell className="px-3 py-2 text-[10px] text-text-2">{row.total.toLocaleString()}</TableCell>
-                      <TableCell className="px-3 py-2 text-[10px] text-text-2">{pctVal}%</TableCell>
-                    </TableRow>
-                  );
-                })}
-                {displayRows.length === 0 && (
+                {breakdown.map((row) => (
+                  <TableRow key={row.id ?? row.label} className="border-border/30 hover:bg-bg-3">
+                    <TableCell className="px-3 py-2 text-[10px] font-semibold text-foreground">{row.label}</TableCell>
+                    <TableCell className="px-3 py-2 text-center">
+                      {row.diocese_active > 0
+                        ? <Pill tone="danger">{row.diocese_active}</Pill>
+                        : <span className="text-[10px] text-text-4">—</span>}
+                    </TableCell>
+                    <TableCell className="px-3 py-2 text-center">
+                      {row.deanery_active > 0
+                        ? <Pill tone="gold">{row.deanery_active}</Pill>
+                        : <span className="text-[10px] text-text-4">—</span>}
+                    </TableCell>
+                    <TableCell className="px-3 py-2 text-center">
+                      {row.parish_active > 0
+                        ? <Pill tone="info">{row.parish_active}</Pill>
+                        : <span className="text-[10px] text-text-4">—</span>}
+                    </TableCell>
+                    <TableCell className="px-3 py-2 text-center">
+                      {row.outstation_active > 0
+                        ? <Pill tone="success">{row.outstation_active}</Pill>
+                        : <span className="text-[10px] text-text-4">—</span>}
+                    </TableCell>
+                    <TableCell className="px-3 py-2 text-[10px] font-bold text-foreground">{row.total_active}</TableCell>
+                  </TableRow>
+                ))}
+                {breakdown.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} className="py-6 text-center text-[11px] text-text-2">
+                    <TableCell colSpan={6} className="py-6 text-center text-[11px] text-text-2">
                       No leader records match the selected filters.
                     </TableCell>
                   </TableRow>

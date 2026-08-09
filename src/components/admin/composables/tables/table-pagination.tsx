@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
-const DEFAULT_PAGE_SIZES = [10, 25, 50, 100];
+const DEFAULT_PAGE_SIZES = [5, 10, 25, 50, 100];
 
 // Server-side pagination: manages page/size state; caller drives API refetch.
-export function useServerPagination(initialPageSize = 25) {
+export function useServerPagination(initialPageSize = 10) {
   const [page, setPage] = useState(1); // 1-indexed (matches TablePagination UI)
   const [pageSize, setPageSize] = useState(initialPageSize);
 

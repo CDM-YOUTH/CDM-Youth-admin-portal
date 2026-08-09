@@ -93,6 +93,7 @@ export type YouthInput = {
   fullName: string;
   gender: Gender;
   age: number;
+  ageRange?: string | null;    // raw display value e.g. "18-25"; age holds the lower bound
   phone?: string | null;
   altPhone?: string | null;
   email?: string | null;
@@ -112,6 +113,7 @@ function toRow(input: YouthInput, org: OrgTree) {
     full_name: input.fullName.trim(),
     gender: input.gender,
     age: input.age,
+    age_range: input.ageRange || null,
     phone: input.phone || null,
     alt_phone: input.altPhone || null,
     email: input.email || null,
@@ -126,16 +128,19 @@ function toRow(input: YouthInput, org: OrgTree) {
   };
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const youthsTable = () => (supabase as any).from("youths");
+
 export async function createYouth(input: YouthInput) {
   const org = await fetchOrg();
-  const { data, error } = await supabase.from("youths").insert(toRow(input, org)).select().single();
+  const { data, error } = await youthsTable().insert(toRow(input, org)).select().single();
   if (error) throw error;
   return data;
 }
 
 export async function updateYouth(id: string, input: YouthInput) {
   const org = await fetchOrg();
-  const { data, error } = await supabase.from("youths").update(toRow(input, org)).eq("id", id).select().single();
+  const { data, error } = await youthsTable().update(toRow(input, org)).eq("id", id).select().single();
   if (error) throw error;
   return data;
 }
@@ -148,7 +153,7 @@ export async function deleteYouth(id: string) {
 export async function bulkInsertYouths(rows: YouthInput[]) {
   const org = await fetchOrg();
   const payload = rows.map((r) => toRow(r, org));
-  const { data, error } = await supabase.from("youths").insert(payload).select("id, cdm_id, full_name");
+  const { data, error } = await youthsTable().insert(payload).select("id, cdm_id, full_name");
   if (error) throw error;
   return data ?? [];
 }
