@@ -1,0 +1,498 @@
+/**
+ * Bulk-import youth records from a structured XLSX file.
+ *
+ * Handles in one pass per row:
+ *   - Youth record creation (skip if full_name+phone already exists)
+ *   - CUSA entry auto-creation for Tertiary students with institution
+ *   - Leadership role appointment across up to 4 org levels
+ *   - Auto-creation of unknown parishes (under matched deanery)
+ *   - Auto-creation of unknown outstations (under matched parish)
+ *   - Auto-creation of unknown role type names
+ */
+import ExcelJS from "exceljs";
+import { supabase } from "@/integrations/supabase/client";
+import { fetchOrg, type OrgTree, type ParishRow, type OutstationRow } from "@/lib/db/org";
+import { listRoleTypes, type RoleTypeRow } from "./leaders";
+
+// ── Types ───────────────────────────────────────────────────────────────────
+
+export type ImportRowError = { row: number; reason: string };
+
+export type ImportResult = {
+  inserted: number;
+  skipped: number;
+  createdParishes: string[];
+  createdOutstations: string[];
+  createdRoleTypes: string[];
+  errors: ImportRowError[];
+};
+
+type ParsedRow = {
+  rowNum: number;
+  fullName: string;
+  gender: string;
+  age: number;
+  ageRange: string | null;
+  phone: string;
+  altPhone: string;
+  email: string;
+  deanery: string;
+  parish: string;
+  outstation: string;
+  category: string;
+  institution: string;
+  yearOfStudy: string;
+  course: string;
+  notes: string;
+  // Leadership: column header = level label, value = role name
+  Diocese: string;
+  Deanery: string;
+  Parish: string;
+  Outstation: string;
+};
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Parse age from a cell that may be a plain number ("22") or a range ("18-25",
+ * "18–25", "18 - 25").
+ *
+ * Returns:
+ *   numeric — the lower bound (used for the DB `age int` column)
+ *   range   — the original trimmed string if it was a range, null if it was plain
+ */
+function parseAge(val: string): { numeric: number; range: string | null } {
+  const s = val.trim();
+  if (!s) return { numeric: 0, range: null };
+  const isRange = /[-–—]/.test(s);
+  const match = s.match(/\d+/);
+  const numeric = match ? parseInt(match[0], 10) : 0;
+  return { numeric, range: isRange ? s : null };
+}
+
+// ── XLSX parsing ─────────────────────────────────────────────────────────────
+
+async function parseXlsx(file: File): Promise<ParsedRow[]> {
+  const buffer = await file.arrayBuffer();
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(buffer);
+  const ws = wb.getWorksheet(1);
+  if (!ws) throw new Error("No worksheet found in the Excel file");
+
+  const headers: string[] = [];
+  ws.getRow(1).eachCell({ includeEmpty: false }, (cell, colNum) => {
+    headers[colNum - 1] = String(cell.value ?? "").trim();
+  });
+
+  const rows: ParsedRow[] = [];
+  ws.eachRow({ includeEmpty: false }, (row, rowNum) => {
+    if (rowNum === 1) return;
+
+    const get = (header: string): string => {
+      const idx = headers.indexOf(header);
+      if (idx < 0) return "";
+      const v = row.getCell(idx + 1).value;
+      if (v === null || v === undefined) return "";
+      if (typeof v === "object" && "result" in (v as object)) {
+        return String((v as { result: unknown }).result ?? "").trim();
+      }
+      return String(v).trim();
+    };
+
+    // Accept both "full_name" and "full name" variants in the header
+    const fullName =
+      get("full_name") || get("Full Name") || get("FULL NAME") || get("name") || get("Name");
+
+    rows.push({
+      rowNum,
+      fullName,
+      gender:      get("gender")        || get("GENDER"),
+      ...(() => { const a = parseAge(get("age") || get("AGE")); return { age: a.numeric, ageRange: a.range }; })(),
+      phone:       get("phone")         || get("PHONE"),
+      altPhone:    get("alt_phone")     || get("Alt Phone")     || get("ALT PHONE"),
+      email:       get("email")         || get("EMAIL"),
+      // Org columns: lowercase or UPPERCASE only — never Title Case (reserved for leadership)
+      deanery:     get("deanery")       || get("DEANERY"),
+      parish:      get("parish")        || get("PARISH"),
+      outstation:  get("outstation")    || get("OUTSTATION"),
+      category:    get("category")      || get("CATEGORY"),
+      institution: get("institution")   || get("INSTITUTION"),
+      yearOfStudy: get("year_of_study") || get("Year of Study") || get("YEAR OF STUDY"),
+      course:      get("course")        || get("COURSE"),
+      notes:       get("notes")         || get("NOTES"),
+      // Leadership columns: Title Case header — distinct from lowercase org column names
+      Diocese:     get("Diocese"),
+      Deanery:     get("Deanery"),
+      Parish:      get("Parish"),
+      Outstation:  get("Outstation"),
+    });
+  });
+
+  return rows.filter((r) => r.fullName || r.phone);
+}
+
+// ── Org lookups (case-insensitive, mutated as new entries are created) ────────
+
+type OrgMaps = {
+  deaneryByName: Map<string, string>;             // name_lower → id
+  parishByKey: Map<string, string>;               // deanery_id:name_lower → id
+  outstationByKey: Map<string, string>;           // parish_id:name_lower → id
+  parishRows: ParishRow[];
+  outstationRows: OutstationRow[];
+};
+
+function buildOrgMaps(org: OrgTree): OrgMaps {
+  const deaneryByName = new Map<string, string>();
+  const parishByKey = new Map<string, string>();
+  const outstationByKey = new Map<string, string>();
+
+  for (const d of org.deaneries) {
+    deaneryByName.set(d.name.trim().toLowerCase(), d.id);
+  }
+  for (const p of org.parishes) {
+    parishByKey.set(`${p.deanery_id}:${p.name.trim().toLowerCase()}`, p.id);
+  }
+  for (const o of org.outstations) {
+    outstationByKey.set(`${o.parish_id}:${o.name.trim().toLowerCase()}`, o.id);
+  }
+
+  return {
+    deaneryByName,
+    parishByKey,
+    outstationByKey,
+    parishRows: [...org.parishes],
+    outstationRows: [...org.outstations],
+  };
+}
+
+async function ensureParish(
+  maps: OrgMaps,
+  deaneryId: string,
+  name: string,
+  created: string[],
+): Promise<string> {
+  const key = `${deaneryId}:${name.trim().toLowerCase()}`;
+  if (maps.parishByKey.has(key)) return maps.parishByKey.get(key)!;
+
+  const { data, error } = await supabase
+    .from("parishes")
+    .insert({ deanery_id: deaneryId, name: name.trim() })
+    .select("id, deanery_id, name")
+    .single();
+  if (error) throw new Error(`Could not create parish "${name}": ${error.message}`);
+
+  const row = data as ParishRow;
+  maps.parishByKey.set(key, row.id);
+  maps.parishRows.push(row);
+  created.push(name.trim());
+  return row.id;
+}
+
+async function ensureOutstation(
+  maps: OrgMaps,
+  parishId: string,
+  name: string,
+  created: string[],
+): Promise<string> {
+  const key = `${parishId}:${name.trim().toLowerCase()}`;
+  if (maps.outstationByKey.has(key)) return maps.outstationByKey.get(key)!;
+
+  const { data, error } = await supabase
+    .from("outstations")
+    .insert({ parish_id: parishId, name: name.trim() })
+    .select("id, parish_id, name")
+    .single();
+  if (error) throw new Error(`Could not create outstation "${name}": ${error.message}`);
+
+  const row = data as OutstationRow;
+  maps.outstationByKey.set(key, row.id);
+  maps.outstationRows.push(row);
+  created.push(name.trim());
+  return row.id;
+}
+
+// ── Role type lookups ─────────────────────────────────────────────────────────
+
+async function buildRoleMap(
+  roleTypes: RoleTypeRow[],
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  for (const rt of roleTypes) {
+    map.set(rt.name.trim().toLowerCase(), rt.id);
+  }
+  return map;
+}
+
+async function ensureRoleType(
+  map: Map<string, string>,
+  name: string,
+  created: string[],
+): Promise<string> {
+  const key = name.trim().toLowerCase();
+  if (map.has(key)) return map.get(key)!;
+
+  const { data, error } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .from("leadership_role_types" as any)
+    .insert({ name: name.trim() })
+    .select("id, name")
+    .single();
+  if (error) throw new Error(`Could not create role type "${name}": ${error.message}`);
+
+  const row = data as unknown as { id: string; name: string };
+  map.set(key, row.id);
+  created.push(name.trim());
+  return row.id;
+}
+
+// ── Duplicate detection ───────────────────────────────────────────────────────
+
+async function loadExistingYouthKeys(): Promise<Set<string>> {
+  const { data } = await supabase.from("youths").select("full_name, phone").limit(20000);
+  const set = new Set<string>();
+  for (const y of data ?? []) {
+    set.add(
+      `${String(y.full_name ?? "").trim().toLowerCase()}|${String(y.phone ?? "").trim()}`,
+    );
+  }
+  return set;
+}
+
+// ── Leadership org FK helper ──────────────────────────────────────────────────
+
+function leaderOrgFks(
+  level: string,
+  deaneryId: string | null,
+  parishId: string | null,
+  outstationId: string | null,
+) {
+  if (level === "diocese")    return { deanery_id: null, parish_id: null, outstation_id: null };
+  if (level === "deanery")    return { deanery_id: deaneryId, parish_id: null, outstation_id: null };
+  if (level === "parish")     return { deanery_id: null, parish_id: parishId, outstation_id: null };
+  /* outstation */            return { deanery_id: null, parish_id: null, outstation_id: outstationId };
+}
+
+// ── Main import function ──────────────────────────────────────────────────────
+
+export async function importYouths(
+  file: File,
+  onProgress?: (current: number, total: number) => void,
+): Promise<ImportResult> {
+  const result: ImportResult = {
+    inserted: 0,
+    skipped: 0,
+    createdParishes: [],
+    createdOutstations: [],
+    createdRoleTypes: [],
+    errors: [],
+  };
+
+  // Parse file
+  const parsed = await parseXlsx(file);
+  if (parsed.length === 0) throw new Error("No data rows found in the Excel file");
+
+  // Load reference data in parallel
+  const [org, roleTypes, existingKeys] = await Promise.all([
+    fetchOrg(),
+    listRoleTypes(),
+    loadExistingYouthKeys(),
+  ]);
+  const maps = buildOrgMaps(org);
+  const roleMap = await buildRoleMap(roleTypes);
+
+  const VALID_CATEGORIES = new Set(["Primary", "Secondary", "Tertiary", "Working"]);
+  const VALID_GENDERS = new Set(["Female", "Male"]);
+  const LEVEL_MAP: Record<string, string> = {
+    Diocese: "diocese",
+    Deanery: "deanery",
+    Parish: "parish",
+    Outstation: "outstation",
+  };
+
+  for (let i = 0; i < parsed.length; i++) {
+    const row = parsed[i];
+    onProgress?.(i + 1, parsed.length);
+
+    // ── Validate required fields ─────────────────────────────────────────────
+    if (!row.fullName) {
+      result.errors.push({ row: row.rowNum, reason: "Missing full name" });
+      continue;
+    }
+    if (!row.phone) {
+      result.errors.push({ row: row.rowNum, reason: `${row.fullName}: missing phone` });
+      continue;
+    }
+    if (!row.deanery) {
+      result.errors.push({ row: row.rowNum, reason: `${row.fullName}: missing deanery` });
+      continue;
+    }
+    if (!row.parish) {
+      result.errors.push({ row: row.rowNum, reason: `${row.fullName}: missing parish` });
+      continue;
+    }
+    const age = row.age;
+    const displayAge = row.ageRange ?? String(row.age);
+    if (!age || age < 5 || age > 80) {
+      result.errors.push({ row: row.rowNum, reason: `${row.fullName}: invalid age (${displayAge})` });
+      continue;
+    }
+
+    // ── Normalise optional fields ────────────────────────────────────────────
+    const gender = VALID_GENDERS.has(row.gender) ? row.gender : "Female";
+    const category = VALID_CATEGORIES.has(row.category) ? row.category : "Secondary";
+
+    // ── Duplicate check ──────────────────────────────────────────────────────
+    const dupKey = `${row.fullName.trim().toLowerCase()}|${row.phone.trim()}`;
+    if (existingKeys.has(dupKey)) {
+      result.skipped++;
+      continue;
+    }
+
+    // ── Resolve org IDs ──────────────────────────────────────────────────────
+    const deaneryId = maps.deaneryByName.get(row.deanery.trim().toLowerCase()) ?? null;
+    if (!deaneryId) {
+      result.errors.push({
+        row: row.rowNum,
+        reason: `${row.fullName}: deanery not found — "${row.deanery}"`,
+      });
+      continue;
+    }
+
+    let parishId: string | null = null;
+    try {
+      parishId = await ensureParish(maps, deaneryId, row.parish, result.createdParishes);
+    } catch (e) {
+      result.errors.push({ row: row.rowNum, reason: `${row.fullName}: ${(e as Error).message}` });
+      continue;
+    }
+
+    let outstationId: string | null = null;
+    if (row.outstation) {
+      try {
+        outstationId = await ensureOutstation(maps, parishId, row.outstation, result.createdOutstations);
+      } catch (e) {
+        // Non-fatal: record the error but continue inserting the youth
+        result.errors.push({
+          row: row.rowNum,
+          reason: `${row.fullName}: outstation warning — ${(e as Error).message}`,
+        });
+      }
+    }
+
+    // ── Insert youth ─────────────────────────────────────────────────────────
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: youth, error: yErr } = await (supabase as any)
+        .from("youths")
+        .insert({
+          full_name:     row.fullName.trim(),
+          gender:        gender as "Female" | "Male",
+          age,
+          age_range:     row.ageRange || null,
+          phone:         row.phone.trim() || null,
+          alt_phone:     row.altPhone || null,
+          email:         row.email || null,
+          deanery_id:    deaneryId,
+          parish_id:     parishId,
+          outstation_id: outstationId,
+          category:      category as "Primary" | "Secondary" | "Tertiary" | "Working",
+          institution:   row.institution || null,
+          year_of_study: row.yearOfStudy || null,
+          notes:         row.notes || null,
+        })
+        .select("id, cdm_id")
+        .single();
+
+      if (yErr) {
+        result.errors.push({ row: row.rowNum, reason: `${row.fullName}: ${yErr.message}` });
+        continue;
+      }
+
+      const youthId = (youth as { id: string; cdm_id: string }).id;
+      existingKeys.add(dupKey); // prevent re-insert if file has duplicates
+      result.inserted++;
+
+      // ── CUSA: auto-create for Tertiary with institution ──────────────────
+      if (category === "Tertiary" && row.institution.trim()) {
+        try {
+          await supabase.from("cusa_members").insert({
+            youth_id:      youthId,
+            institution:   row.institution.trim(),
+            course:        row.course || null,
+            year_of_study: row.yearOfStudy || null,
+          });
+        } catch {
+          // Non-fatal — CUSA entry can be added manually
+        }
+      }
+
+      // ── Leadership roles ─────────────────────────────────────────────────
+      for (const [colLabel, levelValue] of Object.entries(LEVEL_MAP)) {
+        const roleName = (row as unknown as Record<string, string>)[colLabel]?.trim();
+        if (!roleName || roleName === "-" || roleName === "—") continue;
+
+        try {
+          const roleId = await ensureRoleType(roleMap, roleName, result.createdRoleTypes);
+          const fks = leaderOrgFks(levelValue, deaneryId, parishId, outstationId);
+
+          // Outstation level requires an outstation to be set
+          if (levelValue === "outstation" && !outstationId) continue;
+          // Deanery level requires a deanery
+          if (levelValue === "deanery" && !deaneryId) continue;
+          // Parish level requires a parish
+          if (levelValue === "parish" && !parishId) continue;
+
+          const { error: rErr } = await supabase
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            .from("youth_leadership_roles" as any)
+            .insert({ youth_id: youthId, role_id: roleId, level: levelValue, ...fks });
+
+          if (rErr) {
+            // Unique constraint: another person already holds this role at this org → warn
+            result.errors.push({
+              row: row.rowNum,
+              reason: `${row.fullName}: leadership conflict — ${roleName} at ${colLabel} level already assigned`,
+            });
+          }
+        } catch (e) {
+          result.errors.push({
+            row: row.rowNum,
+            reason: `${row.fullName}: leadership error — ${(e as Error).message}`,
+          });
+        }
+      }
+    } catch (e) {
+      result.errors.push({ row: row.rowNum, reason: `${row.fullName}: ${(e as Error).message}` });
+    }
+  }
+
+  return result;
+}
+
+// ── Template download helper ──────────────────────────────────────────────────
+
+export type TemplateOpts = {
+  deaneryNames: string[];
+  parishByDeanery: Record<string, string[]>;
+  outstationByParish: Record<string, string[]>;
+  roleTypeNames: string[];
+};
+
+export async function buildTemplateOpts(): Promise<TemplateOpts> {
+  const [org, roleTypes] = await Promise.all([fetchOrg(), listRoleTypes()]);
+  const deaneryNames = org.deaneries.map((d) => d.name);
+  const parishByDeanery: Record<string, string[]> = {};
+  for (const [dName, parishes] of org.parishesByDeaneryName) {
+    parishByDeanery[dName] = parishes.map((p) => p.name);
+  }
+  const outstationByParish: Record<string, string[]> = {};
+  for (const [pName, outstations] of org.outstationsByParishName) {
+    outstationByParish[pName] = outstations.map((o) => o.name);
+  }
+  return {
+    deaneryNames,
+    parishByDeanery,
+    outstationByParish,
+    roleTypeNames: roleTypes.map((r) => r.name),
+  };
+}
