@@ -68,7 +68,7 @@ export async function setUserRole(
 /** Get the role for a given user id. */
 export async function getUserRole(
   userId: string
-): Promise<"admin" | "moderator" | "user" | null> {
+): Promise<"admin" | "moderator" | "office" | "user" | null> {
   const { data, error } = await supabase
     .from("user_roles")
     .select("role")

@@ -147,6 +147,39 @@ export async function createCusaMember(input: CusaInput) {
   return data;
 }
 
+/** One-shot idempotent backfill: inserts any Tertiary youth (with institution) who
+ *  is not yet in cusa_members for the current year.  Existing rows are left untouched. */
+export async function syncTertiaryYouthsToCusa(): Promise<void> {
+  const year = new Date().getFullYear();
+
+  const { data: youths, error } = await supabase
+    .from("youths")
+    .select("id, institution, year_of_study")
+    .eq("category", "Tertiary" as never)
+    .not("institution", "is", null);
+
+  if (error) throw error;
+
+  const rows = ((youths ?? []) as { id: string; institution: string | null; year_of_study: string | null }[])
+    .filter((y) => y.institution?.trim())
+    .map((y) => ({
+      youth_id: y.id,
+      year,
+      institution: y.institution!,
+      year_of_study: y.year_of_study || null,
+      course: null as string | null,
+      leadership_role: null as string | null,
+    }));
+
+  if (!rows.length) return;
+
+  const { error: upsertErr } = await supabase
+    .from("cusa_members")
+    .upsert(rows, { onConflict: "youth_id,year", ignoreDuplicates: true });
+
+  if (upsertErr) throw upsertErr;
+}
+
 export async function deleteCusaMember(id: string) {
   const { error } = await supabase.from("cusa_members").delete().eq("id", id);
   if (error) throw error;

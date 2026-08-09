@@ -81,7 +81,7 @@ const enrollmentSearchSchema = z.object({
   deanery_id: fallback(z.string(), "").default(""),
   parish_id: fallback(z.string(), "").default(""),
   page: fallback(z.number().int().min(1), 1).default(1),
-  size: fallback(z.number().int().min(1).max(100), 25).default(25),
+  size: fallback(z.number().int().min(1).max(100), 10).default(10),
   // Client-side column filters on current page
   f_cdm: filterValueSchema,
   f_name: filterValueSchema,
