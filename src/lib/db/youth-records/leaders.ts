@@ -171,6 +171,15 @@ export async function updateLeader(id: string, input: LeadershipRoleUpdate): Pro
   if (error) throw error;
 }
 
+export async function listActiveRolesForYouth(youthId: string): Promise<LeadershipRoleRow[]> {
+  const { data, error } = await db()
+    .select("id, role_id, level, deanery_id, parish_id, outstation_id, start_date")
+    .eq("youth_id", youthId)
+    .is("end_date", null);
+  if (error) throw error;
+  return (data ?? []) as unknown as LeadershipRoleRow[];
+}
+
 export async function deleteLeader(id: string): Promise<void> {
   const { error } = await db().delete().eq("id", id);
   if (error) throw error;
