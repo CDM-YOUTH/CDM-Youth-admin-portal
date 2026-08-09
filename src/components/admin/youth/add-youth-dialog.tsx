@@ -28,7 +28,10 @@ import {
 } from "@/lib/db/youth-records/youths";
 import {
   appointLeader,
+  endLeaderTerm,
+  updateLeader,
   listRoleTypes,
+  listActiveRolesForYouth,
   type LeadershipLevel,
 } from "@/lib/db/youth-records/leaders";
 import { createCusaMember } from "@/lib/db/youth-records/cusa";
@@ -121,6 +124,8 @@ export function AddYouthDialog({
   const [isLeader, setIsLeader] = useState(false);
   const [selectedLevels, setSelectedLevels] = useState<Set<LeadershipLevel>>(new Set());
   const [levelPositions, setLevelPositions] = useState<LevelPositions>({});
+  /* tracks roles that existed in DB when dialog opened (edit mode) */
+  const [existingRoles, setExistingRoles] = useState<Map<LeadershipLevel, { id: string; roleId: string }>>(new Map());
 
   /* role types for leadership position selects */
   const { data: roleTypes = [] } = useQuery({
@@ -128,6 +133,14 @@ export function AddYouthDialog({
     queryFn: listRoleTypes,
     staleTime: 5 * 60_000,
     enabled: open && isLeader,
+  });
+
+  /* fetch active roles for youth in edit mode */
+  const { data: activeRoles = [] } = useQuery({
+    queryKey: ["youth-active-roles", youthId],
+    queryFn: () => listActiveRolesForYouth(youthId!),
+    enabled: !!youthId && open,
+    staleTime: 0,
   });
 
   /* re-seed form when initial values or open state change */
@@ -146,10 +159,30 @@ export function AddYouthDialog({
     setInstitution(initial?.institution ?? "");
     setYearOfStudy(initial?.yearOfStudy ?? "");
     setNotes(initial?.notes ?? "");
+    /* reset leadership — the activeRoles effect below will re-seed for edit mode */
     setIsLeader(false);
     setSelectedLevels(new Set());
     setLevelPositions({});
+    setExistingRoles(new Map());
   }, [open, initial]);
+
+  /* pre-populate leadership state from DB when editing a youth with active roles */
+  useEffect(() => {
+    if (!open || !youthId || activeRoles.length === 0) return;
+    const map = new Map<LeadershipLevel, { id: string; roleId: string }>();
+    const levels = new Set<LeadershipLevel>();
+    const positions: LevelPositions = {};
+    for (const role of activeRoles) {
+      const level = role.level as LeadershipLevel;
+      map.set(level, { id: role.id, roleId: role.role_id });
+      levels.add(level);
+      positions[level] = role.role_id;
+    }
+    setExistingRoles(map);
+    setIsLeader(true);
+    setSelectedLevels(levels);
+    setLevelPositions(positions);
+  }, [open, youthId, activeRoles]);
 
   /* cascading org selects */
   const parishOptions = deaneryId
@@ -198,8 +231,33 @@ export function AddYouthDialog({
         });
       }
 
-      /* appoint leadership roles (add mode only — or when new levels are selected) */
-      if (isLeader && selectedLevels.size > 0) {
+      /* ── leadership changes ── */
+      if (isEdit) {
+        /* end roles for levels removed or when leader toggle turned off */
+        for (const [level, existing] of existingRoles) {
+          if (!isLeader || !selectedLevels.has(level)) {
+            await endLeaderTerm(existing.id);
+          } else if (levelPositions[level] && levelPositions[level] !== existing.roleId) {
+            await updateLeader(existing.id, { roleId: levelPositions[level]! });
+          }
+        }
+        /* appoint roles for newly added levels */
+        if (isLeader) {
+          for (const level of selectedLevels) {
+            if (!existingRoles.has(level) && levelPositions[level]) {
+              await appointLeader({
+                youthId: youth.id,
+                roleId: levelPositions[level]!,
+                level,
+                deaneryId: level !== "diocese" ? (deaneryId || null) : null,
+                parishId: level === "parish" || level === "outstation" ? (parishId || null) : null,
+                outstationId: level === "outstation" ? (outstationId || null) : null,
+              });
+            }
+          }
+        }
+      } else if (isLeader && selectedLevels.size > 0) {
+        /* add mode: appoint all selected levels */
         await Promise.all(
           Array.from(selectedLevels)
             .filter((level) => !!levelPositions[level])
@@ -433,11 +491,7 @@ export function AddYouthDialog({
                 type="button"
                 role="switch"
                 aria-checked={isLeader}
-                onClick={() => {
-                  setIsLeader((v) => !v);
-                  setSelectedLevels(new Set());
-                  setLevelPositions({});
-                }}
+                onClick={() => setIsLeader((v) => !v)}
                 className={[
                   "relative inline-flex h-5 w-9 items-center rounded-full transition-colors",
                   isLeader ? "bg-danger" : "bg-border",
