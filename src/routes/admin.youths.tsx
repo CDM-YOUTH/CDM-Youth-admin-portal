@@ -9,7 +9,7 @@ import { downloadXlsx } from "@/lib/export-xlsx";
 import { fetchOrg } from "@/lib/db/org";
 import { useAdminScope } from "@/lib/hooks/use-admin-scope";
 import { importYouths, buildTemplateOpts, type ImportResult } from "@/lib/db/youth-records/import";
-import { type PagedResponse } from "@/lib/api/fetch-api";
+import { apiFetch, type PagedResponse } from "@/lib/api/fetch-api";
 import { Topbar } from "@/components/admin/layout/topbar";
 import { Card, CardBody, Pill } from "@/components/admin/composables/ui-bits";
 import { TablePagination } from "@/components/admin/composables/tables/table-pagination";
@@ -318,6 +318,21 @@ function YouthsPage() {
       invalidate();
       qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
       qc.invalidateQueries({ queryKey: ["live-analytics"] });
+
+      if (result.errors.length > 0) {
+        apiFetch("/api/import-errors-sheet", {
+          method: "POST",
+          body: JSON.stringify({ errors: result.errors }),
+        })
+          .then((res) => res.json())
+          .then((body: unknown) => {
+            const b = body as { logged?: number };
+            toast.info(`${result.errors.length} import error${result.errors.length !== 1 ? "s" : ""} logged to Google Sheet (row${(b.logged ?? 0) !== 1 ? "s" : ""} appended)`);
+          })
+          .catch(() => {
+            toast.warning("Could not log import errors to Google Sheet");
+          });
+      }
     } catch (e) {
       setImportProgress(null);
       toast.error((e as Error).message);
