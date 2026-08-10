@@ -39,7 +39,7 @@ async function ensureHeaders(token: string, spreadsheetId: string): Promise<void
   }
 }
 
-export const APIRoute = createAPIFileRoute("/api/import-errors-sheet")({
+export const APIRoute = createAPIFileRoute("/api/sheets/errors")({
   POST: async ({ request }) => {
     const guard = await guardRequest(request);
     if ("error" in guard) return guard.error;
@@ -92,7 +92,7 @@ export const APIRoute = createAPIFileRoute("/api/import-errors-sheet")({
 
       return jsonOk({ ok: true, logged: rows.length });
     } catch (e: unknown) {
-      console.error("[import-errors-sheet] error:", e);
+      console.error("[sheets/errors] error:", e);
       return jsonError(e instanceof Error ? e.message : "Sheet write failed", 500);
     }
   },

@@ -320,7 +320,7 @@ function YouthsPage() {
       qc.invalidateQueries({ queryKey: ["live-analytics"] });
 
       if (result.errors.length > 0) {
-        apiFetch("/api/import-errors-sheet", {
+        apiFetch("/api/sheets/errors", {
           method: "POST",
           body: JSON.stringify({ errors: result.errors }),
         })

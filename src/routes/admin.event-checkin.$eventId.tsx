@@ -98,7 +98,7 @@ function EventCheckinPage() {
   const syncToSheets = async () => {
     setSheetSyncing(true);
     try {
-      const res = await apiFetch("/api/leadership-sheet");
+      const res = await apiFetch("/api/sheets/leadership");
       const body = await res.json() as { ok?: boolean; synced?: number; error?: string };
       if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
       toast.success(`Sheet synced — ${body.synced ?? 0} registration${body.synced !== 1 ? "s" : ""} written`);
@@ -116,7 +116,7 @@ function EventCheckinPage() {
       qc.invalidateQueries({ queryKey: ["event-full", eventId] });
       // Sync to Google Sheets for Leadership Workshop
       if (eventId === LEADERSHIP_WORKSHOP_ID) {
-        apiFetch("/api/leadership-sheet", {
+        apiFetch("/api/sheets/leadership", {
           method: "POST",
           body: JSON.stringify({
             eventId,
