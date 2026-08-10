@@ -83,15 +83,15 @@ function Landing() {
         </p>
 
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-          <Link
-            to="/portal"
-            className="rounded-xl bg-danger px-8 py-3.5 text-[14px] font-bold text-white shadow-lg transition-all hover:opacity-90 hover:shadow-xl"
+          <span
+            aria-disabled="true"
+            className="cursor-not-allowed rounded-xl border-2 border-gold-3/50 bg-gold/10 px-8 py-3.5 text-[14px] font-semibold text-gold-3"
           >
             Open Youth Portal →
-          </Link>
+          </span>
           <Link
             to="/login"
-            className="rounded-xl border-2 border-gold-3/50 bg-white px-8 py-3.5 text-[14px] font-semibold text-gold-3 transition-colors hover:bg-warn-soft"
+            className="rounded-xl bg-danger px-8 py-3.5 text-[14px] font-bold text-white shadow-lg transition-all hover:opacity-90 hover:shadow-xl"
           >
             Admin Login
           </Link>

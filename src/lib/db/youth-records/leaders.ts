@@ -102,8 +102,8 @@ export async function listLeadersPaged(opts: {
   const page = opts.page ?? 0;
   const size = Math.min(opts.size ?? 25, 500);
 
-  // Use !inner join on youths when doing a text search so unmatched rows are excluded
-  const needsInner = !!(opts.q?.trim());
+  // Use !inner join on youths when doing text search or filtering by youth's org
+  const needsInner = !!(opts.q?.trim() || opts.deaneryId || opts.parishId || opts.outstationId);
   const youthJoin = needsInner
     ? "youth:youths!inner(full_name,cdm_id,phone,deanery:deaneries(name),parish:parishes(name),outstation:outstations(name))"
     : "youth:youths(full_name,cdm_id,phone,deanery:deaneries(name),parish:parishes(name),outstation:outstations(name))";
@@ -116,9 +116,10 @@ export async function listLeadersPaged(opts: {
 
   if (opts.level)        query = query.eq("level", opts.level);
   if (opts.active)       query = query.is("end_date", null);
-  if (opts.deaneryId)    query = query.eq("deanery_id", opts.deaneryId);
-  if (opts.parishId)     query = query.eq("parish_id", opts.parishId);
-  if (opts.outstationId) query = query.eq("outstation_id", opts.outstationId);
+  // Filter on the youth's own org, not the role's served-at org, so filters work on any tab level
+  if (opts.deaneryId)    query = query.eq("youths.deanery_id", opts.deaneryId);
+  if (opts.parishId)     query = query.eq("youths.parish_id", opts.parishId);
+  if (opts.outstationId) query = query.eq("youths.outstation_id", opts.outstationId);
   if (opts.q?.trim()) {
     const t = likePattern(opts.q);
     query = query.or(`cdm_id.ilike.${t},full_name.ilike.${t},phone.ilike.${t}`, { referencedTable: "youths" });
