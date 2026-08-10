@@ -66,8 +66,8 @@ async function ensureHeaders(token: string, spreadsheetId: string) {
   }
 }
 
-export const APIRoute = createAPIFileRoute("/api/leadership-sheet")({
-  /* ── GET: bulk sync ────────────────────────────────────────────────────── */
+export const APIRoute = createAPIFileRoute("/api/sheets/leadership")({
+  /* ── GET: bulk sync ─────────────────────────────────────────────────────── */
   GET: async ({ request }) => {
     const guard = await guardRequest(request);
     if ("error" in guard) return guard.error;
@@ -99,12 +99,12 @@ export const APIRoute = createAPIFileRoute("/api/leadership-sheet")({
 
       return jsonOk({ ok: true, synced: rows.length });
     } catch (e: unknown) {
-      console.error("[leadership-sheet] sync error:", e);
+      console.error("[sheets/leadership] sync error:", e);
       return jsonError(e instanceof Error ? e.message : "Sync failed", 500);
     }
   },
 
-  /* ── POST: single append after registration ────────────────────────────── */
+  /* ── POST: single append after registration ─────────────────────────────── */
   POST: async ({ request }) => {
     const guard = await guardRequest(request);
     if ("error" in guard) return guard.error;
@@ -165,7 +165,7 @@ export const APIRoute = createAPIFileRoute("/api/leadership-sheet")({
 
       return jsonOk({ ok: true });
     } catch (e: unknown) {
-      console.error("[leadership-sheet] append error:", e);
+      console.error("[sheets/leadership] append error:", e);
       return jsonError(e instanceof Error ? e.message : "Sheets sync failed", 500);
     }
   },
