@@ -35,7 +35,7 @@ type NavGroup = { label: string; items: NavItem[] };
 const GROUPS: NavGroup[] = [
   {
     label: "Overview",
-    items: [{ to: "/admin", label: "Dashboard", icon: LayoutDashboard }],
+    items: [{ to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard }],
   },
   {
     label: "Youth",
@@ -192,9 +192,7 @@ export function AdminSidebar() {
             {collapsed && <div className="my-2 h-px bg-border/60" />}
             {group.items.map((item) => {
               const isActive =
-                item.to === "/admin"
-                  ? pathname === "/admin"
-                  : pathname === item.to || pathname.startsWith(item.to + "/");
+                pathname === item.to || pathname.startsWith(item.to + "/");
               const Icon = item.icon;
               return (
                 <Link

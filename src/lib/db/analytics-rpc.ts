@@ -63,6 +63,28 @@ export type EnrollmentBreakdownRow = {
   waived:       number;
 };
 
+export type EnrollmentTrendRow = {
+  year: number;
+  enrolled: number;
+  paid: number;
+  pending: number;
+  waived: number;
+};
+
+export type EnrollmentDemographicsRow = {
+  enrolled: number;
+  paid: number;
+  pending: number;
+  waived: number;
+  male: number;
+  female: number;
+  cat_primary: number;
+  cat_secondary: number;
+  cat_tertiary: number;
+  cat_working: number;
+  cat_other: number;
+};
+
 export type CusaBreakdownRow = {
   id:           string | null;
   label:        string;
@@ -110,6 +132,8 @@ export type EventBreakdownRow = {
   completed:      number;
   total_checkins: number;
 };
+
+export type AgeRangeRow = { label: string; count: number };
 
 // ── Helper ──────────────────────────────────────────────────────────────────
 
@@ -210,14 +234,69 @@ export async function getEnrollmentBreakdown(
   }));
 }
 
-// ── 4. CUSA breakdown ────────────────────────────────────────────────────────
+// ── 4. Enrollment trend ──────────────────────────────────────────────────────
+
+export async function getEnrollmentTrend(
+  year: number,
+  scope: ScopeParams = {},
+  yearsBack = 5,
+): Promise<EnrollmentTrendRow[]> {
+  const { data, error } = await rpc<unknown[]>("get_enrollment_trend", {
+    p_year:           year,
+    p_years_back:     yearsBack,
+    p_deanery_id:     scope.deaneryId    ?? null,
+    p_parish_id:      scope.parishId     ?? null,
+    p_outstation_id:  scope.outstationId ?? null,
+  });
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
+    year:     Number(r.year ?? 0),
+    enrolled: n(r.enrolled),
+    paid:     n(r.paid),
+    pending:  n(r.pending),
+    waived:   n(r.waived),
+  }));
+}
+
+// ── 5. Enrollment demographics ──────────────────────────────────────────────
+
+export async function getEnrollmentDemographics(
+  year: number,
+  scope: ScopeParams = {},
+): Promise<EnrollmentDemographicsRow> {
+  const { data, error } = await rpc<unknown[]>("get_enrollment_demographics", {
+    p_year:           year,
+    p_deanery_id:     scope.deaneryId    ?? null,
+    p_parish_id:      scope.parishId     ?? null,
+    p_outstation_id:  scope.outstationId ?? null,
+  });
+  if (error) throw new Error(error.message);
+  const row = Array.isArray(data) ? (data[0] as Record<string, unknown> | undefined) : (data as Record<string, unknown> | null);
+  return {
+    enrolled:  n(row?.enrolled),
+    paid:      n(row?.paid),
+    pending:   n(row?.pending),
+    waived:    n(row?.waived),
+    male:      n(row?.male),
+    female:    n(row?.female),
+    cat_primary: n(row?.cat_primary),
+    cat_secondary: n(row?.cat_secondary),
+    cat_tertiary: n(row?.cat_tertiary),
+    cat_working: n(row?.cat_working),
+    cat_other: n(row?.cat_other),
+  };
+}
+
+// ── 6. CUSA breakdown ────────────────────────────────────────────────────────
 
 export async function getCusaBreakdown(
+  year: number,
   scope: ScopeParams = {},
   groupBy: GroupBy = "deanery",
   institution?: string | null,
 ): Promise<CusaBreakdownRow[]> {
   const { data, error } = await rpc<unknown[]>("get_cusa_breakdown", {
+    p_year:           year,
     p_deanery_id:     scope.deaneryId    ?? null,
     p_parish_id:      scope.parishId     ?? null,
     p_outstation_id:  scope.outstationId ?? null,
@@ -239,7 +318,7 @@ export async function getCusaBreakdown(
   }));
 }
 
-// ── 5. Leader breakdown ──────────────────────────────────────────────────────
+// ── 7. Leader breakdown ──────────────────────────────────────────────────────
 
 export async function getLeaderBreakdown(
   scope: ScopeParams = {},
@@ -267,7 +346,7 @@ export async function getLeaderBreakdown(
   }));
 }
 
-// ── 6. Welfare breakdown ─────────────────────────────────────────────────────
+// ── 8. Welfare breakdown ─────────────────────────────────────────────────────
 
 export async function getWelfareBreakdown(
   scope: ScopeParams = {},
@@ -288,7 +367,7 @@ export async function getWelfareBreakdown(
   }));
 }
 
-// ── 7. Event breakdown ───────────────────────────────────────────────────────
+// ── 9. Event breakdown ───────────────────────────────────────────────────────
 
 export async function getEventBreakdown(
   scope: ScopeParams = {},
@@ -310,4 +389,50 @@ export async function getEventBreakdown(
     completed:      n(r.completed),
     total_checkins: n(r.total_checkins),
   }));
+}
+
+// ── 10. Age-range breakdown ──────────────────────────────────────────────────
+
+// Three canonical display buckets. All stored age_range strings (e.g. "18-21",
+// "21-24", "25-27", "27-30", "30-35") are harmonised to these at query time by
+// extracting the lower bound of the stored range and re-bucketing.
+const AGE_BUCKETS = [
+  { label: "Below 18", test: (n: number) => n < 18 },
+  { label: "18-24",    test: (n: number) => n >= 18 && n <= 24 },
+  { label: "25-30",    test: (n: number) => n >= 25 },
+] as const;
+
+function resolveAgeBucket(age: number | null, ageRange: string | null): string | null {
+  // Prefer age_range: extract the first number (lower bound) and re-bucket
+  if (ageRange) {
+    const m = String(ageRange).match(/\d+/);
+    if (m) {
+      const lower = parseInt(m[0], 10);
+      return AGE_BUCKETS.find((b) => b.test(lower))?.label ?? null;
+    }
+  }
+  if (age != null && age > 0) {
+    return AGE_BUCKETS.find((b) => b.test(age))?.label ?? null;
+  }
+  return null;
+}
+
+export async function getAgeRangeBreakdown(scope: ScopeParams = {}): Promise<AgeRangeRow[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let q = (supabase as any).from("youths").select("age, age_range");
+  if (scope.deaneryId)    q = q.eq("deanery_id", scope.deaneryId);
+  if (scope.parishId)     q = q.eq("parish_id", scope.parishId);
+  if (scope.outstationId) q = q.eq("outstation_id", scope.outstationId);
+  const { data } = await q;
+  const rows = (data ?? []) as { age: number | null; age_range: string | null }[];
+
+  const buckets: Record<string, number> = {};
+  for (const r of rows) {
+    const label = resolveAgeBucket(r.age, r.age_range);
+    if (label) buckets[label] = (buckets[label] ?? 0) + 1;
+  }
+
+  return AGE_BUCKETS
+    .map(({ label }) => ({ label, count: buckets[label] ?? 0 }))
+    .filter((r) => r.count > 0);
 }

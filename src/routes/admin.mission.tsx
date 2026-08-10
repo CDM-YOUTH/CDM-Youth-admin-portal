@@ -182,7 +182,7 @@ const pairingByYouth = useMemo(() => {
     });
   }, [rows, search, fName, fSourceParish, fSourceDeanery, fHostParish, fStatus]);
 
-  const rowPagination = usePagination(filteredRows, 15);
+  const rowPagination = usePagination(filteredRows, 10);
 
   const handleExport = () => {
     const headers = ["CDM No.", "Name", "Source Parish", "Source Deanery", "Sent To Parish", "Sent To Deanery", "Status"];

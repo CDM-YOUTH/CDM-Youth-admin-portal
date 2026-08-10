@@ -1,4 +1,4 @@
-import { createAPIFileRoute } from "@tanstack/react-start/api";
+import { createFileRoute } from "@tanstack/react-router";
 import { guardRequest, createServerClient, jsonOk, jsonError } from "@/lib/api/server-client";
 import {
   getServiceAccountKey,
@@ -66,7 +66,9 @@ async function ensureHeaders(token: string, spreadsheetId: string) {
   }
 }
 
-export const APIRoute = createAPIFileRoute("/api/sheets/leadership")({
+export const Route = createFileRoute("/api/sheets/leadership")({
+  server: {
+    handlers: {
   /* ── GET: bulk sync ─────────────────────────────────────────────────────── */
   GET: async ({ request }) => {
     const guard = await guardRequest(request);
@@ -168,5 +170,7 @@ export const APIRoute = createAPIFileRoute("/api/sheets/leadership")({
       console.error("[sheets/leadership] append error:", e);
       return jsonError(e instanceof Error ? e.message : "Sheets sync failed", 500);
     }
+  },
+    },
   },
 });

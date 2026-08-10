@@ -37,10 +37,11 @@ export type ImportRowData = {
   Outstation: string;
 };
 
-export type ImportRowError = { row: number; reason: string; data?: ImportRowData };
+export type ImportRowError = { row: number; reason: string; data?: ImportRowData; conflictHolder?: string };
 
 export type ImportResult = {
   inserted: number;
+  updated: number;
   skipped: number;
   createdParishes: string[];
   createdOutstations: string[];
@@ -82,13 +83,20 @@ type ParsedRow = {
  *   numeric — the lower bound (used for the DB `age int` column)
  *   range   — the original trimmed string if it was a range, null if it was plain
  */
+function ageToRange(n: number): string {
+  if (n < 18)  return "Below 18";
+  if (n <= 24) return "18-24";
+  return "25-30";
+}
+
 function parseAge(val: string): { numeric: number; range: string | null } {
   const s = val.trim();
   if (!s) return { numeric: 0, range: null };
   const isRange = /[-–—]/.test(s);
   const match = s.match(/\d+/);
   const numeric = match ? parseInt(match[0], 10) : 0;
-  return { numeric, range: isRange ? s : null };
+  const range = isRange ? s : (numeric > 0 ? ageToRange(numeric) : null);
+  return { numeric, range };
 }
 
 // ── XLSX parsing ─────────────────────────────────────────────────────────────
@@ -292,16 +300,20 @@ function rowData(row: ParsedRow): ImportRowData {
 }
 
 // ── Duplicate detection ───────────────────────────────────────────────────────
+// Key: full_name_lower|deanery_id|parish_id|outstation_id  →  youth id
 
-async function loadExistingYouthKeys(): Promise<Set<string>> {
-  const { data } = await supabase.from("youths").select("full_name, phone").limit(20000);
-  const set = new Set<string>();
+async function loadExistingYouths(): Promise<Map<string, string>> {
+  const { data } = await supabase
+    .from("youths")
+    .select("id, full_name, deanery_id, parish_id, outstation_id")
+    .limit(20000);
+  const map = new Map<string, string>();
   for (const y of data ?? []) {
-    set.add(
-      `${String(y.full_name ?? "").trim().toLowerCase()}|${String(y.phone ?? "").trim()}`,
-    );
+    const name = String(y.full_name ?? "").trim().toLowerCase();
+    const key  = name + "|" + (y.deanery_id ?? "") + "|" + (y.parish_id ?? "") + "|" + (y.outstation_id ?? "");
+    map.set(key, y.id as string);
   }
-  return set;
+  return map;
 }
 
 // ── Leadership org FK helper ──────────────────────────────────────────────────
@@ -318,6 +330,27 @@ function leaderOrgFks(
   /* outstation */            return { deanery_id: null, parish_id: null, outstation_id: outstationId };
 }
 
+
+// ── Role conflict holder lookup ─────────────────────────────────────────────
+
+async function findRoleHolder(
+  roleId: string,
+  levelValue: string,
+  fks: { deanery_id: string | null; parish_id: string | null; outstation_id: string | null },
+): Promise<string | undefined> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let q = (supabase as any)
+    .from("youth_leadership_roles")
+    .select("youth:youths(full_name)")
+    .eq("role_id", roleId)
+    .eq("level", levelValue);
+  if (fks.deanery_id !== null)    q = q.eq("deanery_id", fks.deanery_id);    else q = q.is("deanery_id", null);
+  if (fks.parish_id !== null)     q = q.eq("parish_id", fks.parish_id);      else q = q.is("parish_id", null);
+  if (fks.outstation_id !== null) q = q.eq("outstation_id", fks.outstation_id); else q = q.is("outstation_id", null);
+  const { data } = await q.maybeSingle();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data as any)?.youth?.full_name ?? undefined;
+}
 // ── Main import function ──────────────────────────────────────────────────────
 
 export async function importYouths(
@@ -326,6 +359,7 @@ export async function importYouths(
 ): Promise<ImportResult> {
   const result: ImportResult = {
     inserted: 0,
+    updated: 0,
     skipped: 0,
     createdParishes: [],
     createdOutstations: [],
@@ -338,10 +372,10 @@ export async function importYouths(
   if (parsed.length === 0) throw new Error("No data rows found in the Excel file");
 
   // Load reference data in parallel
-  const [org, roleTypes, existingKeys] = await Promise.all([
+  const [org, roleTypes, existingYouths] = await Promise.all([
     fetchOrg(),
     listRoleTypes(),
-    loadExistingYouthKeys(),
+    loadExistingYouths(),
   ]);
   const maps = buildOrgMaps(org);
   const roleMap = await buildRoleMap(roleTypes);
@@ -364,10 +398,6 @@ export async function importYouths(
       result.errors.push({ row: row.rowNum, reason: "Missing full name", data: rowData(row) });
       continue;
     }
-    if (!row.phone) {
-      result.errors.push({ row: row.rowNum, reason: `${row.fullName}: missing phone`, data: rowData(row) });
-      continue;
-    }
     if (!row.deanery) {
       result.errors.push({ row: row.rowNum, reason: `${row.fullName}: missing deanery`, data: rowData(row) });
       continue;
@@ -386,13 +416,6 @@ export async function importYouths(
     // ── Normalise optional fields ────────────────────────────────────────────
     const gender = VALID_GENDERS.has(row.gender) ? row.gender : "Female";
     const category = VALID_CATEGORIES.has(row.category) ? row.category : "Secondary";
-
-    // ── Duplicate check ──────────────────────────────────────────────────────
-    const dupKey = `${row.fullName.trim().toLowerCase()}|${row.phone.trim()}`;
-    if (existingKeys.has(dupKey)) {
-      result.skipped++;
-      continue;
-    }
 
     // ── Resolve org IDs ──────────────────────────────────────────────────────
     const deaneryId = maps.deaneryByName.get(row.deanery.trim().toLowerCase()) ?? null;
@@ -418,7 +441,6 @@ export async function importYouths(
       try {
         outstationId = await ensureOutstation(maps, parishId, row.outstation, result.createdOutstations);
       } catch (e) {
-        // Non-fatal: record the error but continue inserting the youth
         result.errors.push({
           row: row.rowNum,
           reason: `${row.fullName}: outstation warning — ${(e as Error).message}`,
@@ -427,91 +449,130 @@ export async function importYouths(
       }
     }
 
-    // ── Insert youth ─────────────────────────────────────────────────────────
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: youth, error: yErr } = await (supabase as any)
-        .from("youths")
-        .insert({
-          full_name:     row.fullName.trim(),
-          gender:        gender as "Female" | "Male",
-          age,
-          age_range:     row.ageRange || null,
-          phone:         row.phone.trim() || null,
-          alt_phone:     row.altPhone || null,
-          email:         row.email || null,
-          deanery_id:    deaneryId,
-          parish_id:     parishId,
-          outstation_id: outstationId,
-          category:      category as "Primary" | "Secondary" | "Tertiary" | "Working",
-          institution:   row.institution || null,
-          year_of_study: row.yearOfStudy || null,
-          notes:         row.notes || null,
-        })
-        .select("id, cdm_id")
-        .single();
+    // ── Check for existing youth (name + org location) ───────────────────────
+    const orgKey = row.fullName.trim().toLowerCase() + "|" + (deaneryId ?? "") + "|" + (parishId ?? "") + "|" + (outstationId ?? "");
+    const existingId = existingYouths.get(orgKey);
 
-      if (yErr) {
-        result.errors.push({ row: row.rowNum, reason: `${row.fullName}: ${yErr.message}`, data: rowData(row) });
+    let youthId: string;
+
+    if (existingId) {
+      // ── Update existing youth — fill in any new/missing details ─────────────
+      const patch: Record<string, unknown> = {};
+      if (row.phone)       patch.phone         = row.phone.trim();
+      if (row.altPhone)    patch.alt_phone      = row.altPhone;
+      if (row.email)       patch.email          = row.email;
+      if (age > 0)         patch.age            = age;
+      if (row.ageRange)    patch.age_range      = row.ageRange;
+      if (VALID_GENDERS.has(row.gender))     patch.gender    = row.gender;
+      if (VALID_CATEGORIES.has(row.category)) patch.category  = row.category;
+      if (row.institution) patch.institution    = row.institution;
+      if (row.yearOfStudy) patch.year_of_study  = row.yearOfStudy;
+      if (row.notes)       patch.notes          = row.notes;
+
+      if (Object.keys(patch).length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase as any).from("youths").update(patch).eq("id", existingId);
+      }
+
+      youthId = existingId;
+      result.updated++;
+    } else {
+      // ── Insert new youth ─────────────────────────────────────────────────────
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: youth, error: yErr } = await (supabase as any)
+          .from("youths")
+          .insert({
+            full_name:     row.fullName.trim(),
+            gender:        gender as "Female" | "Male",
+            age,
+            age_range:     row.ageRange || null,
+            phone:         row.phone.trim() || null,
+            alt_phone:     row.altPhone || null,
+            email:         row.email || null,
+            deanery_id:    deaneryId,
+            parish_id:     parishId,
+            outstation_id: outstationId,
+            category:      category as "Primary" | "Secondary" | "Tertiary" | "Working",
+            institution:   row.institution || null,
+            year_of_study: row.yearOfStudy || null,
+            notes:         row.notes || null,
+          })
+          .select("id, cdm_id")
+          .single();
+
+        if (yErr) {
+          result.errors.push({ row: row.rowNum, reason: `${row.fullName}: ${yErr.message}`, data: rowData(row) });
+          continue;
+        }
+
+        youthId = (youth as { id: string; cdm_id: string }).id;
+        existingYouths.set(orgKey, youthId);
+        result.inserted++;
+
+        // ── CUSA: auto-create for Tertiary with institution ────────────────────
+        if (category === "Tertiary" && row.institution.trim()) {
+          try {
+            await supabase.from("cusa_members").insert({
+              youth_id:      youthId,
+              institution:   row.institution.trim(),
+              course:        row.course || null,
+              year_of_study: row.yearOfStudy || null,
+            });
+          } catch {
+            // Non-fatal
+          }
+        }
+      } catch (e) {
+        result.errors.push({ row: row.rowNum, reason: `${row.fullName}: ${(e as Error).message}`, data: rowData(row) });
         continue;
       }
+    }
 
-      const youthId = (youth as { id: string; cdm_id: string }).id;
-      existingKeys.add(dupKey); // prevent re-insert if file has duplicates
-      result.inserted++;
+    // ── Leadership roles (runs for both new and existing youths) ─────────────
+    for (const [colLabel, levelValue] of Object.entries(LEVEL_MAP)) {
+      const roleName = (row as unknown as Record<string, string>)[colLabel]?.trim();
+      if (!roleName || roleName === "-" || roleName === "—") continue;
+      if (levelValue === "outstation" && !outstationId) continue;
+      if (levelValue === "deanery"    && !deaneryId)    continue;
+      if (levelValue === "parish"     && !parishId)     continue;
 
-      // ── CUSA: auto-create for Tertiary with institution ──────────────────
-      if (category === "Tertiary" && row.institution.trim()) {
-        try {
-          await supabase.from("cusa_members").insert({
-            youth_id:      youthId,
-            institution:   row.institution.trim(),
-            course:        row.course || null,
-            year_of_study: row.yearOfStudy || null,
-          });
-        } catch {
-          // Non-fatal — CUSA entry can be added manually
-        }
-      }
+      try {
+        const roleId = await ensureRoleType(roleMap, roleName, result.createdRoleTypes);
+        const fks = leaderOrgFks(levelValue, deaneryId, parishId, outstationId);
 
-      // ── Leadership roles ─────────────────────────────────────────────────
-      for (const [colLabel, levelValue] of Object.entries(LEVEL_MAP)) {
-        const roleName = (row as unknown as Record<string, string>)[colLabel]?.trim();
-        if (!roleName || roleName === "-" || roleName === "—") continue;
+        // Skip silently if this youth already holds this exact role
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: alreadyHas } = await (supabase as any)
+          .from("youth_leadership_roles")
+          .select("id")
+          .eq("youth_id", youthId)
+          .eq("role_id", roleId)
+          .eq("level", levelValue)
+          .maybeSingle();
+        if (alreadyHas) continue;
 
-        try {
-          const roleId = await ensureRoleType(roleMap, roleName, result.createdRoleTypes);
-          const fks = leaderOrgFks(levelValue, deaneryId, parishId, outstationId);
+        const { error: rErr } = await supabase
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .from("youth_leadership_roles" as any)
+          .insert({ youth_id: youthId, role_id: roleId, level: levelValue, ...fks });
 
-          // Outstation level requires an outstation to be set
-          if (levelValue === "outstation" && !outstationId) continue;
-          // Deanery level requires a deanery
-          if (levelValue === "deanery" && !deaneryId) continue;
-          // Parish level requires a parish
-          if (levelValue === "parish" && !parishId) continue;
-
-          const { error: rErr } = await supabase
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            .from("youth_leadership_roles" as any)
-            .insert({ youth_id: youthId, role_id: roleId, level: levelValue, ...fks });
-
-          if (rErr) {
-            result.errors.push({
-              row: row.rowNum,
-              reason: `${row.fullName}: leadership conflict — ${roleName} at ${colLabel} level already assigned`,
-              data: rowData(row),
-            });
-          }
-        } catch (e) {
+        if (rErr) {
+          const conflictHolder = await findRoleHolder(roleId, levelValue, fks);
           result.errors.push({
             row: row.rowNum,
-            reason: `${row.fullName}: leadership error — ${(e as Error).message}`,
+            reason: `${row.fullName}: leadership conflict — ${roleName} at ${colLabel} level already assigned`,
             data: rowData(row),
+            conflictHolder,
           });
         }
+      } catch (e) {
+        result.errors.push({
+          row: row.rowNum,
+          reason: `${row.fullName}: leadership error — ${(e as Error).message}`,
+          data: rowData(row),
+        });
       }
-    } catch (e) {
-      result.errors.push({ row: row.rowNum, reason: `${row.fullName}: ${(e as Error).message}`, data: rowData(row) });
     }
   }
 

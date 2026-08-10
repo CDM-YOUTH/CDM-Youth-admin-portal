@@ -11,6 +11,7 @@ export type YouthRow = {
   full_name: string;
   gender: Gender;
   age: number;
+  age_range: string | null;
   phone: string | null;
   alt_phone: string | null;
   email: string | null;
