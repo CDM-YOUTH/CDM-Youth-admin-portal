@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type ComponentType } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, QrCode, Search, UserPlus, X, BadgeCheck, Download, Loader2, UserCog, MoreVertical, Trash2, FileText } from "lucide-react";
+import { ArrowLeft, QrCode, Search, UserPlus, X, BadgeCheck, Download, Loader2, UserCog, MoreVertical, Trash2, FileText, Sheet } from "lucide-react";
 import { toast } from "sonner";
 import { Topbar } from "@/components/admin/layout/topbar";
 import { Card, CardBody, Kpi } from "@/components/admin/composables/ui-bits";
@@ -91,6 +91,23 @@ function EventCheckinPage() {
   });
 
   const LEADERSHIP_WORKSHOP_ID = "391508e3-b057-48ef-aad0-2992046a91ff";
+  const isLeadershipWorkshop = eventId === LEADERSHIP_WORKSHOP_ID;
+
+  const [sheetSyncing, setSheetSyncing] = useState(false);
+
+  const syncToSheets = async () => {
+    setSheetSyncing(true);
+    try {
+      const res = await apiFetch("/api/leadership-sheet");
+      const body = await res.json() as { ok?: boolean; synced?: number; error?: string };
+      if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
+      toast.success(`Sheet synced — ${body.synced ?? 0} registration${body.synced !== 1 ? "s" : ""} written`);
+    } catch (e: unknown) {
+      toast.error(`Sheet sync failed: ${e instanceof Error ? e.message : "unknown error"}`);
+    } finally {
+      setSheetSyncing(false);
+    }
+  };
 
   const registerMut = useMutation({
     mutationFn: registerForEvent,
@@ -340,6 +357,19 @@ function EventCheckinPage() {
                 <button onClick={() => exportPdf(filtered)} className={btnCls("ghost")} title="Export current view as PDF">
                   <FileText className="h-3.5 w-3.5" /> Export PDF
                 </button>
+                {isLeadershipWorkshop && (
+                  <button
+                    onClick={syncToSheets}
+                    disabled={sheetSyncing}
+                    className={btnCls("ghost")}
+                    title="Sync all registrations to Google Sheet"
+                  >
+                    {sheetSyncing
+                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      : <Sheet className="h-3.5 w-3.5" />}
+                    {sheetSyncing ? "Syncing…" : "Sync to Sheets"}
+                  </button>
+                )}
                 <button onClick={() => setScanOpen(true)} className={btnCls("ghost")}>
                   <QrCode className="h-3.5 w-3.5" /> Show QR
                 </button>
