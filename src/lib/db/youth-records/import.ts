@@ -16,7 +16,28 @@ import { listRoleTypes, type RoleTypeRow } from "./leaders";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
-export type ImportRowError = { row: number; reason: string };
+export type ImportRowData = {
+  fullName: string;
+  gender: string;
+  age: string;        // display value — range string or plain number
+  phone: string;
+  altPhone: string;
+  email: string;
+  deanery: string;
+  parish: string;
+  outstation: string;
+  category: string;
+  institution: string;
+  yearOfStudy: string;
+  course: string;
+  notes: string;
+  Diocese: string;
+  Deanery: string;
+  Parish: string;
+  Outstation: string;
+};
+
+export type ImportRowError = { row: number; reason: string; data?: ImportRowData };
 
 export type ImportResult = {
   inserted: number;
@@ -245,6 +266,31 @@ async function ensureRoleType(
   return row.id;
 }
 
+// ── Row-data snapshot for error logging ──────────────────────────────────────
+
+function rowData(row: ParsedRow): ImportRowData {
+  return {
+    fullName:    row.fullName,
+    gender:      row.gender,
+    age:         row.ageRange ?? String(row.age),
+    phone:       row.phone,
+    altPhone:    row.altPhone,
+    email:       row.email,
+    deanery:     row.deanery,
+    parish:      row.parish,
+    outstation:  row.outstation,
+    category:    row.category,
+    institution: row.institution,
+    yearOfStudy: row.yearOfStudy,
+    course:      row.course,
+    notes:       row.notes,
+    Diocese:     row.Diocese,
+    Deanery:     row.Deanery,
+    Parish:      row.Parish,
+    Outstation:  row.Outstation,
+  };
+}
+
 // ── Duplicate detection ───────────────────────────────────────────────────────
 
 async function loadExistingYouthKeys(): Promise<Set<string>> {
@@ -315,25 +361,25 @@ export async function importYouths(
 
     // ── Validate required fields ─────────────────────────────────────────────
     if (!row.fullName) {
-      result.errors.push({ row: row.rowNum, reason: "Missing full name" });
+      result.errors.push({ row: row.rowNum, reason: "Missing full name", data: rowData(row) });
       continue;
     }
     if (!row.phone) {
-      result.errors.push({ row: row.rowNum, reason: `${row.fullName}: missing phone` });
+      result.errors.push({ row: row.rowNum, reason: `${row.fullName}: missing phone`, data: rowData(row) });
       continue;
     }
     if (!row.deanery) {
-      result.errors.push({ row: row.rowNum, reason: `${row.fullName}: missing deanery` });
+      result.errors.push({ row: row.rowNum, reason: `${row.fullName}: missing deanery`, data: rowData(row) });
       continue;
     }
     if (!row.parish) {
-      result.errors.push({ row: row.rowNum, reason: `${row.fullName}: missing parish` });
+      result.errors.push({ row: row.rowNum, reason: `${row.fullName}: missing parish`, data: rowData(row) });
       continue;
     }
     const age = row.age;
     const displayAge = row.ageRange ?? String(row.age);
     if (!age || age < 5 || age > 80) {
-      result.errors.push({ row: row.rowNum, reason: `${row.fullName}: invalid age (${displayAge})` });
+      result.errors.push({ row: row.rowNum, reason: `${row.fullName}: invalid age (${displayAge})`, data: rowData(row) });
       continue;
     }
 
@@ -354,6 +400,7 @@ export async function importYouths(
       result.errors.push({
         row: row.rowNum,
         reason: `${row.fullName}: deanery not found — "${row.deanery}"`,
+        data: rowData(row),
       });
       continue;
     }
@@ -362,7 +409,7 @@ export async function importYouths(
     try {
       parishId = await ensureParish(maps, deaneryId, row.parish, result.createdParishes);
     } catch (e) {
-      result.errors.push({ row: row.rowNum, reason: `${row.fullName}: ${(e as Error).message}` });
+      result.errors.push({ row: row.rowNum, reason: `${row.fullName}: ${(e as Error).message}`, data: rowData(row) });
       continue;
     }
 
@@ -375,6 +422,7 @@ export async function importYouths(
         result.errors.push({
           row: row.rowNum,
           reason: `${row.fullName}: outstation warning — ${(e as Error).message}`,
+          data: rowData(row),
         });
       }
     }
@@ -404,7 +452,7 @@ export async function importYouths(
         .single();
 
       if (yErr) {
-        result.errors.push({ row: row.rowNum, reason: `${row.fullName}: ${yErr.message}` });
+        result.errors.push({ row: row.rowNum, reason: `${row.fullName}: ${yErr.message}`, data: rowData(row) });
         continue;
       }
 
@@ -448,21 +496,22 @@ export async function importYouths(
             .insert({ youth_id: youthId, role_id: roleId, level: levelValue, ...fks });
 
           if (rErr) {
-            // Unique constraint: another person already holds this role at this org → warn
             result.errors.push({
               row: row.rowNum,
               reason: `${row.fullName}: leadership conflict — ${roleName} at ${colLabel} level already assigned`,
+              data: rowData(row),
             });
           }
         } catch (e) {
           result.errors.push({
             row: row.rowNum,
             reason: `${row.fullName}: leadership error — ${(e as Error).message}`,
+            data: rowData(row),
           });
         }
       }
     } catch (e) {
-      result.errors.push({ row: row.rowNum, reason: `${row.fullName}: ${(e as Error).message}` });
+      result.errors.push({ row: row.rowNum, reason: `${row.fullName}: ${(e as Error).message}`, data: rowData(row) });
     }
   }
 
