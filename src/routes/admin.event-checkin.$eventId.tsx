@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { titleCase, formatPhone } from "@/lib/utils";
 import { useEffect, useMemo, useState, type ComponentType } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, QrCode, Search, UserPlus, X, BadgeCheck, Download, Loader2, UserCog, MoreVertical, Trash2, FileText, Sheet } from "lucide-react";
@@ -415,14 +416,14 @@ function EventCheckinPage() {
                   <tr key={a.id} className="border-b border-border/30 last:border-0 hover:bg-bg-3">
                     <td className="px-3.5 py-2.5 font-mono text-[10px] font-bold text-gold">{a.cdmId}</td>
                     <td className="px-3.5 py-2.5 text-[11px] font-semibold text-foreground">
-                      {a.name}
+                      {titleCase(a.name)}
                       {a.kind === "guest" && (
                         <span className="ml-1.5 rounded bg-warn-soft px-1 py-0.5 text-[8px] font-black uppercase tracking-wide text-gold">
                           guest
                         </span>
                       )}
                     </td>
-                    <td className="px-3.5 py-2.5 text-[11px] text-text-3">{a.phone || "—"}</td>
+                    <td className="px-3.5 py-2.5 text-[11px] text-text-3">{formatPhone(a.phone) || "—"}</td>
                     <td className="px-3.5 py-2.5 text-[11px] text-text-2">{a.deanery || "—"}</td>
                     <td className="px-3.5 py-2.5 text-[11px] text-text-1">{a.parish || "—"}</td>
                     <td className="px-3.5 py-2.5 text-[11px] text-text-2">{a.outstation || "—"}</td>
@@ -663,11 +664,11 @@ function RegisterDialog({
             {cdmError && <p className="text-[11px] text-danger">{cdmError}</p>}
             {preview && (
               <div className="rounded-lg border border-border bg-bg-2 p-3 space-y-1">
-                <div className="font-bold text-[13px] text-text-1">{preview.full_name}</div>
+                <div className="font-bold text-[13px] text-text-1">{titleCase(preview.full_name)}</div>
                 <div className="text-[11px] text-text-3">
                   {preview.cdm_id} · {preview.outstation?.name ?? preview.parish?.name ?? "—"} · {preview.category}
                 </div>
-                {preview.phone && <div className="text-[11px] text-text-3">{preview.phone}</div>}
+                {preview.phone && <div className="text-[11px] text-text-3">{formatPhone(preview.phone)}</div>}
                 <button
                   onClick={() => { onAdd(preview.cdm_id); reset(); onClose(); }}
                   className={btnCls("primary", "mt-2")}
@@ -748,7 +749,7 @@ function RegisterDialog({
                 browseResults.map((y) => (
                   <div key={y.id} className="flex items-center gap-2 px-3 py-2 hover:bg-bg-2">
                     <div className="min-w-0 flex-1">
-                      <div className="text-[12px] font-semibold text-text-1">{y.full_name}</div>
+                      <div className="text-[12px] font-semibold text-text-1">{titleCase(y.full_name)}</div>
                       <div className="text-[10px] text-text-3">
                         {y.cdm_id} · {y.outstation?.name ?? y.parish?.name ?? "—"}
                         {y.deanery?.name ? ` · ${y.deanery.name}` : ""}

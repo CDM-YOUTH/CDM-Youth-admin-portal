@@ -122,10 +122,17 @@ async function parseXlsx(file: File): Promise<ParsedRow[]> {
       if (idx < 0) return "";
       const v = row.getCell(idx + 1).value;
       if (v === null || v === undefined) return "";
+      let raw: string;
       if (typeof v === "object" && "result" in (v as object)) {
-        return String((v as { result: unknown }).result ?? "").trim();
+        raw = String((v as { result: unknown }).result ?? "");
+      } else if (typeof v === "object" && "richText" in (v as object)) {
+        // Excel rich-text cell — extract plain text from each run
+        raw = ((v as { richText: { text: string }[] }).richText ?? []).map((r) => r.text).join("");
+      } else {
+        raw = String(v);
       }
-      return String(v).trim();
+      // Normalize Unicode bold/italic math chars (from Word/Excel styling) to ASCII
+      return raw.trim().normalize("NFKC");
     };
 
     // Accept both "full_name" and "full name" variants in the header
@@ -300,20 +307,45 @@ function rowData(row: ParsedRow): ImportRowData {
 }
 
 // ── Duplicate detection ───────────────────────────────────────────────────────
-// Key: full_name_lower|deanery_id|parish_id|outstation_id  →  youth id
+// Per-row DB lookup: avoids the LIMIT / ORDER BY snapshot problem.
+// Primary:   name (case-insensitive) + exact deanery + parish + outstation
+// Secondary: phone number (fallback when org info differs between imports)
 
-async function loadExistingYouths(): Promise<Map<string, string>> {
-  const { data } = await supabase
+async function findExistingYouth(
+  fullName: string,
+  deaneryId: string | null,
+  parishId: string | null,
+  outstationId: string | null,
+  phone: string | null,
+): Promise<string | null> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let q = (supabase as any)
     .from("youths")
-    .select("id, full_name, deanery_id, parish_id, outstation_id")
-    .limit(20000);
-  const map = new Map<string, string>();
-  for (const y of data ?? []) {
-    const name = String(y.full_name ?? "").trim().toLowerCase();
-    const key  = name + "|" + (y.deanery_id ?? "") + "|" + (y.parish_id ?? "") + "|" + (y.outstation_id ?? "");
-    map.set(key, y.id as string);
+    .select("id")
+    .ilike("full_name", fullName.trim())
+    .eq("deanery_id", deaneryId)
+    .eq("parish_id", parishId);
+
+  if (outstationId) {
+    q = q.eq("outstation_id", outstationId);
+  } else {
+    q = q.is("outstation_id", null);
   }
-  return map;
+
+  const { data: byOrg } = await q.maybeSingle();
+  if (byOrg) return (byOrg as { id: string }).id;
+
+  // Phone fallback — only when a phone number is present
+  if (phone?.trim()) {
+    const { data: byPhone } = await supabase
+      .from("youths")
+      .select("id")
+      .eq("phone", phone.trim())
+      .maybeSingle();
+    if (byPhone) return (byPhone as unknown as { id: string }).id;
+  }
+
+  return null;
 }
 
 // ── Leadership org FK helper ──────────────────────────────────────────────────
@@ -372,11 +404,7 @@ export async function importYouths(
   if (parsed.length === 0) throw new Error("No data rows found in the Excel file");
 
   // Load reference data in parallel
-  const [org, roleTypes, existingYouths] = await Promise.all([
-    fetchOrg(),
-    listRoleTypes(),
-    loadExistingYouths(),
-  ]);
+  const [org, roleTypes] = await Promise.all([fetchOrg(), listRoleTypes()]);
   const maps = buildOrgMaps(org);
   const roleMap = await buildRoleMap(roleTypes);
 
@@ -449,9 +477,10 @@ export async function importYouths(
       }
     }
 
-    // ── Check for existing youth (name + org location) ───────────────────────
-    const orgKey = row.fullName.trim().toLowerCase() + "|" + (deaneryId ?? "") + "|" + (parishId ?? "") + "|" + (outstationId ?? "");
-    const existingId = existingYouths.get(orgKey);
+    // ── Check for existing youth (per-row DB lookup — no snapshot limit) ────────
+    const existingId = await findExistingYouth(
+      row.fullName, deaneryId, parishId, outstationId, row.phone || null,
+    );
 
     let youthId: string;
 
@@ -507,7 +536,6 @@ export async function importYouths(
         }
 
         youthId = (youth as { id: string; cdm_id: string }).id;
-        existingYouths.set(orgKey, youthId);
         result.inserted++;
 
         // ── CUSA: auto-create for Tertiary with institution ────────────────────
