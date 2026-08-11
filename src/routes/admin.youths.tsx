@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from "react";
+import { titleCase, formatPhone } from "@/lib/utils";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
@@ -515,7 +516,7 @@ function YouthsPage() {
                 {displayRows.map((row) => (
                   <tr key={row.id} className="border-b border-border/30 last:border-0 hover:bg-bg-3">
                     <td className="px-3.5 py-2.5 font-mono text-[10px] font-bold text-gold">{row.cdmId}</td>
-                    <td className="px-3.5 py-2.5 text-[11px] font-semibold text-foreground">{row.name}</td>
+                    <td className="px-3.5 py-2.5 text-[11px] font-semibold text-foreground">{titleCase(row.name)}</td>
                     <td className="px-3.5 py-2.5 text-[11px] text-text-1">{row.gender === "Female" ? "F" : "M"}</td>
 
                     <td className="px-3.5 py-2.5 text-[11px] text-text-2">{row.deaneryName}</td>

@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { titleCase } from "@/lib/utils";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -341,7 +342,7 @@ const pairingByYouth = useMemo(() => {
                 {rowPagination.pageRows.map((r) => (
                   <tr key={r.id} className="border-b border-border/30 last:border-0 hover:bg-bg-3">
                     <td className="px-3.5 py-2.5 font-mono text-[10px] font-bold text-gold">{r.cdmId}</td>
-                    <td className="px-3.5 py-2.5 text-[11px] font-semibold text-foreground">{r.name}</td>
+                    <td className="px-3.5 py-2.5 text-[11px] font-semibold text-foreground">{titleCase(r.name)}</td>
                     <td className="px-3.5 py-2.5 text-[11px] text-text-1">{r.sourceParish}</td>
                     <td className="px-3.5 py-2.5 text-[11px] text-text-2">{r.sourceDeanery}</td>
                     <td className="px-3.5 py-2.5 text-[11px] text-text-1">{r.hostParish}</td>
