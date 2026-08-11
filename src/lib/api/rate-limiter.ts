@@ -6,14 +6,18 @@ const store = new Map<string, { count: number; windowStart: number }>();
 const WINDOW_MS = 60_000;
 const MAX_PER_WINDOW = 120;
 
-// Prune stale entries every 5 minutes to prevent unbounded growth.
-const prune = () => {
-  const cutoff = Date.now() - WINDOW_MS;
+// Prune stale entries opportunistically — no global setInterval (banned in Cloudflare Workers).
+let _lastPrune = 0;
+const PRUNE_EVERY = 5 * 60_000;
+
+const maybePrune = (now: number) => {
+  if (now - _lastPrune < PRUNE_EVERY) return;
+  _lastPrune = now;
+  const cutoff = now - WINDOW_MS;
   for (const [k, v] of store.entries()) {
     if (v.windowStart < cutoff) store.delete(k);
   }
 };
-if (typeof setInterval !== "undefined") setInterval(prune, 5 * 60_000);
 
 export type RateLimitResult =
   | { allowed: true }
@@ -21,6 +25,7 @@ export type RateLimitResult =
 
 export function checkRateLimit(userId: string): RateLimitResult {
   const now = Date.now();
+  maybePrune(now);
   const entry = store.get(userId);
 
   if (!entry || now >= entry.windowStart + WINDOW_MS) {
