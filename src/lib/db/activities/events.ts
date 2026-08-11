@@ -5,6 +5,7 @@ export type EventRow = {
   id: string;
   name: string;
   event_date: string | null;
+  end_date: string | null;
   venue: string | null;
   description: string | null;
   poster_url: string | null;
@@ -70,6 +71,7 @@ export type EventFull = EventRow & {
 export type EventInput = {
   name: string;
   eventDate?: string | null;
+  endDate?: string | null;
   venue?: string | null;
   description?: string | null;
   posterUrl?: string | null;
@@ -95,7 +97,7 @@ async function resolveOrgIds(deaneryName?: string | null, parishName?: string | 
 export async function listEvents(): Promise<EventRow[]> {
   const { data, error } = await supabase
     .from("events")
-    .select("id, name, event_date, venue, description, poster_url, organization_level, deanery:deaneries(name), parish:parishes(name)")
+    .select("id, name, event_date, end_date, venue, description, poster_url, organization_level, deanery:deaneries(name), parish:parishes(name)")
     .order("event_date", { ascending: false })
     .limit(500);
   if (error) throw error;
@@ -104,11 +106,12 @@ export async function listEvents(): Promise<EventRow[]> {
 
 export async function createEvent(input: EventInput): Promise<EventRow> {
   const { deanery_id, parish_id } = await resolveOrgIds(input.deaneryName, input.parishName);
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from("events")
     .insert({
       name: input.name,
       event_date: input.eventDate || null,
+      end_date: input.endDate || null,
       venue: input.venue || null,
       description: input.description || null,
       poster_url: input.posterUrl || null,
@@ -116,7 +119,7 @@ export async function createEvent(input: EventInput): Promise<EventRow> {
       deanery_id,
       parish_id,
     })
-    .select("id, name, event_date, venue, description, poster_url, organization_level, deanery:deaneries(name), parish:parishes(name)")
+    .select("id, name, event_date, end_date, venue, description, poster_url, organization_level, deanery:deaneries(name), parish:parishes(name)")
     .single();
   if (error) throw error;
   return data as unknown as EventRow;
@@ -124,11 +127,12 @@ export async function createEvent(input: EventInput): Promise<EventRow> {
 
 export async function updateEvent(id: string, input: EventInput): Promise<EventRow> {
   const { deanery_id, parish_id } = await resolveOrgIds(input.deaneryName, input.parishName);
-  const { data, error } = await supabase
+  const { data, error } = await (supabase as any)
     .from("events")
     .update({
       name: input.name,
       event_date: input.eventDate || null,
+      end_date: input.endDate || null,
       venue: input.venue || null,
       description: input.description || null,
       poster_url: input.posterUrl || null,
@@ -137,7 +141,7 @@ export async function updateEvent(id: string, input: EventInput): Promise<EventR
       parish_id,
     })
     .eq("id", id)
-    .select("id, name, event_date, venue, description, poster_url, organization_level, deanery:deaneries(name), parish:parishes(name)")
+    .select("id, name, event_date, end_date, venue, description, poster_url, organization_level, deanery:deaneries(name), parish:parishes(name)")
     .single();
   if (error) throw error;
   return data as unknown as EventRow;
@@ -258,7 +262,7 @@ export async function getEventFull(eventId: string): Promise<EventFull> {
   const [eventRes, programRes, categoriesRes, registrationsRes, checkinRes] = await Promise.all([
     supabase
       .from("events")
-      .select("id, name, event_date, venue, description, poster_url, organization_level, deanery:deaneries(name), parish:parishes(name)")
+      .select("id, name, event_date, end_date, venue, description, poster_url, organization_level, deanery:deaneries(name), parish:parishes(name)")
       .eq("id", eventId)
       .single(),
     supabase
@@ -389,7 +393,7 @@ export async function listEventsPaged(opts: {
   q?: string;
   deaneryId?: string | null;
   parishId?: string | null;
-  period?: "upcoming" | "done" | null;
+  period?: "upcoming" | "ongoing" | "done" | null;
 }): Promise<{ data: EventRow[]; total: number; page: number; size: number }> {
   const page = opts.page ?? 0;
   const size = Math.min(opts.size ?? 25, 100);
@@ -399,7 +403,7 @@ export async function listEventsPaged(opts: {
   let query = (supabase as any)
     .from("events")
     .select(
-      "id, name, event_date, venue, description, poster_url, organization_level, deanery:deaneries(name), parish:parishes(name)",
+      "id, name, event_date, end_date, venue, description, poster_url, organization_level, deanery:deaneries(name), parish:parishes(name)",
       { count: "exact" },
     )
     .order("event_date", { ascending: opts.period === "upcoming" })
@@ -407,8 +411,12 @@ export async function listEventsPaged(opts: {
 
   if (opts.deaneryId) query = query.eq("deanery_id", opts.deaneryId);
   if (opts.parishId)  query = query.eq("parish_id",  opts.parishId);
-  if (opts.period === "upcoming") query = query.gte("event_date", today);
-  if (opts.period === "done")     query = query.lt("event_date",  today);
+  // upcoming: starts strictly in the future
+  if (opts.period === "upcoming") query = query.gt("event_date", today);
+  // ongoing: started on or before today AND (end_date >= today OR single-day event happening today)
+  if (opts.period === "ongoing")  query = query.lte("event_date", today).or(`end_date.gte.${today},and(end_date.is.null,event_date.eq.${today})`);
+  // done: started before today AND end_date is past or unset
+  if (opts.period === "done")     query = query.lt("event_date", today).or(`end_date.lt.${today},end_date.is.null`);
   if (opts.q?.trim()) {
     const t = likePattern(opts.q);
     query = query.or(`name.ilike.${t},venue.ilike.${t}`);
@@ -421,13 +429,21 @@ export async function listEventsPaged(opts: {
 
 export async function getEventsAnalytics() {
   const today = new Date().toISOString().slice(0, 10);
-  const [up, done, regCount] = await Promise.all([
-    supabase.from("events").select("id", { count: "exact", head: true }).gte("event_date", today),
-    supabase.from("events").select("id", { count: "exact", head: true }).lt("event_date", today),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any;
+  const [up, ongoing, done, regCount] = await Promise.all([
+    db.from("events").select("id", { count: "exact", head: true }).gt("event_date", today),
+    db.from("events").select("id", { count: "exact", head: true })
+      .lte("event_date", today)
+      .or(`end_date.gte.${today},and(end_date.is.null,event_date.eq.${today})`),
+    db.from("events").select("id", { count: "exact", head: true })
+      .lt("event_date", today)
+      .or(`end_date.lt.${today},end_date.is.null`),
     supabase.from("event_registrations").select("id", { count: "exact", head: true }),
   ]);
   return {
     upcoming: up.count ?? 0,
+    ongoing: ongoing.count ?? 0,
     done: done.count ?? 0,
     registered: regCount.count ?? 0,
   };
