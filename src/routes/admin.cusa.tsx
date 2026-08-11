@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { titleCase } from "@/lib/utils";
 import { MoreVertical, Pencil, Trash2, Plus } from "lucide-react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
@@ -345,7 +346,7 @@ const fc = (key: keyof CusaSearch, label: string, mode: "text" | "select" = "tex
                 {displayMembers.map((member) => (
                   <TableRow key={member.id} className="border-border/30 hover:bg-bg-3">
                     <TableCell className="px-3 py-2 font-mono text-[10px] font-bold text-violet">{member.cdmId}</TableCell>
-                    <TableCell className="px-3 py-2 text-[11px] font-semibold text-foreground">{member.name}</TableCell>
+                    <TableCell className="px-3 py-2 text-[11px] font-semibold text-foreground">{titleCase(member.name)}</TableCell>
                     <TableCell className="px-3 py-2 text-[11px] text-text-1">{member.institution}</TableCell>
                     <TableCell className="px-3 py-2 text-[11px] text-text-2">{member.deaneryName}</TableCell>
                     <TableCell className="px-3 py-2 text-[11px] text-text-2">{member.parishName}</TableCell>

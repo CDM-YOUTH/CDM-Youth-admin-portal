@@ -122,10 +122,17 @@ async function parseXlsx(file: File): Promise<ParsedRow[]> {
       if (idx < 0) return "";
       const v = row.getCell(idx + 1).value;
       if (v === null || v === undefined) return "";
+      let raw: string;
       if (typeof v === "object" && "result" in (v as object)) {
-        return String((v as { result: unknown }).result ?? "").trim();
+        raw = String((v as { result: unknown }).result ?? "");
+      } else if (typeof v === "object" && "richText" in (v as object)) {
+        // Excel rich-text cell — extract plain text from each run
+        raw = ((v as { richText: { text: string }[] }).richText ?? []).map((r) => r.text).join("");
+      } else {
+        raw = String(v);
       }
-      return String(v).trim();
+      // Normalize Unicode bold/italic math chars (from Word/Excel styling) to ASCII
+      return raw.trim().normalize("NFKC");
     };
 
     // Accept both "full_name" and "full name" variants in the header
