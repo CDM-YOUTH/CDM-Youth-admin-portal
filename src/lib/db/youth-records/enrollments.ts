@@ -25,7 +25,7 @@ export async function listEnrollments(year?: number): Promise<EnrollmentRow[]> {
   let q = supabase
     .from("enrollments")
     .select(
-      "*, youth:youths(cdm_id, full_name, category, deanery:deaneries(name), parish:parishes(name))",
+      "*, youth:youths(cdm_id, full_name, category, deanery:deaneries(name), parish:parishes(name), outstation:outstations(name))",
     )
     .order("created_at", { ascending: false })
     .limit(2000);
