@@ -84,6 +84,7 @@ function eventToFormSeed(event: EventFull): EventFormState {
     details: {
       name: event.name,
       date: event.event_date ?? "",
+      endDate: event.end_date ?? "",
       time: "",
       venue: event.venue ?? "",
       expected: "",
@@ -214,11 +215,16 @@ function EventDetailPage() {
                 <CardHead title="Event Details" subtitle="Saved information" />
                 <CardBody className="grid gap-2 md:grid-cols-2">
                   <ReadField label="Event name" value={event.name} />
-                  <ReadField label="Date" value={event.event_date ?? "—"} />
+                  <ReadField label="Start date" value={event.event_date ?? "—"} />
+                  {event.end_date && <ReadField label="End date" value={event.end_date} />}
                   <ReadField label="Venue" value={event.venue ?? "—"} />
                   <ReadField label="Level" value={event.organization_level ?? "—"} />
-                  <ReadField label="Deanery" value={event.deanery?.name ?? "—"} />
-                  <ReadField label="Parish" value={event.parish?.name ?? "—"} />
+                  {event.organization_level !== "Diocese" && (
+                    <ReadField label="Deanery" value={event.deanery?.name ?? "—"} />
+                  )}
+                  {event.organization_level !== "Diocese" && event.organization_level !== "Deanery" && (
+                    <ReadField label="Parish" value={event.parish?.name ?? "—"} />
+                  )}
                   {event.description && (
                     <div className="md:col-span-2">
                       <ReadField label="Description" value={event.description} />
@@ -227,32 +233,42 @@ function EventDetailPage() {
                 </CardBody>
               </Card>
 
-              {/* Program */}
+              {/* Program — image if poster uploaded, otherwise structured slots */}
               <Card>
-                <CardHead title="Program" subtitle="Time slots and activities" />
-                <CardBody className="space-y-2">
-                  {event.program.length === 0 && (
-                    <p className="text-[11px] text-text-3">No program saved yet.</p>
-                  )}
-                  {programItemsToSlots(event.program).map((slot, i) => (
-                    <div key={i} className="rounded-lg border border-border bg-bg-2 px-3 py-2">
-                      <div className="text-[10px] font-bold text-gold">
-                        {slot.startTime}
-                        {slot.endTime ? ` – ${slot.endTime}` : ""}
-                      </div>
-                      {slot.activities.map((a, j) => (
-                        <div key={j} className="mt-0.5 text-[11px] text-text-1">
-                          {j + 1}. {a.name}
+                <CardHead title="Program" subtitle={event.poster_url ? "Event program" : "Time slots and activities"} />
+                {event.poster_url ? (
+                  <CardBody className="p-2">
+                    <img
+                      src={event.poster_url}
+                      alt="Event program"
+                      className="w-full rounded-md object-contain"
+                    />
+                  </CardBody>
+                ) : (
+                  <CardBody className="space-y-2">
+                    {event.program.length === 0 && (
+                      <p className="text-[11px] text-text-3">No program saved yet.</p>
+                    )}
+                    {programItemsToSlots(event.program).map((slot, i) => (
+                      <div key={i} className="rounded-lg border border-border bg-bg-2 px-3 py-2">
+                        <div className="text-[10px] font-bold text-gold">
+                          {slot.startTime}
+                          {slot.endTime ? ` – ${slot.endTime}` : ""}
                         </div>
-                      ))}
-                    </div>
-                  ))}
-                </CardBody>
+                        {slot.activities.map((a, j) => (
+                          <div key={j} className="mt-0.5 text-[11px] text-text-1">
+                            {j + 1}. {a.name}
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </CardBody>
+                )}
               </Card>
             </div>
 
-            {/* Duties */}
-            {event.duty_categories.length > 0 && (
+            {/* Duties — only shown when no program image is uploaded */}
+            {!event.poster_url && event.duty_categories.length > 0 && (
               <Card className="mt-3">
                 <CardHead title="Duties" subtitle="Assigned roles and persons" />
                 <CardBody className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
