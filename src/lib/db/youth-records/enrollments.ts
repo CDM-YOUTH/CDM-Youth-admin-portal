@@ -17,6 +17,7 @@ export type EnrollmentRow = {
     category: string;
     deanery: { name: string } | null;
     parish: { name: string } | null;
+    outstation: { name: string } | null;
   } | null;
 };
 
@@ -42,15 +43,16 @@ export async function listEnrollmentsPaged(opts: {
   status?: string | null;
   deaneryId?: string | null;
   parishId?: string | null;
+  outstationId?: string | null;
 }): Promise<{ data: EnrollmentRow[]; total: number; page: number; size: number }> {
   const page = opts.page ?? 0;
   const size = Math.min(opts.size ?? 25, 100);
 
   // Use !inner join when filtering on youth columns so non-matching rows are excluded
-  const needsInner = !!(opts.deaneryId || opts.parishId || opts.q?.trim());
+  const needsInner = !!(opts.deaneryId || opts.parishId || opts.outstationId || opts.q?.trim());
   const youthJoin = needsInner
-    ? "youth:youths!inner(cdm_id, full_name, category, deanery:deaneries(name), parish:parishes(name))"
-    : "youth:youths(cdm_id, full_name, category, deanery:deaneries(name), parish:parishes(name))";
+    ? "youth:youths!inner(cdm_id, full_name, category, deanery:deaneries(name), parish:parishes(name), outstation:outstations(name))"
+    : "youth:youths(cdm_id, full_name, category, deanery:deaneries(name), parish:parishes(name), outstation:outstations(name))";
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let query = (supabase as any)
@@ -64,8 +66,9 @@ export async function listEnrollmentsPaged(opts: {
   if (opts.status) query = query.eq("status", opts.status);
 
   // Embedded table filters — use real table name "youths", not alias "youth"
-  if (opts.deaneryId) query = query.eq("youths.deanery_id", opts.deaneryId);
-  if (opts.parishId)  query = query.eq("youths.parish_id",  opts.parishId);
+  if (opts.deaneryId)    query = query.eq("youths.deanery_id",    opts.deaneryId);
+  if (opts.parishId)     query = query.eq("youths.parish_id",     opts.parishId);
+  if (opts.outstationId) query = query.eq("youths.outstation_id", opts.outstationId);
 
   // Text search on youth name / CDM (own columns of the joined table)
   if (opts.q?.trim()) {

@@ -144,6 +144,7 @@ function YouthsPage() {
         name: y.full_name,
         gender: y.gender,
         age: y.age,
+        ageRange: (y as { age_range?: string | null }).age_range ?? null,
         phone: y.phone ?? "",
         altPhone: y.alt_phone ?? "",
         email: y.email ?? "",
@@ -383,7 +384,7 @@ function YouthsPage() {
                   status: search.status || null,
                 });
                 const headers = ["CDM No.", "Full Name", "Gender", "Age", "Phone", "Alt Phone", "Email", "Deanery", "Parish", "Outstation", "Category", "Institution", "Year of Study", "Status"];
-                const data: (string | number | null)[][] = (all.data ?? []).map((y) => [y.cdm_id, y.full_name, y.gender ?? null, y.age ?? null, y.phone ?? null, y.alt_phone ?? null, y.email ?? null, y.deanery?.name ?? null, y.parish?.name ?? null, y.outstation?.name ?? null, y.category ?? null, y.institution ?? null, y.year_of_study ?? null, y.status ?? null]);
+                const data: (string | number | null)[][] = (all.data ?? []).map((y) => [y.cdm_id, y.full_name, y.gender ?? null, y.age_range ?? String(y.age ?? ""), y.phone ?? null, y.alt_phone ?? null, y.email ?? null, y.deanery?.name ?? null, y.parish?.name ?? null, y.outstation?.name ?? null, y.category ?? null, y.institution ?? null, y.year_of_study ?? null, y.status ?? null]);
                 await downloadXlsx("youths-export", "Youth Records", headers, data);
                 toast.success(`Exported ${all.total} youths`);
               } catch (e) {
@@ -434,7 +435,7 @@ function YouthsPage() {
                       filter={fc("f_sex", "Sex", "select", YOUTH_GENDERS.map((g) => ({ value: g, label: g })))}
                     />
                   </th>
-                  <th className="label-eyebrow px-3.5 py-2.5 text-left">Age</th>
+
                   <th className="label-eyebrow px-3.5 py-2.5 text-left">
                     <ColumnHeader
                       label="Deanery"
@@ -516,7 +517,7 @@ function YouthsPage() {
                     <td className="px-3.5 py-2.5 font-mono text-[10px] font-bold text-gold">{row.cdmId}</td>
                     <td className="px-3.5 py-2.5 text-[11px] font-semibold text-foreground">{row.name}</td>
                     <td className="px-3.5 py-2.5 text-[11px] text-text-1">{row.gender === "Female" ? "F" : "M"}</td>
-                    <td className="px-3.5 py-2.5 text-[11px] text-text-1">{row.age}</td>
+
                     <td className="px-3.5 py-2.5 text-[11px] text-text-2">{row.deaneryName}</td>
                     <td className="px-3.5 py-2.5 text-[11px] text-text-1">{row.parishName}</td>
                     <td className="px-3.5 py-2.5 text-[11px] text-text-2">{row.churchName}</td>
@@ -664,14 +665,18 @@ function YouthsPage() {
             <AlertDialogDescription asChild>
               <div className="space-y-3 text-[12px] text-text-1">
                 {/* Summary row */}
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   <div className="rounded-lg border border-border bg-bg-2 p-3 text-center">
                     <div className="text-2xl font-black text-gold">{importResult?.inserted ?? 0}</div>
-                    <div className="text-[10px] text-text-3">Youth records inserted</div>
+                    <div className="text-[10px] text-text-3">New records</div>
+                  </div>
+                  <div className="rounded-lg border border-border bg-bg-2 p-3 text-center">
+                    <div className="text-2xl font-black text-info">{importResult?.updated ?? 0}</div>
+                    <div className="text-[10px] text-text-3">Updated existing</div>
                   </div>
                   <div className="rounded-lg border border-border bg-bg-2 p-3 text-center">
                     <div className="text-2xl font-black text-text-2">{importResult?.skipped ?? 0}</div>
-                    <div className="text-[10px] text-text-3">Skipped (already exist)</div>
+                    <div className="text-[10px] text-text-3">Skipped</div>
                   </div>
                 </div>
 

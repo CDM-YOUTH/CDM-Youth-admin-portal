@@ -19,7 +19,7 @@ const HEADERS = [
   "Deanery", "Parish", "Outstation", "Category", "Institution",
   "Year of Study", "Course", "Notes",
   "Diocese (Role)", "Deanery (Role)", "Parish (Role)", "Outstation (Role)",
-  "Error Message", "Conflict Holder",
+  "Error Message",
 ];
 
 async function ensureTab(token: string, spreadsheetId: string): Promise<void> {
@@ -35,7 +35,7 @@ async function ensureTab(token: string, spreadsheetId: string): Promise<void> {
 async function ensureHeaders(token: string, spreadsheetId: string): Promise<void> {
   const check = await sheetsGetValues(token, spreadsheetId, `'${TAB}'!A1:A1`);
   if (!check.values?.length) {
-    await sheetsUpdateValues(token, spreadsheetId, `'${TAB}'!A1:U1`, [HEADERS]);
+    await sheetsUpdateValues(token, spreadsheetId, , [HEADERS]);
   }
 }
 
@@ -87,11 +87,10 @@ export const Route = createFileRoute("/api/sheets/errors")({
               d?.Parish ?? "",
               d?.Outstation ?? "",
               e.reason,
-              e.conflictHolder ?? "",
             ];
           });
 
-          await sheetsAppendValues(token, spreadsheetId, `'${TAB}'!A:U`, rows);
+          await sheetsAppendValues(token, spreadsheetId, , rows);
 
           return jsonOk({ ok: true, logged: rows.length });
         } catch (e: unknown) {
