@@ -43,6 +43,7 @@ const eventSearchSchema = z.object({
   deanery_id: fallback(z.string(), "").default(""),
   parish_id: fallback(z.string(), "").default(""),
   upcoming_page: fallback(z.number().int().min(1), 1).default(1),
+  ongoing_page:  fallback(z.number().int().min(1), 1).default(1),
   done_page: fallback(z.number().int().min(1), 1).default(1),
   size: fallback(z.number().int().min(1).max(50), 8).default(8),
 });
@@ -78,36 +79,28 @@ function EventsPage() {
 
   const { data: upcomingResp } = useQuery({
     queryKey: ["events", "upcoming", search.q, deaneryId, parishId, search.upcoming_page, search.size],
-    queryFn: () =>
-      listEventsPaged({
-        page: search.upcoming_page - 1,
-        size: search.size,
-        q: search.q,
-        deaneryId: deaneryId || null,
-        parishId:  parishId  || null,
-        period: "upcoming",
-      }),
+    queryFn: () => listEventsPaged({ page: search.upcoming_page - 1, size: search.size, q: search.q, deaneryId: deaneryId || null, parishId: parishId || null, period: "upcoming" }),
+    placeholderData: keepPreviousData,
+  });
+
+  const { data: ongoingResp } = useQuery({
+    queryKey: ["events", "ongoing", search.q, deaneryId, parishId, search.ongoing_page, search.size],
+    queryFn: () => listEventsPaged({ page: search.ongoing_page - 1, size: search.size, q: search.q, deaneryId: deaneryId || null, parishId: parishId || null, period: "ongoing" }),
     placeholderData: keepPreviousData,
   });
 
   const { data: doneResp } = useQuery({
     queryKey: ["events", "done", search.q, deaneryId, parishId, search.done_page, search.size],
-    queryFn: () =>
-      listEventsPaged({
-        page: search.done_page - 1,
-        size: search.size,
-        q: search.q,
-        deaneryId: deaneryId || null,
-        parishId:  parishId  || null,
-        period: "done",
-      }),
+    queryFn: () => listEventsPaged({ page: search.done_page - 1, size: search.size, q: search.q, deaneryId: deaneryId || null, parishId: parishId || null, period: "done" }),
     placeholderData: keepPreviousData,
   });
 
   const upcomingEvents = upcomingResp?.data ?? [];
-  const doneEvents = doneResp?.data ?? [];
-  const upcomingTotal = upcomingResp?.total ?? 0;
-  const doneTotal = doneResp?.total ?? 0;
+  const ongoingEvents  = ongoingResp?.data  ?? [];
+  const doneEvents     = doneResp?.data     ?? [];
+  const upcomingTotal  = upcomingResp?.total ?? 0;
+  const ongoingTotal   = ongoingResp?.total  ?? 0;
+  const doneTotal      = doneResp?.total     ?? 0;
 
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
@@ -149,56 +142,72 @@ function EventsPage() {
         <FilterRow>
           <FilterSearch
             value={search.q}
-            onChange={(v) => setFilter({ q: v, upcoming_page: 1, done_page: 1 })}
+            onChange={(v) => setFilter({ q: v, upcoming_page: 1, ongoing_page: 1, done_page: 1 })}
             placeholder="Search events, venues…"
           />
           <FilterSelect
             label="Deanery"
             value={deaneryId}
-            onChange={(v) => setFilter({ deanery_id: v, parish_id: "", upcoming_page: 1, done_page: 1 })}
+            onChange={(v) => setFilter({ deanery_id: v, parish_id: "", upcoming_page: 1, ongoing_page: 1, done_page: 1 })}
             options={deaneryOptions}
             disabled={!!scope.deaneryId}
           />
           <FilterSelect
             label="Parish"
             value={parishId}
-            onChange={(v) => setFilter({ parish_id: v, upcoming_page: 1, done_page: 1 })}
+            onChange={(v) => setFilter({ parish_id: v, upcoming_page: 1, ongoing_page: 1, done_page: 1 })}
             options={parishOptions}
             disabled={!!scope.parishId || (!deaneryId && parishOptions.length === 0)}
           />
           <FilterClear
             visible={hasFilter}
-            onClick={() => setFilter({ q: "", deanery_id: "", parish_id: "", upcoming_page: 1, done_page: 1 })}
+            onClick={() => setFilter({ q: "", deanery_id: "", parish_id: "", upcoming_page: 1, ongoing_page: 1, done_page: 1 })}
           />
         </FilterRow>
 
         <div className="px-5 py-4">
           <div className="mb-4 grid grid-cols-1 gap-2.5 sm:grid-cols-4">
             <Kpi label="Upcoming" value={String(analytics?.upcoming ?? upcomingTotal)} trend="future events" tone="info" />
+            <Kpi label="Ongoing" value={String(analytics?.ongoing ?? ongoingTotal)} trend="in progress" tone="warn" />
             <Kpi label="Done" value={String(analytics?.done ?? doneTotal)} trend="completed" tone="up" />
             <Kpi label="Registered" value={(analytics?.registered ?? 0).toLocaleString()} trend="all events" tone="up" />
-            <Kpi label="Total" value={String((analytics?.upcoming ?? 0) + (analytics?.done ?? 0))} trend="in calendar" tone="up" />
           </div>
 
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.1fr_0.9fr]">
-            <EventList
-              title="Upcoming Events"
-              events={upcomingEvents}
-              total={upcomingTotal}
-              page={search.upcoming_page}
-              size={search.size}
-              onPageChange={(p) => setFilter({ upcoming_page: p })}
-              onDelete={(id, name) => setDeleteTarget({ id, name })}
-            />
-            <EventList
-              title="Done Events"
-              events={doneEvents}
-              total={doneTotal}
-              page={search.done_page}
-              size={search.size}
-              onPageChange={(p) => setFilter({ done_page: p })}
-              onDelete={(id, name) => setDeleteTarget({ id, name })}
-            />
+          <div className="space-y-3">
+            {(ongoingEvents.length > 0 || ongoingTotal > 0) && (
+              <EventList
+                title="Ongoing Events"
+                events={ongoingEvents}
+                total={ongoingTotal}
+                page={search.ongoing_page}
+                size={search.size}
+                onPageChange={(p) => setFilter({ ongoing_page: p })}
+                onDelete={(id, name) => setDeleteTarget({ id, name })}
+                period="ongoing"
+              />
+            )}
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.1fr_0.9fr]">
+              <EventList
+                title="Upcoming Events"
+                events={upcomingEvents}
+                total={upcomingTotal}
+                page={search.upcoming_page}
+                size={search.size}
+                onPageChange={(p) => setFilter({ upcoming_page: p })}
+                onDelete={(id, name) => setDeleteTarget({ id, name })}
+                period="upcoming"
+              />
+              <EventList
+                title="Done Events"
+                events={doneEvents}
+                total={doneTotal}
+                page={search.done_page}
+                size={search.size}
+                onPageChange={(p) => setFilter({ done_page: p })}
+                onDelete={(id, name) => setDeleteTarget({ id, name })}
+                period="done"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -237,6 +246,7 @@ function EventList({
   size,
   onPageChange,
   onDelete,
+  period = "upcoming",
 }: {
   title: string;
   events: EventRow[];
@@ -245,8 +255,10 @@ function EventList({
   size: number;
   onPageChange: (p: number) => void;
   onDelete: (id: string, name: string) => void;
+  period?: "upcoming" | "ongoing" | "done";
 }) {
   const totalPages = Math.max(1, Math.ceil(total / size));
+  const pillTone = period === "done" ? "success" : period === "ongoing" ? "gold" : "info";
   return (
     <Card>
       <CardHead title={title} action="Calendar →" />
@@ -256,20 +268,24 @@ function EventList({
           const d = event.event_date ? new Date(event.event_date) : null;
           const day = d ? String(d.getDate()).padStart(2, "0") : "—";
           const month = d ? MONTHS[d.getMonth()] : "—";
-          const today = new Date().toISOString().slice(0, 10);
-          const isDone = event.event_date && event.event_date < today;
+          const endD = event.end_date ? new Date(event.end_date) : null;
+          const endDay = endD ? String(endD.getDate()).padStart(2, "0") : null;
+          const endMonth = endD ? MONTHS[endD.getMonth()] : null;
           return (
           <div key={event.id} className="flex items-center gap-3 rounded-lg border border-border bg-bg-2 p-3">
             <div className="min-w-[52px] shrink-0 rounded-lg bg-bg-4 px-2.5 py-2 text-center">
               <div className="text-[8px] font-bold uppercase tracking-wide text-gold">{month}</div>
               <div className="text-display text-[22px] font-black leading-none text-foreground">{day}</div>
+              {endDay && endMonth && (
+                <div className="mt-0.5 text-[7px] font-semibold uppercase tracking-wide text-text-3">→ {endDay} {endMonth}</div>
+              )}
             </div>
             <div className="min-w-0 flex-1 leading-tight">
               <div className="truncate text-[12px] font-semibold text-text-1">{event.name}</div>
               <div className="text-[10px] text-text-3">{event.venue ?? "—"} · {event.parish?.name ?? event.deanery?.name ?? "Diocese-wide"}</div>
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              <Pill tone={isDone ? "success" : "info"}>{isDone ? "done" : "upcoming"}</Pill>
+              <Pill tone={pillTone}>{period}</Pill>
               <Link to="/admin/event/$eventId" params={{ eventId: event.id }} className="rounded-md border border-border bg-bg-3 px-3 py-1.5 text-[10px] font-semibold text-text-1 hover:border-gold-3 hover:text-gold">
                 View / Edit
               </Link>
@@ -299,7 +315,7 @@ function EventList({
   );
 }
 
-function CreateEventDialog({ onCreate }: { onCreate: (data: { name: string; eventDate?: string | null; venue?: string | null; description?: string | null; deaneryName?: string | null; parishName?: string | null; organizationLevel?: "Diocese"|"Deanery"|"Parish"|"Outstation"|null }) => void }) {
+function CreateEventDialog({ onCreate }: { onCreate: (data: { name: string; eventDate?: string | null; endDate?: string | null; venue?: string | null; description?: string | null; deaneryName?: string | null; parishName?: string | null; organizationLevel?: "Diocese"|"Deanery"|"Parish"|"Outstation"|null }) => void }) {
   const [open, setOpen] = useState(false);
   const qc = useQueryClient();
 
@@ -313,6 +329,7 @@ function CreateEventDialog({ onCreate }: { onCreate: (data: { name: string; even
       onCreate({
         name: state.details.name,
         eventDate: state.details.date || null,
+        endDate: state.details.endDate || null,
         venue: state.details.venue || null,
         description: state.details.description || null,
         deaneryName: state.details.deanery || null,

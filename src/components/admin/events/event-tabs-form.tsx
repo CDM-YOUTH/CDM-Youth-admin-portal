@@ -22,6 +22,7 @@ import { Upload, Loader2 } from "lucide-react";
 export type EventDetails = {
   name: string;
   date: string; // ISO yyyy-mm-dd
+  endDate: string; // ISO yyyy-mm-dd — leave blank for single-day events
   time: string;
   venue: string;
   expected: string;
@@ -107,6 +108,7 @@ export function emptyEventState(): EventFormState {
     details: {
       name: "",
       date: "",
+      endDate: "",
       time: "",
       venue: "",
       expected: "",
@@ -198,6 +200,7 @@ export function EventTabsForm({
   const detailsInput = () => ({
     name: state.details.name,
     eventDate: state.details.date || null,
+    endDate: state.details.endDate || null,
     venue: state.details.venue || null,
     description: state.details.description || null,
     posterUrl: state.details.posterUrl || null,
@@ -419,7 +422,7 @@ function DetailsTab({
           placeholder="Diocesan Youth Day"
         />
       </FieldLabel>
-      <FieldLabel label="Date *">
+      <FieldLabel label="Start date *">
         <Popover>
           <PopoverTrigger asChild>
             <Button
@@ -443,6 +446,36 @@ function DetailsTab({
             />
           </PopoverContent>
         </Popover>
+      </FieldLabel>
+      <FieldLabel label="End date (multi-day events only)">
+        {(() => {
+          const endVal = details.endDate ? new Date(details.endDate + "T12:00:00") : undefined;
+          return (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-start bg-white text-left font-normal text-black",
+                    !endVal && "text-gray-300",
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {endVal ? format(endVal, "PPP") : <span>Same day (leave blank)</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={endVal}
+                  onSelect={(d) => onChange({ endDate: d ? format(d, "yyyy-MM-dd") : "" })}
+                  initialFocus
+                  className={cn("p-3 pointer-events-auto")}
+                />
+              </PopoverContent>
+            </Popover>
+          );
+        })()}
       </FieldLabel>
       <FieldLabel label="Time">
         <Input
