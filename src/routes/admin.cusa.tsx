@@ -395,7 +395,7 @@ const fc = (key: keyof CusaSearch, label: string, mode: "text" | "select" = "tex
                 ))}
                 {displayMembers.length === 0 && !isLoading && (
                   <TableRow>
-                    <TableCell colSpan={9} className="px-3 py-6 text-center text-[11px] text-text-3">
+                    <TableCell colSpan={10} className="px-3 py-6 text-center text-[11px] text-text-3">
                       No CUSA members match your search.
                     </TableCell>
                   </TableRow>
