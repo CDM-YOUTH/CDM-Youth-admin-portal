@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { titleCase, formatPhone } from "@/lib/utils";
 import Papa from "papaparse";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
@@ -183,9 +184,13 @@ function LeadersPage() {
         }
         action={
           <>
-            <TopbarButton onClick={() => setAddYouthOpen(true)}>
-              <Plus className="mr-1 h-3.5 w-3.5" />Add Youth
-            </TopbarButton>
+            <button
+              type="button"
+              onClick={() => setAddYouthOpen(true)}
+              className="inline-flex h-8 w-24 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-primary px-3 text-[11px] font-bold text-primary-foreground shadow-sm transition-opacity hover:opacity-90"
+            >
+              <Plus className="h-3.5 w-3.5" /> Add Youth
+            </button>
             <TopbarButton onClick={() => setImportOpen(true)}>Import CSV</TopbarButton>
             <TopbarButton onClick={() => setAppointOpen(true)}>+ Appoint</TopbarButton>
           </>
@@ -550,10 +555,10 @@ function LeadersTable({
                     {row.youth?.cdm_id ?? "—"}
                   </td>
                   <td className="px-3.5 py-2.5 text-[11px] font-semibold text-foreground">
-                    {row.youth?.full_name ?? "—"}
+                    {titleCase(row.youth?.full_name) || "—"}
                   </td>
                   <td className="px-3.5 py-2.5 font-mono text-[10px] text-text-3">
-                    {row.youth?.phone ?? "—"}
+                    {formatPhone(row.youth?.phone) || "—"}
                   </td>
                   <td className="px-3.5 py-2.5 text-[11px] text-text-2">
                     {row.youth?.deanery?.name ?? "—"}
@@ -685,9 +690,9 @@ function EditDialog({
             Edit Appointment
           </DialogTitle>
           <DialogDescription className="text-[12px] text-text-3">
-            {row?.youth?.full_name} · <span className="font-mono">{row?.youth?.cdm_id}</span>
+            {titleCase(row?.youth?.full_name)} · <span className="font-mono">{row?.youth?.cdm_id}</span>
             {row?.youth?.phone && (
-              <> · <span className="font-mono">{row.youth.phone}</span></>
+              <> · <span className="font-mono">{formatPhone(row.youth.phone)}</span></>
             )}
           </DialogDescription>
         </DialogHeader>

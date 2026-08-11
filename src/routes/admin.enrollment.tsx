@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { titleCase } from "@/lib/utils";
 import Papa from "papaparse";
 import { downloadXlsx } from "@/lib/export-xlsx";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -463,7 +464,7 @@ function EnrollmentPage() {
                 {displayRows.map((row) => (
                   <tr key={row.id} className="border-b border-border/30 last:border-0 hover:bg-bg-3">
                     <td className="px-3.5 py-2.5 font-mono text-[10px] font-bold text-gold">{row.cdmId}</td>
-                    <td className="px-3.5 py-2.5 text-[11px] font-semibold text-foreground">{row.name}</td>
+                    <td className="px-3.5 py-2.5 text-[11px] font-semibold text-foreground">{titleCase(row.name)}</td>
                     <td className="px-3.5 py-2.5 text-[11px] text-text-2">{row.deaneryName}</td>
                     <td className="px-3.5 py-2.5 text-[11px] text-text-1">{row.parishName}</td>
                     <td className="px-3.5 py-2.5 text-[11px] text-text-2">{row.outstationName}</td>
