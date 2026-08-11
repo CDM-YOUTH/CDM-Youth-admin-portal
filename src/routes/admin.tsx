@@ -8,6 +8,10 @@ import { GlobalNavbar } from "@/components/admin/layout/topbar";
 
 export const Route = createFileRoute("/admin")({
   beforeLoad: async ({ location }) => {
+    // Skip on the server — localStorage doesn't exist there, so getSession()
+    // always returns null and would redirect every SSR page load to /login.
+    // The client-side check fires immediately after hydration.
+    if (typeof window === "undefined") return;
     const { data } = await supabase.auth.getSession();
     if (!data.session) {
       throw redirect({

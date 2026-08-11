@@ -18,6 +18,7 @@ export type CusaRow = {
     gender: string;
     deanery: { name: string } | null;
     parish: { name: string } | null;
+    outstation: { name: string } | null;
   } | null;
 };
 
@@ -26,7 +27,7 @@ export async function listCusa(year?: number): Promise<CusaRow[]> {
   const { data, error } = await supabase
     .from("cusa_members")
     .select(
-      "*, youth:youths(cdm_id, full_name, gender, deanery:deaneries(name), parish:parishes(name))",
+      "*, youth:youths(cdm_id, full_name, gender, deanery:deaneries(name), parish:parishes(name), outstation:outstations(name))",
     )
     .eq("year", y)
     .order("created_at", { ascending: false })
@@ -43,16 +44,17 @@ export async function listCusaPaged(opts: {
   institution?: string | null;
   deaneryId?: string | null;
   parishId?: string | null;
+  outstationId?: string | null;
 }): Promise<{ data: CusaRow[]; total: number; page: number; size: number }> {
   const page = opts.page ?? 0;
   const size = Math.min(opts.size ?? 25, 100);
   const year = opts.year ?? new Date().getFullYear();
 
-  // Use !inner join when filtering on youth columns so non-matching rows are excluded
-  const needsInner = !!(opts.deaneryId || opts.parishId);
+  // Use !inner join when filtering/searching on youth columns so non-matching rows are excluded
+  const needsInner = !!(opts.deaneryId || opts.parishId || opts.outstationId || opts.q?.trim());
   const youthJoin = needsInner
-    ? "youth:youths!inner(cdm_id, full_name, gender, deanery:deaneries(name), parish:parishes(name))"
-    : "youth:youths(cdm_id, full_name, gender, deanery:deaneries(name), parish:parishes(name))";
+    ? "youth:youths!inner(cdm_id, full_name, gender, deanery:deaneries(name), parish:parishes(name), outstation:outstations(name))"
+    : "youth:youths(cdm_id, full_name, gender, deanery:deaneries(name), parish:parishes(name), outstation:outstations(name))";
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let query = (supabase as any)
@@ -64,14 +66,17 @@ export async function listCusaPaged(opts: {
 
   // Own-table filters
   if (opts.institution) query = query.eq("institution", opts.institution);
-  if (opts.q?.trim()) {
-    const t = likePattern(opts.q);
-    query = query.or(`institution.ilike.${t},course.ilike.${t}`);
-  }
 
   // Embedded table filters — use real table name "youths", not alias "youth"
-  if (opts.deaneryId) query = query.eq("youths.deanery_id", opts.deaneryId);
-  if (opts.parishId)  query = query.eq("youths.parish_id",  opts.parishId);
+  if (opts.deaneryId)    query = query.eq("youths.deanery_id",    opts.deaneryId);
+  if (opts.parishId)     query = query.eq("youths.parish_id",     opts.parishId);
+  if (opts.outstationId) query = query.eq("youths.outstation_id", opts.outstationId);
+
+  // Text search on youth's name and CDM ID
+  if (opts.q?.trim()) {
+    const t = likePattern(opts.q);
+    query = query.or(`cdm_id.ilike.${t},full_name.ilike.${t}`, { referencedTable: "youths" });
+  }
 
   const { data, error, count } = await query;
   if (error) throw error;

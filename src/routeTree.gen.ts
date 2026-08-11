@@ -32,9 +32,12 @@ import { Route as AdminLeadersRouteImport } from './routes/admin.leaders'
 import { Route as AdminFormationRouteImport } from './routes/admin.formation'
 import { Route as AdminEventsRouteImport } from './routes/admin.events'
 import { Route as AdminEnrollmentRouteImport } from './routes/admin.enrollment'
+import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
 import { Route as AdminCusaRouteImport } from './routes/admin.cusa'
 import { Route as AdminAuditRouteImport } from './routes/admin.audit'
 import { Route as PortalEventsEventIdRouteImport } from './routes/portal.events.$eventId'
+import { Route as ApiSheetsLeadershipRouteImport } from './routes/api/sheets/leadership'
+import { Route as ApiSheetsErrorsRouteImport } from './routes/api/sheets/errors'
 import { Route as AdminEventEventIdRouteImport } from './routes/admin.event.$eventId'
 import { Route as AdminEventCheckinEventIdRouteImport } from './routes/admin.event-checkin.$eventId'
 
@@ -153,6 +156,11 @@ const AdminEnrollmentRoute = AdminEnrollmentRouteImport.update({
   path: '/enrollment',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminDashboardRoute = AdminDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminCusaRoute = AdminCusaRouteImport.update({
   id: '/cusa',
   path: '/cusa',
@@ -167,6 +175,16 @@ const PortalEventsEventIdRoute = PortalEventsEventIdRouteImport.update({
   id: '/$eventId',
   path: '/$eventId',
   getParentRoute: () => PortalEventsRoute,
+} as any)
+const ApiSheetsLeadershipRoute = ApiSheetsLeadershipRouteImport.update({
+  id: '/api/sheets/leadership',
+  path: '/api/sheets/leadership',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSheetsErrorsRoute = ApiSheetsErrorsRouteImport.update({
+  id: '/api/sheets/errors',
+  path: '/api/sheets/errors',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AdminEventEventIdRoute = AdminEventEventIdRouteImport.update({
   id: '/event/$eventId',
@@ -187,6 +205,7 @@ export interface FileRoutesByFullPath {
   '/portal': typeof PortalRouteWithChildren
   '/admin/audit': typeof AdminAuditRoute
   '/admin/cusa': typeof AdminCusaRoute
+  '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/enrollment': typeof AdminEnrollmentRoute
   '/admin/events': typeof AdminEventsRoute
   '/admin/formation': typeof AdminFormationRoute
@@ -208,6 +227,8 @@ export interface FileRoutesByFullPath {
   '/portal/': typeof PortalIndexRoute
   '/admin/event-checkin/$eventId': typeof AdminEventCheckinEventIdRoute
   '/admin/event/$eventId': typeof AdminEventEventIdRoute
+  '/api/sheets/errors': typeof ApiSheetsErrorsRoute
+  '/api/sheets/leadership': typeof ApiSheetsLeadershipRoute
   '/portal/events/$eventId': typeof PortalEventsEventIdRoute
 }
 export interface FileRoutesByTo {
@@ -215,6 +236,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/admin/audit': typeof AdminAuditRoute
   '/admin/cusa': typeof AdminCusaRoute
+  '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/enrollment': typeof AdminEnrollmentRoute
   '/admin/events': typeof AdminEventsRoute
   '/admin/formation': typeof AdminFormationRoute
@@ -236,6 +258,8 @@ export interface FileRoutesByTo {
   '/portal': typeof PortalIndexRoute
   '/admin/event-checkin/$eventId': typeof AdminEventCheckinEventIdRoute
   '/admin/event/$eventId': typeof AdminEventEventIdRoute
+  '/api/sheets/errors': typeof ApiSheetsErrorsRoute
+  '/api/sheets/leadership': typeof ApiSheetsLeadershipRoute
   '/portal/events/$eventId': typeof PortalEventsEventIdRoute
 }
 export interface FileRoutesById {
@@ -246,6 +270,7 @@ export interface FileRoutesById {
   '/portal': typeof PortalRouteWithChildren
   '/admin/audit': typeof AdminAuditRoute
   '/admin/cusa': typeof AdminCusaRoute
+  '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/enrollment': typeof AdminEnrollmentRoute
   '/admin/events': typeof AdminEventsRoute
   '/admin/formation': typeof AdminFormationRoute
@@ -267,6 +292,8 @@ export interface FileRoutesById {
   '/portal/': typeof PortalIndexRoute
   '/admin/event-checkin/$eventId': typeof AdminEventCheckinEventIdRoute
   '/admin/event/$eventId': typeof AdminEventEventIdRoute
+  '/api/sheets/errors': typeof ApiSheetsErrorsRoute
+  '/api/sheets/leadership': typeof ApiSheetsLeadershipRoute
   '/portal/events/$eventId': typeof PortalEventsEventIdRoute
 }
 export interface FileRouteTypes {
@@ -278,6 +305,7 @@ export interface FileRouteTypes {
     | '/portal'
     | '/admin/audit'
     | '/admin/cusa'
+    | '/admin/dashboard'
     | '/admin/enrollment'
     | '/admin/events'
     | '/admin/formation'
@@ -299,6 +327,8 @@ export interface FileRouteTypes {
     | '/portal/'
     | '/admin/event-checkin/$eventId'
     | '/admin/event/$eventId'
+    | '/api/sheets/errors'
+    | '/api/sheets/leadership'
     | '/portal/events/$eventId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -306,6 +336,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/admin/audit'
     | '/admin/cusa'
+    | '/admin/dashboard'
     | '/admin/enrollment'
     | '/admin/events'
     | '/admin/formation'
@@ -327,6 +358,8 @@ export interface FileRouteTypes {
     | '/portal'
     | '/admin/event-checkin/$eventId'
     | '/admin/event/$eventId'
+    | '/api/sheets/errors'
+    | '/api/sheets/leadership'
     | '/portal/events/$eventId'
   id:
     | '__root__'
@@ -336,6 +369,7 @@ export interface FileRouteTypes {
     | '/portal'
     | '/admin/audit'
     | '/admin/cusa'
+    | '/admin/dashboard'
     | '/admin/enrollment'
     | '/admin/events'
     | '/admin/formation'
@@ -357,6 +391,8 @@ export interface FileRouteTypes {
     | '/portal/'
     | '/admin/event-checkin/$eventId'
     | '/admin/event/$eventId'
+    | '/api/sheets/errors'
+    | '/api/sheets/leadership'
     | '/portal/events/$eventId'
   fileRoutesById: FileRoutesById
 }
@@ -366,6 +402,8 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   PortalRoute: typeof PortalRouteWithChildren
   CheckinEventIdRoute: typeof CheckinEventIdRoute
+  ApiSheetsErrorsRoute: typeof ApiSheetsErrorsRoute
+  ApiSheetsLeadershipRoute: typeof ApiSheetsLeadershipRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -531,6 +569,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminEnrollmentRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/dashboard': {
+      id: '/admin/dashboard'
+      path: '/dashboard'
+      fullPath: '/admin/dashboard'
+      preLoaderRoute: typeof AdminDashboardRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/cusa': {
       id: '/admin/cusa'
       path: '/cusa'
@@ -552,6 +597,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PortalEventsEventIdRouteImport
       parentRoute: typeof PortalEventsRoute
     }
+    '/api/sheets/leadership': {
+      id: '/api/sheets/leadership'
+      path: '/api/sheets/leadership'
+      fullPath: '/api/sheets/leadership'
+      preLoaderRoute: typeof ApiSheetsLeadershipRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/sheets/errors': {
+      id: '/api/sheets/errors'
+      path: '/api/sheets/errors'
+      fullPath: '/api/sheets/errors'
+      preLoaderRoute: typeof ApiSheetsErrorsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/event/$eventId': {
       id: '/admin/event/$eventId'
       path: '/event/$eventId'
@@ -572,6 +631,7 @@ declare module '@tanstack/react-router' {
 interface AdminRouteChildren {
   AdminAuditRoute: typeof AdminAuditRoute
   AdminCusaRoute: typeof AdminCusaRoute
+  AdminDashboardRoute: typeof AdminDashboardRoute
   AdminEnrollmentRoute: typeof AdminEnrollmentRoute
   AdminEventsRoute: typeof AdminEventsRoute
   AdminFormationRoute: typeof AdminFormationRoute
@@ -591,6 +651,7 @@ interface AdminRouteChildren {
 const AdminRouteChildren: AdminRouteChildren = {
   AdminAuditRoute: AdminAuditRoute,
   AdminCusaRoute: AdminCusaRoute,
+  AdminDashboardRoute: AdminDashboardRoute,
   AdminEnrollmentRoute: AdminEnrollmentRoute,
   AdminEventsRoute: AdminEventsRoute,
   AdminFormationRoute: AdminFormationRoute,
@@ -648,6 +709,8 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   PortalRoute: PortalRouteWithChildren,
   CheckinEventIdRoute: CheckinEventIdRoute,
+  ApiSheetsErrorsRoute: ApiSheetsErrorsRoute,
+  ApiSheetsLeadershipRoute: ApiSheetsLeadershipRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

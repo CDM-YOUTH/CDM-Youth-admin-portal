@@ -209,7 +209,7 @@ function EventCheckinPage() {
     });
   }, [attendees, deaneryId, parishId, outstationId, selectedDeaneryName, selectedParishName, selectedOutstationName, q, fCdm, fName]);
 
-  const pagination = usePagination(filtered, 25);
+  const pagination = usePagination(filtered, 10);
 
   if (isLoading || !event) {
     return (

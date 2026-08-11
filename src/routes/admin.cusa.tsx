@@ -67,6 +67,7 @@ const cusaSearchSchema = z.object({
   institution: fallback(z.string(), "").default(""),
   deanery_id: fallback(z.string(), "").default(""),
   parish_id: fallback(z.string(), "").default(""),
+  outstation_id: fallback(z.string(), "").default(""),
   year: fallback(z.number().int(), new Date().getFullYear()).default(new Date().getFullYear()),
   page: fallback(z.number().int().min(1), 1).default(1),
   size: fallback(z.number().int().min(1).max(100), 10).default(10),
@@ -110,7 +111,7 @@ function CusaPage() {
 
   const { data: org } = useQuery({ queryKey: ["org"], queryFn: fetchOrg });
   const { data: resp, isLoading } = useQuery({
-    queryKey: ["cusa", search.page - 1, search.size, search.q, search.institution, search.deanery_id, search.parish_id, search.year],
+    queryKey: ["cusa", search.page - 1, search.size, search.q, search.institution, search.deanery_id, search.parish_id, search.outstation_id, search.year],
     queryFn: () =>
       listCusaPaged({
         page: search.page - 1,
@@ -120,6 +121,7 @@ function CusaPage() {
         institution: search.institution || null,
         deaneryId: search.deanery_id || null,
         parishId: search.parish_id || null,
+        outstationId: search.outstation_id || null,
       }),
     placeholderData: keepPreviousData,
   });
@@ -182,6 +184,7 @@ function CusaPage() {
         year: m.year_of_study ?? "",
         deaneryName: m.youth?.deanery?.name ?? "",
         parishName: m.youth?.parish?.name ?? "",
+        outstationName: m.youth?.outstation?.name ?? "",
         status: m.leadership_role ? "active" : "reporting",
       })),
     [resp],
@@ -203,6 +206,9 @@ function CusaPage() {
   const parishOptions = (org?.parishes ?? [])
     .filter((p) => !search.deanery_id || p.deanery_id === search.deanery_id)
     .map((p) => ({ value: p.id, label: p.name }));
+  const outstationOptions = (org?.outstations ?? [])
+    .filter((o) => !search.parish_id || o.parish_id === search.parish_id)
+    .map((o) => ({ value: o.id, label: o.name }));
 
 const fc = (key: keyof CusaSearch, label: string, mode: "text" | "select" = "text", options?: { value: string; label: string }[]) => (
     <ColumnFilter
@@ -243,7 +249,7 @@ const fc = (key: keyof CusaSearch, label: string, mode: "text" | "select" = "tex
           <TableToolbar
             searchValue={search.q}
             onSearchChange={(value) => setFilter({ q: value })}
-            searchPlaceholder="Search name, CDM No., institution, parish…"
+            searchPlaceholder="Search name, CDM No.…"
             onImport={() => toast.info("Import CUSA members — bring CSV soon")}
             onExport={() => toast.success(`Exporting ${displayMembers.length} CUSA members`)}
           />
@@ -280,7 +286,7 @@ const fc = (key: keyof CusaSearch, label: string, mode: "text" | "select" = "tex
                           mode="select"
                           options={deaneryOptions}
                           value={search.deanery_id ? { operator: "equals", value: search.deanery_id } : undefined}
-                          onChange={(v) => setFilter({ deanery_id: v?.value ?? "", parish_id: "" })}
+                          onChange={(v) => setFilter({ deanery_id: v?.value ?? "", parish_id: "", outstation_id: "" })}
                         />
                       }
                     />
@@ -294,7 +300,21 @@ const fc = (key: keyof CusaSearch, label: string, mode: "text" | "select" = "tex
                           mode="select"
                           options={parishOptions}
                           value={search.parish_id ? { operator: "equals", value: search.parish_id } : undefined}
-                          onChange={(v) => setFilter({ parish_id: v?.value ?? "" })}
+                          onChange={(v) => setFilter({ parish_id: v?.value ?? "", outstation_id: "" })}
+                        />
+                      }
+                    />
+                  </TableHead>
+                  <TableHead className="label-eyebrow px-3 py-2">
+                    <ColumnHeader
+                      label="Outstation"
+                      filter={
+                        <ColumnFilter
+                          label="Outstation"
+                          mode="select"
+                          options={outstationOptions}
+                          value={search.outstation_id ? { operator: "equals", value: search.outstation_id } : undefined}
+                          onChange={(v) => setFilter({ outstation_id: v?.value ?? "" })}
                         />
                       }
                     />
@@ -329,6 +349,7 @@ const fc = (key: keyof CusaSearch, label: string, mode: "text" | "select" = "tex
                     <TableCell className="px-3 py-2 text-[11px] text-text-1">{member.institution}</TableCell>
                     <TableCell className="px-3 py-2 text-[11px] text-text-2">{member.deaneryName}</TableCell>
                     <TableCell className="px-3 py-2 text-[11px] text-text-2">{member.parishName}</TableCell>
+                    <TableCell className="px-3 py-2 text-[11px] text-text-2">{member.outstationName}</TableCell>
                     <TableCell className="px-3 py-2 text-[11px] text-text-2">{member.gender}</TableCell>
                     <TableCell className="px-3 py-2 text-[11px] text-text-2">{member.course} · {member.year}</TableCell>
                     <TableCell className="px-3 py-2"><Pill tone={member.status === "active" ? "success" : "violet"}>{member.status}</Pill></TableCell>

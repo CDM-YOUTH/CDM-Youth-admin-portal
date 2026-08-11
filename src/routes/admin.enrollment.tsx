@@ -80,6 +80,7 @@ const enrollmentSearchSchema = z.object({
   status: fallback(z.string(), "").default(""),
   deanery_id: fallback(z.string(), "").default(""),
   parish_id: fallback(z.string(), "").default(""),
+  outstation_id: fallback(z.string(), "").default(""),
   page: fallback(z.number().int().min(1), 1).default(1),
   size: fallback(z.number().int().min(1).max(100), 10).default(10),
   // Client-side column filters on current page
@@ -118,11 +119,12 @@ function EnrollmentPage() {
   const [importResult, setImportResult] = useState<null | { inserted: number; missing: string[]; total: number }>(null);
   const qc = useQueryClient();
   const scope = useAdminScope();
-  const deaneryId = scope.deaneryId || search.deanery_id;
-  const parishId  = scope.parishId  || search.parish_id;
+  const deaneryId    = scope.deaneryId || search.deanery_id;
+  const parishId     = scope.parishId  || search.parish_id;
+  const outstationId = search.outstation_id;
   const { data: org } = useQuery({ queryKey: ["org"], queryFn: fetchOrg });
   const { data: resp, isLoading } = useQuery({
-    queryKey: ["enrollments", search.year, search.page - 1, search.size, search.q, search.status, deaneryId, parishId],
+    queryKey: ["enrollments", search.year, search.page - 1, search.size, search.q, search.status, deaneryId, parishId, outstationId],
     queryFn: () =>
       listEnrollmentsPaged({
         page: search.page - 1,
@@ -130,8 +132,9 @@ function EnrollmentPage() {
         year: search.year || null,
         q: search.q,
         status: search.status || null,
-        deaneryId: deaneryId || null,
-        parishId:  parishId  || null,
+        deaneryId:    deaneryId    || null,
+        parishId:     parishId     || null,
+        outstationId: outstationId || null,
       }),
     placeholderData: keepPreviousData,
   });
@@ -191,6 +194,7 @@ function EnrollmentPage() {
         name: e.youth?.full_name ?? "",
         deaneryName: e.youth?.deanery?.name ?? "",
         parishName: e.youth?.parish?.name ?? "",
+        outstationName: e.youth?.outstation?.name ?? "",
         category: e.youth?.category ?? "",
         fee: FEE_BY_CATEGORY[e.youth?.category ?? ""] ?? "KES 500",
         paymentStatus: e.status === "paid" ? "approved" : "pending",
@@ -214,6 +218,9 @@ function EnrollmentPage() {
   const parishOptions = (org?.parishes ?? [])
     .filter((p) => !deaneryId || p.deanery_id === deaneryId)
     .map((p) => ({ value: p.id, label: p.name }));
+  const outstationOptions = (org?.outstations ?? [])
+    .filter((o) => !parishId || o.parish_id === parishId)
+    .map((o) => ({ value: o.id, label: o.name }));
 
   const enrollFields: FieldDef[] = [
     { key: "cdmId", label: "CDM No.", required: true, placeholder: "CDM-2026-00001" },
@@ -398,7 +405,7 @@ function EnrollmentPage() {
                           mode="select"
                           options={deaneryOptions}
                           value={deaneryId ? { operator: "equals", value: deaneryId } : undefined}
-                          onChange={(v) => setFilter({ deanery_id: v?.value ?? "", parish_id: "" })}
+                          onChange={(v) => setFilter({ deanery_id: v?.value ?? "", parish_id: "", outstation_id: "" })}
                           disabled={!!scope.deaneryId}
                         />
                       }
@@ -413,8 +420,22 @@ function EnrollmentPage() {
                           mode="select"
                           options={parishOptions}
                           value={parishId ? { operator: "equals", value: parishId } : undefined}
-                          onChange={(v) => setFilter({ parish_id: v?.value ?? "" })}
+                          onChange={(v) => setFilter({ parish_id: v?.value ?? "", outstation_id: "" })}
                           disabled={!!scope.parishId}
+                        />
+                      }
+                    />
+                  </th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
+                    <ColumnHeader
+                      label="Outstation"
+                      filter={
+                        <ColumnFilter
+                          label="Outstation"
+                          mode="select"
+                          options={outstationOptions}
+                          value={outstationId ? { operator: "equals", value: outstationId } : undefined}
+                          onChange={(v) => setFilter({ outstation_id: v?.value ?? "" })}
                         />
                       }
                     />
@@ -445,6 +466,7 @@ function EnrollmentPage() {
                     <td className="px-3.5 py-2.5 text-[11px] font-semibold text-foreground">{row.name}</td>
                     <td className="px-3.5 py-2.5 text-[11px] text-text-2">{row.deaneryName}</td>
                     <td className="px-3.5 py-2.5 text-[11px] text-text-1">{row.parishName}</td>
+                    <td className="px-3.5 py-2.5 text-[11px] text-text-2">{row.outstationName}</td>
                     <td className="px-3.5 py-2.5 text-[11px] text-text-1">{row.category}</td>
                     <td className="px-3.5 py-2.5 text-[11px] text-text-1">{row.fee}</td>
                     <td className="px-3.5 py-2.5">
@@ -485,7 +507,7 @@ function EnrollmentPage() {
                 ))}
                 {displayRows.length === 0 && !isLoading && (
                   <tr>
-                    <td colSpan={8} className="px-3.5 py-6 text-center text-[11px] text-text-3">
+                    <td colSpan={9} className="px-3.5 py-6 text-center text-[11px] text-text-3">
                       No enrollments match your search.
                     </td>
                   </tr>
