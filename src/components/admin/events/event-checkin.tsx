@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Checkbox } from "@/components/ui/checkbox";
 import { ORGANIZATION } from "@/lib/mock-data";
 import { YOUTH_REGISTRY, type YouthRecord } from "@/lib/youth-data";
+import { TablePagination, usePagination } from "@/components/admin/composables/tables/table-pagination";
 
 type CheckinKind = "member" | "guest";
 export type CheckinEntry = {
@@ -458,20 +459,25 @@ function KioskTab({ eventId, eventName }: { eventId: string; eventName: string }
 
 function DayRegister({ entries, onRemove }: { entries: CheckinEntry[]; onRemove: (id: string) => void }) {
   const [filter, setFilter] = useState("");
+  const orderedEntries = useMemo(() => {
+    const kindRank: Record<CheckinKind, number> = { member: 0, guest: 1 };
+    return [...entries].sort((a, b) => kindRank[a.kind] - kindRank[b.kind]);
+  }, [entries]);
   const filtered = useMemo(() => {
     const term = filter.trim().toLowerCase();
-    if (!term) return entries;
-    return entries.filter(
+    if (!term) return orderedEntries;
+    return orderedEntries.filter(
       (e) =>
         e.name.toLowerCase().includes(term) ||
         e.cdmId.toLowerCase().includes(term) ||
         e.parish.toLowerCase().includes(term),
     );
-  }, [entries, filter]);
+  }, [orderedEntries, filter]);
+  const pagination = usePagination(filtered, 10);
 
   const exportCsv = () => {
     const header = "Time,CDM No,Name,Type,Parish,Method";
-    const rows = entries.map((e) => `${e.time},${e.cdmId},"${e.name}",${e.kind},"${e.parish}",${e.method}`);
+    const rows = orderedEntries.map((e) => `${e.time},${e.cdmId},"${e.name}",${e.kind},"${e.parish}",${e.method}`);
     const csv = [header, ...rows].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const a = document.createElement("a");
@@ -505,41 +511,51 @@ function DayRegister({ entries, onRemove }: { entries: CheckinEntry[]; onRemove:
           No check-ins yet. Search, scan, or bulk-select to begin.
         </div>
       ) : (
-        <div className="max-h-72 overflow-y-auto rounded-lg border border-border bg-bg-2">
-          <table className="w-full text-[11px]">
-            <thead className="sticky top-0 bg-bg-3 text-text-3">
-              <tr>
-                <th className="px-2 py-1.5 text-left font-bold">Time</th>
-                <th className="px-2 py-1.5 text-left font-bold">CDM No.</th>
-                <th className="px-2 py-1.5 text-left font-bold">Name</th>
-                <th className="px-2 py-1.5 text-left font-bold">Type</th>
-                <th className="px-2 py-1.5 text-left font-bold">Parish</th>
-                <th className="px-2 py-1.5 text-right font-bold">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((e) => (
-                <tr key={e.id} className="border-t border-border">
-                  <td className="px-2 py-1.5 text-text-2">{e.time}</td>
-                  <td className="px-2 py-1.5 font-bold text-text-1">{e.cdmId}</td>
-                  <td className="px-2 py-1.5 text-text-1">{e.name}</td>
-                  <td className="px-2 py-1.5">
-                    <Pill tone={e.kind === "member" ? "success" : "info"}>{e.kind}</Pill>
-                  </td>
-                  <td className="px-2 py-1.5 text-text-2">{e.parish}</td>
-                  <td className="px-2 py-1.5 text-right">
-                    <button
-                      onClick={() => onRemove(e.id)}
-                      className="rounded-md border border-border bg-bg-3 px-2 py-0.5 text-[10px] font-bold text-text-3 hover:text-danger"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </td>
+        <>
+          <div className="max-h-72 overflow-y-auto rounded-lg border border-border bg-bg-2">
+            <table className="w-full text-[11px]">
+              <thead className="sticky top-0 bg-bg-3 text-text-3">
+                <tr>
+                  <th className="px-2 py-1.5 text-left font-bold">Time</th>
+                  <th className="px-2 py-1.5 text-left font-bold">CDM No.</th>
+                  <th className="px-2 py-1.5 text-left font-bold">Name</th>
+                  <th className="px-2 py-1.5 text-left font-bold">Type</th>
+                  <th className="px-2 py-1.5 text-left font-bold">Parish</th>
+                  <th className="px-2 py-1.5 text-right font-bold">Action</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {pagination.pageRows.map((e) => (
+                  <tr key={e.id} className="border-t border-border">
+                    <td className="px-2 py-1.5 text-text-2">{e.time}</td>
+                    <td className="px-2 py-1.5 font-bold text-text-1">{e.cdmId}</td>
+                    <td className="px-2 py-1.5 text-text-1">{e.name}</td>
+                    <td className="px-2 py-1.5">
+                      <Pill tone={e.kind === "member" ? "success" : "info"}>{e.kind}</Pill>
+                    </td>
+                    <td className="px-2 py-1.5 text-text-2">{e.parish}</td>
+                    <td className="px-2 py-1.5 text-right">
+                      <button
+                        onClick={() => onRemove(e.id)}
+                        className="rounded-md border border-border bg-bg-3 px-2 py-0.5 text-[10px] font-bold text-text-3 hover:text-danger"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <TablePagination
+            page={pagination.page}
+            pageSize={pagination.pageSize}
+            total={pagination.total}
+            totalPages={pagination.totalPages}
+            onPageChange={pagination.setPage}
+            onPageSizeChange={pagination.setPageSize}
+          />
+        </>
       )}
     </div>
   );

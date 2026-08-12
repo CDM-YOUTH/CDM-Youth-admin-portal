@@ -199,15 +199,20 @@ function EventCheckinPage() {
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
-    return attendees.filter((a) => {
-      if (deaneryId && a.deanery !== selectedDeaneryName) return false;
-      if (parishId && a.parish !== selectedParishName) return false;
-      if (outstationId && a.outstation !== selectedOutstationName) return false;
-      if (term && ![a.name, a.cdmId, a.phone, a.parish, a.outstation].join(" ").toLowerCase().includes(term)) return false;
-      if (!applyColumnFilter(a.cdmId, fCdm)) return false;
-      if (!applyColumnFilter(a.name, fName)) return false;
-      return true;
-    });
+    return attendees
+      .filter((a) => {
+        if (deaneryId && a.deanery !== selectedDeaneryName) return false;
+        if (parishId && a.parish !== selectedParishName) return false;
+        if (outstationId && a.outstation !== selectedOutstationName) return false;
+        if (term && ![a.name, a.cdmId, a.phone, a.parish, a.outstation].join(" ").toLowerCase().includes(term)) return false;
+        if (!applyColumnFilter(a.cdmId, fCdm)) return false;
+        if (!applyColumnFilter(a.name, fName)) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        if (a.kind === b.kind) return 0;
+        return a.kind === "guest" ? 1 : -1;
+      });
   }, [attendees, deaneryId, parishId, outstationId, selectedDeaneryName, selectedParishName, selectedOutstationName, q, fCdm, fName]);
 
   const pagination = usePagination(filtered, 10);
