@@ -49,6 +49,10 @@ export type EventRegistration = {
   guest_name: string | null;
   guest_phone: string | null;
   guest_email: string | null;
+  guest_deanery: string | null;
+  guest_parish: string | null;
+  guest_outstation: string | null;
+  guest_role: string | null;
   notes: string | null;
   created_at: string;
   youth: {
@@ -277,7 +281,7 @@ export async function getEventFull(eventId: string): Promise<EventFull> {
       .order("position"),
     supabase
       .from("event_registrations")
-      .select("id, guest_name, guest_phone, guest_email, notes, created_at, youth:youths(cdm_id, full_name, phone, deanery:deaneries(name), parish:parishes(name), outstation:outstations(name))")
+      .select("id, guest_name, guest_phone, guest_email, guest_deanery, guest_parish, guest_outstation, guest_role, notes, created_at, youth:youths(cdm_id, full_name, phone, deanery:deaneries(name), parish:parishes(name), outstation:outstations(name))")
       .eq("event_id", eventId)
       .order("created_at", { ascending: false })
       .limit(500),
@@ -341,6 +345,10 @@ export async function registerForEvent(input: {
   guestName?: string | null;
   guestPhone?: string | null;
   guestEmail?: string | null;
+  guestDeanery?: string | null;
+  guestParish?: string | null;
+  guestOutstation?: string | null;
+  guestRole?: string | null;
   notes?: string | null;
 }) {
   let youth_id: string | null = null;
@@ -357,17 +365,48 @@ export async function registerForEvent(input: {
   if (!youth_id && !input.guestName) {
     throw new Error("Provide a CDM No. or guest name");
   }
-  const { error } = await supabase.from("event_registrations").upsert(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any).from("event_registrations").upsert(
     {
       event_id: input.eventId,
       youth_id,
       guest_name: input.guestName || null,
       guest_phone: input.guestPhone || null,
       guest_email: input.guestEmail || null,
+      guest_deanery: input.guestDeanery || null,
+      guest_parish: input.guestParish || null,
+      guest_outstation: input.guestOutstation || null,
+      guest_role: input.guestRole || null,
       notes: input.notes || null,
     },
     { onConflict: "event_id,youth_id" },
   );
+  if (error) throw error;
+}
+
+export async function updateGuestRegistration(
+  id: string,
+  input: {
+    guestName?: string | null;
+    guestPhone?: string | null;
+    guestDeanery?: string | null;
+    guestParish?: string | null;
+    guestOutstation?: string | null;
+    guestRole?: string | null;
+  },
+): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { error } = await (supabase as any)
+    .from("event_registrations")
+    .update({
+      guest_name:        input.guestName       ?? null,
+      guest_phone:       input.guestPhone      ?? null,
+      guest_deanery:     input.guestDeanery    ?? null,
+      guest_parish:      input.guestParish     ?? null,
+      guest_outstation:  input.guestOutstation ?? null,
+      guest_role:        input.guestRole       ?? null,
+    })
+    .eq("id", id);
   if (error) throw error;
 }
 
@@ -379,7 +418,7 @@ export async function deleteRegistration(registrationId: string) {
 export async function listRegistrations(eventId: string) {
   const { data, error } = await supabase
     .from("event_registrations")
-    .select("id, guest_name, guest_phone, guest_email, notes, created_at, youth:youths(cdm_id, full_name, parish:parishes(name))")
+    .select("id, guest_name, guest_phone, guest_email, guest_deanery, guest_parish, guest_outstation, guest_role, notes, created_at, youth:youths(cdm_id, full_name, parish:parishes(name))")
     .eq("event_id", eventId)
     .order("created_at", { ascending: false })
     .limit(2000);
