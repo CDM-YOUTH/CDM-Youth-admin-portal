@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { titleCase, formatPhone } from "@/lib/utils";
 import { useEffect, useMemo, useState, type ComponentType } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, QrCode, Search, UserPlus, X, BadgeCheck, Download, Loader2, UserCog, MoreVertical, Trash2, FileText, Sheet } from "lucide-react";
+import { ArrowLeft, QrCode, Search, UserPlus, X, BadgeCheck, Download, Loader2, UserCog, MoreVertical, Trash2, FileText, Sheet, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { Topbar } from "@/components/admin/layout/topbar";
 import { Card, CardBody, Kpi } from "@/components/admin/composables/ui-bits";
@@ -34,7 +34,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { getEventFull, registerForEvent, deleteRegistration } from "@/lib/db/activities/events";
+import { getEventFull, registerForEvent, deleteRegistration, updateGuestRegistration } from "@/lib/db/activities/events";
 import { apiFetch } from "@/lib/api/fetch-api";
 import { listYouthsPaged, fetchYouthByCdmId, type YouthRow } from "@/lib/db/youth-records/youths";
 import { fetchOrg, type OrgTree } from "@/lib/db/org";
@@ -63,6 +63,17 @@ type AttendeeEntry = {
   outstation: string;
   time: string;
   kind: AttendeeKind;
+  role: string;
+};
+
+const GUEST_ROLES = ["guest", "facilitator", "accompaniment", "patronage"] as const;
+type GuestRole = typeof GUEST_ROLES[number];
+
+const ROLE_TONE: Record<GuestRole, string> = {
+  guest:         "bg-warn-soft text-gold",
+  facilitator:   "bg-info-soft text-info",
+  accompaniment: "bg-success-soft text-success",
+  patronage:     "bg-violet-50 text-violet-600",
 };
 
 function btnCls(variant: "primary" | "ghost" = "primary", extra = "") {
@@ -143,6 +154,17 @@ function EventCheckinPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const editMut = useMutation({
+    mutationFn: ({ id, input }: { id: string; input: Parameters<typeof updateGuestRegistration>[1] }) =>
+      updateGuestRegistration(id, input),
+    onSuccess: () => {
+      toast.success("Guest details updated");
+      qc.invalidateQueries({ queryKey: ["event-full", eventId] });
+      setEditTarget(null);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const [attendees, setAttendees] = useState<AttendeeEntry[]>([]);
 
   useEffect(() => {
@@ -152,12 +174,13 @@ function EventCheckinPage() {
         id: reg.id,
         cdmId: reg.youth?.cdm_id ?? "—",
         name: reg.youth?.full_name ?? reg.guest_name ?? "—",
-        phone: reg.youth?.phone ?? "",
-        deanery: reg.youth?.deanery?.name ?? "",
-        parish: reg.youth?.parish?.name ?? "",
-        outstation: reg.youth?.outstation?.name ?? "",
+        phone: reg.youth?.phone ?? reg.guest_phone ?? "",
+        deanery: reg.youth?.deanery?.name ?? reg.guest_deanery ?? "",
+        parish: reg.youth?.parish?.name ?? reg.guest_parish ?? "",
+        outstation: reg.youth?.outstation?.name ?? reg.guest_outstation ?? "",
         time: new Date(reg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         kind: reg.youth ? "member" : "guest",
+        role: reg.guest_role ?? (reg.youth ? "" : "guest"),
       })),
     );
   }, [event]);
@@ -174,6 +197,7 @@ function EventCheckinPage() {
   const [scanOpen, setScanOpen] = useState(false);
   const [addYouthOpen, setAddYouthOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<{ id: string; name: string } | null>(null);
+  const [editTarget, setEditTarget] = useState<AttendeeEntry | null>(null);
 
   /* per-column filters */
   const [fCdm, setFCdm] = useState<ColumnFilterValue | undefined>(undefined);
@@ -247,11 +271,11 @@ function EventCheckinPage() {
     doc.text(`Registrations & Check-in · Exported ${dateStr} · ${rows.length} attendee${rows.length !== 1 ? "s" : ""}`, 14, 20);
     autoTable(doc, {
       startY: 26,
-      head: [["CDM No.", "Name", "Type", "Phone", "Deanery", "Parish", "Outstation", "Registered At"]],
+      head: [["CDM No.", "Name", "Role", "Phone", "Deanery", "Parish", "Outstation", "Registered At"]],
       body: rows.map((a) => [
         a.cdmId === "—" ? "" : a.cdmId,
         a.name,
-        a.kind === "guest" ? "Guest" : "Member",
+        a.kind === "guest" ? (a.role || "guest") : "member",
         a.phone || "",
         a.deanery || "",
         a.parish || "",
@@ -261,7 +285,7 @@ function EventCheckinPage() {
       styles: { fontSize: 8, cellPadding: 2 },
       headStyles: { fillColor: [185, 28, 28], textColor: 255, fontStyle: "bold" },
       alternateRowStyles: { fillColor: [250, 250, 250] },
-      columnStyles: { 0: { cellWidth: 28 }, 1: { cellWidth: 40 }, 2: { cellWidth: 16 } },
+      columnStyles: { 0: { cellWidth: 28 }, 1: { cellWidth: 40 }, 2: { cellWidth: 22 } },
     });
     doc.save(`${event.name.replace(/\s+/g, "-")}-registrations.pdf`);
     toast.success(`Exported ${rows.length} registrations`);
@@ -423,8 +447,12 @@ function EventCheckinPage() {
                     <td className="px-3.5 py-2.5 text-[11px] font-semibold text-foreground">
                       {titleCase(a.name)}
                       {a.kind === "guest" && (
-                        <span className="ml-1.5 rounded bg-warn-soft px-1 py-0.5 text-[8px] font-black uppercase tracking-wide text-gold">
-                          guest
+                        <span
+                          className={`ml-1.5 rounded px-1 py-0.5 text-[8px] font-black uppercase tracking-wide ${
+                            ROLE_TONE[a.role as GuestRole] ?? ROLE_TONE.guest
+                          }`}
+                        >
+                          {a.role || "guest"}
                         </span>
                       )}
                     </td>
@@ -444,7 +472,12 @@ function EventCheckinPage() {
                             <MoreVertical className="h-3.5 w-3.5" />
                           </button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-40">
+                        <DropdownMenuContent align="end" className="w-44">
+                          {a.kind === "guest" && (
+                            <DropdownMenuItem onClick={() => setEditTarget(a)}>
+                              <Pencil className="mr-2 h-3.5 w-3.5" /> Edit guest
+                            </DropdownMenuItem>
+                          )}
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             className="text-danger focus:text-danger"
@@ -498,6 +531,7 @@ function EventCheckinPage() {
       <WalkInDialog
         open={walkInOpen}
         onClose={() => setWalkInOpen(false)}
+        org={org}
         onAdd={(input) => registerMut.mutate({ eventId, ...input })}
       />
       <ScanDialog
@@ -529,6 +563,14 @@ function EventCheckinPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <EditGuestDialog
+        open={editTarget !== null}
+        target={editTarget}
+        org={org}
+        onClose={() => setEditTarget(null)}
+        onSave={(id, input) => editMut.mutate({ id, input })}
+      />
     </>
   );
 }
@@ -787,24 +829,55 @@ function RegisterDialog({
 
 /* ─── Walk-in dialog ─── */
 function WalkInDialog({
-  open, onClose, onAdd,
+  open, onClose, org, onAdd,
 }: {
   open: boolean;
   onClose: () => void;
-  onAdd: (input: { guestName: string; guestPhone?: string; notes?: string }) => void;
+  org: OrgTree | undefined;
+  onAdd: (input: {
+    guestName: string;
+    guestPhone?: string;
+    guestDeanery?: string;
+    guestParish?: string;
+    guestOutstation?: string;
+    guestRole?: string;
+  }) => void;
 }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [area, setArea] = useState("");
+  const [deaneryId, setDeaneryId] = useState("");
+  const [parishId, setParishId] = useState("");
+  const [outstationId, setOutstationId] = useState("");
+  const [role, setRole] = useState<string>("guest");
 
-  const reset = () => { setName(""); setPhone(""); setArea(""); };
+  const reset = () => {
+    setName(""); setPhone("");
+    setDeaneryId(""); setParishId(""); setOutstationId("");
+    setRole("guest");
+  };
+
+  const parishOptions = deaneryId
+    ? (org?.parishes ?? []).filter((p) => p.deanery_id === deaneryId)
+    : (org?.parishes ?? []);
+
+  const outstationOptions = parishId
+    ? (org?.outstations ?? []).filter((o) => o.parish_id === parishId)
+    : deaneryId
+      ? (org?.outstations ?? []).filter((o) => parishOptions.some((p) => p.id === o.parish_id))
+      : (org?.outstations ?? []);
 
   const submit = () => {
     if (!name.trim()) { toast.error("Name is required"); return; }
+    const deaneryName  = org?.deaneries.find((d) => d.id === deaneryId)?.name;
+    const parishName   = org?.parishes.find((p) => p.id === parishId)?.name;
+    const outstName    = org?.outstations.find((o) => o.id === outstationId)?.name;
     onAdd({
-      guestName: name.trim(),
-      guestPhone: phone.trim() || undefined,
-      notes: area.trim() ? `Area: ${area.trim()}` : undefined,
+      guestName:      name.trim(),
+      guestPhone:     phone.trim() || undefined,
+      guestDeanery:   deaneryName  || undefined,
+      guestParish:    parishName   || undefined,
+      guestOutstation: outstName   || undefined,
+      guestRole:      role || undefined,
     });
     reset();
     onClose();
@@ -812,7 +885,7 @@ function WalkInDialog({
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) { reset(); onClose(); } }}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Add Walk-in Guest</DialogTitle>
         </DialogHeader>
@@ -825,10 +898,63 @@ function WalkInDialog({
             <label className="mb-1 block text-[11px] font-bold text-text-3">Phone</label>
             <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+254700000000" type="tel" />
           </div>
-          <div>
-            <label className="mb-1 block text-[11px] font-bold text-text-3">Parish / Area</label>
-            <Input value={area} onChange={(e) => setArea(e.target.value)} placeholder="e.g. Cathedral Parish" />
+
+          <div className="grid grid-cols-1 gap-2">
+            <label className="text-[11px] font-bold text-text-3">Location (optional)</label>
+            <select
+              value={deaneryId}
+              onChange={(e) => { setDeaneryId(e.target.value); setParishId(""); setOutstationId(""); }}
+              className={SEL_CLS}
+            >
+              <option value="">Select Deanery</option>
+              {(org?.deaneries ?? []).map((d) => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </select>
+            <select
+              value={parishId}
+              onChange={(e) => { setParishId(e.target.value); setOutstationId(""); }}
+              disabled={!deaneryId || parishOptions.length === 0}
+              className={SEL_CLS}
+            >
+              <option value="">Select Parish</option>
+              {parishOptions.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+            <select
+              value={outstationId}
+              onChange={(e) => setOutstationId(e.target.value)}
+              disabled={!parishId || outstationOptions.length === 0}
+              className={SEL_CLS}
+            >
+              <option value="">Select Outstation</option>
+              {outstationOptions.map((o) => (
+                <option key={o.id} value={o.id}>{o.name}</option>
+              ))}
+            </select>
           </div>
+
+          <div>
+            <label className="mb-1 block text-[11px] font-bold text-text-3">Role</label>
+            <div className="flex flex-wrap gap-2">
+              {GUEST_ROLES.map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setRole(r)}
+                  className={`rounded-md border px-3 py-1.5 text-[11px] font-bold capitalize transition ${
+                    role === r
+                      ? "border-danger bg-danger text-white"
+                      : "border-border bg-bg-2 text-text-2 hover:border-danger/50 hover:text-text-1"
+                  }`}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <button onClick={submit} className={btnCls("primary", "w-full justify-center")}>
             <UserPlus className="h-3.5 w-3.5" /> Add Walk-in
           </button>
@@ -918,6 +1044,138 @@ function ScanDialog({
 
           <button onClick={downloadQr} className={btnCls("ghost", "w-full justify-center")}>
             <Download className="h-3.5 w-3.5" /> Download QR (SVG)
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ─── Edit guest dialog ─── */
+function EditGuestDialog({
+  open, target, org, onClose, onSave,
+}: {
+  open: boolean;
+  target: AttendeeEntry | null;
+  org: OrgTree | undefined;
+  onClose: () => void;
+  onSave: (id: string, input: Parameters<typeof updateGuestRegistration>[1]) => void;
+}) {
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [deaneryId, setDeaneryId] = useState("");
+  const [parishId, setParishId] = useState("");
+  const [outstationId, setOutstationId] = useState("");
+  const [role, setRole] = useState<string>("guest");
+
+  // Re-seed whenever the target changes (dialog opens for a different guest)
+  useEffect(() => {
+    if (!target || !org) return;
+    setName(target.name);
+    setPhone(target.phone);
+    setRole(target.role || "guest");
+    setDeaneryId(org.deaneries.find((d) => d.name === target.deanery)?.id ?? "");
+    setParishId(org.parishes.find((p) => p.name === target.parish)?.id ?? "");
+    setOutstationId(org.outstations.find((o) => o.name === target.outstation)?.id ?? "");
+  }, [target, org]);
+
+  const parishOptions = deaneryId
+    ? (org?.parishes ?? []).filter((p) => p.deanery_id === deaneryId)
+    : (org?.parishes ?? []);
+
+  const outstationOptions = parishId
+    ? (org?.outstations ?? []).filter((o) => o.parish_id === parishId)
+    : deaneryId
+      ? (org?.outstations ?? []).filter((o) => parishOptions.some((p) => p.id === o.parish_id))
+      : (org?.outstations ?? []);
+
+  const submit = () => {
+    if (!name.trim()) { toast.error("Name is required"); return; }
+    if (!target) return;
+    onSave(target.id, {
+      guestName:        name.trim(),
+      guestPhone:       phone.trim() || null,
+      guestDeanery:     org?.deaneries.find((d) => d.id === deaneryId)?.name   ?? null,
+      guestParish:      org?.parishes.find((p)  => p.id === parishId)?.name    ?? null,
+      guestOutstation:  org?.outstations.find((o) => o.id === outstationId)?.name ?? null,
+      guestRole:        role || null,
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Edit Guest Details</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div>
+            <label className="mb-1 block text-[11px] font-bold text-text-3">Full name *</label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. John Kamau" />
+          </div>
+          <div>
+            <label className="mb-1 block text-[11px] font-bold text-text-3">Phone</label>
+            <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+254700000000" type="tel" />
+          </div>
+
+          <div className="grid grid-cols-1 gap-2">
+            <label className="text-[11px] font-bold text-text-3">Location (optional)</label>
+            <select
+              value={deaneryId}
+              onChange={(e) => { setDeaneryId(e.target.value); setParishId(""); setOutstationId(""); }}
+              className={SEL_CLS}
+            >
+              <option value="">Select Deanery</option>
+              {(org?.deaneries ?? []).map((d) => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </select>
+            <select
+              value={parishId}
+              onChange={(e) => { setParishId(e.target.value); setOutstationId(""); }}
+              disabled={!deaneryId || parishOptions.length === 0}
+              className={SEL_CLS}
+            >
+              <option value="">Select Parish</option>
+              {parishOptions.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+            <select
+              value={outstationId}
+              onChange={(e) => setOutstationId(e.target.value)}
+              disabled={!parishId || outstationOptions.length === 0}
+              className={SEL_CLS}
+            >
+              <option value="">Select Outstation</option>
+              {outstationOptions.map((o) => (
+                <option key={o.id} value={o.id}>{o.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-[11px] font-bold text-text-3">Role</label>
+            <div className="flex flex-wrap gap-2">
+              {GUEST_ROLES.map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setRole(r)}
+                  className={`rounded-md border px-3 py-1.5 text-[11px] font-bold capitalize transition ${
+                    role === r
+                      ? "border-danger bg-danger text-white"
+                      : "border-border bg-bg-2 text-text-2 hover:border-danger/50 hover:text-text-1"
+                  }`}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <button onClick={submit} className={btnCls("primary", "w-full justify-center")}>
+            Save changes
           </button>
         </div>
       </DialogContent>
