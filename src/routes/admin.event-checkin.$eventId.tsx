@@ -261,6 +261,15 @@ function EventCheckinPage() {
   const exportPdf = async (rows: typeof filtered) => {
     const { default: jsPDF } = await import("jspdf");
     const { default: autoTable } = await import("jspdf-autotable");
+
+    // Sort: members first (already sorted), then within each group sort by deanery → parish
+    const sorted = [...rows].sort((a, b) => {
+      if (a.kind !== b.kind) return a.kind === "member" ? -1 : 1;
+      const d = a.deanery.localeCompare(b.deanery);
+      if (d !== 0) return d;
+      return a.parish.localeCompare(b.parish);
+    });
+
     const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
     const dateStr = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
     doc.setFontSize(13);
@@ -268,11 +277,13 @@ function EventCheckinPage() {
     doc.text(event.name, 14, 14);
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
-    doc.text(`Registrations & Check-in · Exported ${dateStr} · ${rows.length} attendee${rows.length !== 1 ? "s" : ""}`, 14, 20);
+    doc.text(`Registrations & Check-in · Exported ${dateStr} · ${sorted.length} attendee${sorted.length !== 1 ? "s" : ""}`, 14, 20);
     autoTable(doc, {
       startY: 26,
-      head: [["CDM No.", "Name", "Role", "Phone", "Deanery", "Parish", "Outstation", "Registered At"]],
-      body: rows.map((a) => [
+      theme: "grid",
+      head: [["#", "CDM No.", "Name", "Role", "Phone", "Deanery", "Parish", "Outstation", "Registered At"]],
+      body: sorted.map((a, i) => [
+        i + 1,
         a.cdmId === "—" ? "" : a.cdmId,
         a.name,
         a.kind === "guest" ? (a.role || "guest") : "member",
@@ -282,13 +293,13 @@ function EventCheckinPage() {
         a.outstation || "",
         a.time,
       ]),
-      styles: { fontSize: 8, cellPadding: 2 },
-      headStyles: { fillColor: [185, 28, 28], textColor: 255, fontStyle: "bold" },
+      styles: { fontSize: 8, cellPadding: 2, lineColor: [210, 210, 210], lineWidth: 0.15 },
+      headStyles: { fillColor: [185, 28, 28], textColor: 255, fontStyle: "bold", lineColor: [185, 28, 28], lineWidth: 0.15 },
       alternateRowStyles: { fillColor: [250, 250, 250] },
-      columnStyles: { 0: { cellWidth: 28 }, 1: { cellWidth: 40 }, 2: { cellWidth: 22 } },
+      columnStyles: { 0: { cellWidth: 12, halign: "center" }, 1: { cellWidth: 28 }, 2: { cellWidth: 40 }, 3: { cellWidth: 22 } },
     });
     doc.save(`${event.name.replace(/\s+/g, "-")}-registrations.pdf`);
-    toast.success(`Exported ${rows.length} registrations`);
+    toast.success(`Exported ${sorted.length} registrations`);
   };
 
   return (
