@@ -41,9 +41,9 @@ import {
   ANALYTICS_UNITS,
   ORGANIZATION,
   TOP_PARISHES,
-  UPCOMING_EVENTS,
   type AnalyticsUnit,
 } from "@/lib/mock-data";
+import { listDashboardEvents, type EventRow } from "@/lib/db/activities/events";
 
 export const Route = createFileRoute("/admin/dashboard")({
   head: () => ({
@@ -306,6 +306,11 @@ function GeneralTab({ chartDisplay }: { chartDisplay: ChartDisplay }) {
     queryFn: () => getAgeRangeBreakdown(scopeParams),
     staleTime: 30_000,
   });
+  const { data: dashboardEvents = [] } = useQuery({
+    queryKey: ["dashboard-events"],
+    queryFn: () => listDashboardEvents(4),
+    staleTime: 60_000,
+  });
 
   const totalYouths   = summary?.total_youths ?? 0;
   const totalEnrolled = summary?.enrolled ?? 0;
@@ -409,20 +414,25 @@ function GeneralTab({ chartDisplay }: { chartDisplay: ChartDisplay }) {
                   {upcomingCount} event{upcomingCount !== 1 ? "s" : ""} coming up — <a href="/admin/events" className="text-danger hover:underline">view all →</a>
                 </div>
               )}
-              {UPCOMING_EVENTS.slice(0, upcomingCount > 0 ? 2 : 3).map((e) => (
-                <div key={e.name} className="flex items-center gap-3 rounded-lg border border-border bg-bg-2 p-2.5">
-                  <div className="min-w-[44px] shrink-0 rounded-md bg-bg-4 px-2 py-1.5 text-center">
-                    <div className="text-[7px] font-bold uppercase tracking-wide text-gold">{e.month}</div>
-                    <div className="text-[18px] font-black leading-none text-foreground">{e.day}</div>
+              {dashboardEvents.map((e: EventRow) => {
+                const d = e.event_date ? new Date(e.event_date) : null;
+                const month = d ? d.toLocaleString("en-GB", { month: "short" }) : "—";
+                const day = d ? String(d.getDate()).padStart(2, "0") : "—";
+                const location = e.parish?.name ?? e.deanery?.name ?? e.venue ?? "Diocese";
+                return (
+                  <div key={e.id} className="flex items-center gap-3 rounded-lg border border-border bg-bg-2 p-2.5">
+                    <div className="min-w-[44px] shrink-0 rounded-md bg-bg-4 px-2 py-1.5 text-center">
+                      <div className="text-[7px] font-bold uppercase tracking-wide text-gold">{month}</div>
+                      <div className="text-[18px] font-black leading-none text-foreground">{day}</div>
+                    </div>
+                    <div className="flex-1 leading-tight">
+                      <div className="text-[11px] font-semibold text-text-1">{e.name}</div>
+                      <div className="text-[9px] text-text-3">{location}</div>
+                    </div>
                   </div>
-                  <div className="flex-1 leading-tight">
-                    <div className="text-[11px] font-semibold text-text-1">{e.name}</div>
-                    <div className="text-[9px] text-text-3">{e.parish}</div>
-                  </div>
-                  <Pill tone="success">{e.registered} RSVP</Pill>
-                </div>
-              ))}
-              {upcomingCount === 0 && UPCOMING_EVENTS.length === 0 && (
+                );
+              })}
+              {dashboardEvents.length === 0 && (
                 <div className="rounded-lg border border-dashed border-border bg-bg-2 p-3 text-center text-[10px] text-text-3">No upcoming events scheduled.</div>
               )}
             </CardBody>

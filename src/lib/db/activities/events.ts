@@ -427,6 +427,28 @@ export async function listEventsPaged(opts: {
   return { data: (data ?? []) as unknown as EventRow[], total: count ?? 0, page, size };
 }
 
+export async function listDashboardEvents(limit = 4): Promise<EventRow[]> {
+  const today = new Date().toISOString().slice(0, 10);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db = supabase as any;
+  const sel = "id, name, event_date, end_date, venue, description, poster_url, organization_level, deanery:deaneries(name), parish:parishes(name)";
+
+  const [ongoingRes, upcomingRes] = await Promise.all([
+    db.from("events").select(sel)
+      .lte("event_date", today)
+      .or(`end_date.gte.${today},and(end_date.is.null,event_date.eq.${today})`)
+      .order("event_date", { ascending: true })
+      .limit(limit),
+    db.from("events").select(sel)
+      .gt("event_date", today)
+      .order("event_date", { ascending: true })
+      .limit(limit),
+  ]);
+
+  const combined = [...(ongoingRes.data ?? []), ...(upcomingRes.data ?? [])];
+  return combined.slice(0, limit) as unknown as EventRow[];
+}
+
 export async function getEventsAnalytics() {
   const today = new Date().toISOString().slice(0, 10);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
