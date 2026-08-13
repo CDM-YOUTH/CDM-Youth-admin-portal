@@ -59,6 +59,7 @@ export type EventRegistration = {
     cdm_id: string;
     full_name: string;
     phone: string | null;
+    category: string | null;
     deanery: { name: string } | null;
     parish: { name: string } | null;
     outstation: { name: string } | null;
@@ -281,7 +282,7 @@ export async function getEventFull(eventId: string): Promise<EventFull> {
       .order("position"),
     supabase
       .from("event_registrations")
-      .select("id, guest_name, guest_phone, guest_email, guest_deanery, guest_parish, guest_outstation, guest_role, notes, created_at, youth:youths(cdm_id, full_name, phone, deanery:deaneries(name), parish:parishes(name), outstation:outstations(name))")
+      .select("id, guest_name, guest_phone, guest_email, guest_deanery, guest_parish, guest_outstation, guest_role, notes, created_at, youth:youths(cdm_id, full_name, phone, category, deanery:deaneries(name), parish:parishes(name), outstation:outstations(name))")
       .eq("event_id", eventId)
       .order("created_at", { ascending: false })
       .limit(500),
