@@ -58,6 +58,7 @@ type AttendeeEntry = {
   cdmId: string;
   name: string;
   phone: string;
+  category: string;
   deanery: string;
   parish: string;
   outstation: string;
@@ -175,6 +176,7 @@ function EventCheckinPage() {
         cdmId: reg.youth?.cdm_id ?? "—",
         name: reg.youth?.full_name ?? reg.guest_name ?? "—",
         phone: reg.youth?.phone ?? reg.guest_phone ?? "",
+        category: reg.youth?.category ?? "",
         deanery: reg.youth?.deanery?.name ?? reg.guest_deanery ?? "",
         parish: reg.youth?.parish?.name ?? reg.guest_parish ?? "",
         outstation: reg.youth?.outstation?.name ?? reg.guest_outstation ?? "",
@@ -202,6 +204,12 @@ function EventCheckinPage() {
   /* per-column filters */
   const [fCdm, setFCdm] = useState<ColumnFilterValue | undefined>(undefined);
   const [fName, setFName] = useState<ColumnFilterValue | undefined>(undefined);
+  const [fCategory, setFCategory] = useState<ColumnFilterValue | undefined>(undefined);
+  const [fPhone, setFPhone] = useState<ColumnFilterValue | undefined>(undefined);
+  const [fDeanery, setFDeanery] = useState<ColumnFilterValue | undefined>(undefined);
+  const [fParish, setFParish] = useState<ColumnFilterValue | undefined>(undefined);
+  const [fOutstation, setFOutstation] = useState<ColumnFilterValue | undefined>(undefined);
+  const [fTime, setFTime] = useState<ColumnFilterValue | undefined>(undefined);
 
   /* cascading filter options from real org data — pure JS, zero DB calls */
   const parishOptions = useMemo(() => {
@@ -231,13 +239,19 @@ function EventCheckinPage() {
         if (term && ![a.name, a.cdmId, a.phone, a.parish, a.outstation].join(" ").toLowerCase().includes(term)) return false;
         if (!applyColumnFilter(a.cdmId, fCdm)) return false;
         if (!applyColumnFilter(a.name, fName)) return false;
+        if (!applyColumnFilter(a.category, fCategory)) return false;
+        if (!applyColumnFilter(a.phone, fPhone)) return false;
+        if (!applyColumnFilter(a.deanery, fDeanery)) return false;
+        if (!applyColumnFilter(a.parish, fParish)) return false;
+        if (!applyColumnFilter(a.outstation, fOutstation)) return false;
+        if (!applyColumnFilter(a.time, fTime)) return false;
         return true;
       })
       .sort((a, b) => {
         if (a.kind === b.kind) return 0;
         return a.kind === "guest" ? 1 : -1;
       });
-  }, [attendees, deaneryId, parishId, outstationId, selectedDeaneryName, selectedParishName, selectedOutstationName, q, fCdm, fName]);
+  }, [attendees, deaneryId, parishId, outstationId, selectedDeaneryName, selectedParishName, selectedOutstationName, q, fCdm, fName, fCategory, fPhone, fDeanery, fParish, fOutstation, fTime]);
 
   const pagination = usePagination(filtered, 10);
 
@@ -256,7 +270,7 @@ function EventCheckinPage() {
   const guestCount = attendees.filter((a) => a.kind === "guest").length;
   const filteredMemberCount = filtered.filter((a) => a.kind === "member").length;
   const filteredGuestCount = filtered.filter((a) => a.kind === "guest").length;
-  const hasFilter = !!(deaneryId || parishId || outstationId || q || fCdm?.value || fName?.value);
+  const hasFilter = !!(deaneryId || parishId || outstationId || q || fCdm?.value || fName?.value || fCategory?.value || fPhone?.value || fDeanery?.value || fParish?.value || fOutstation?.value || fTime?.value);
 
   const exportPdf = async (rows: typeof filtered) => {
     const { default: jsPDF } = await import("jspdf");
@@ -281,21 +295,22 @@ function EventCheckinPage() {
     autoTable(doc, {
       startY: 26,
       theme: "grid",
-      head: [["#", "CDM No.", "Name", "Role", "Phone", "Deanery", "Parish", "Outstation", "Registered At"]],
+      head: [["#", "CDM No.", "Name", "Category", "Role", "Phone", "Deanery", "Parish", "Outstation", "Registered At"]],
       body: sorted.map((a, i) => [
         i + 1,
         a.cdmId === "—" ? "" : a.cdmId,
         a.name,
+        a.category || "",
         a.kind === "guest" ? (a.role || "guest") : "member",
-        a.phone || "",
+        formatPhone(a.phone) || "",
         a.deanery || "",
         a.parish || "",
         a.outstation || "",
         a.time,
       ]),
-      styles: { fontSize: 8, cellPadding: 2, lineColor: [210, 210, 210], lineWidth: 0.15 },
-      headStyles: { fillColor: [185, 28, 28], textColor: 255, fontStyle: "bold", lineColor: [185, 28, 28], lineWidth: 0.15 },
-      alternateRowStyles: { fillColor: [250, 250, 250] },
+      styles: { fontSize: 8, cellPadding: 2, fillColor: [255, 255, 255], textColor: [0, 0, 0], lineColor: [210, 210, 210], lineWidth: 0.15 },
+      headStyles: { fillColor: [185, 28, 28], textColor: [255, 255, 255], fontStyle: "bold", lineColor: [185, 28, 28], lineWidth: 0.15 },
+      alternateRowStyles: { fillColor: [255, 255, 255] },
       columnStyles: { 0: { cellWidth: 12, halign: "center" }, 1: { cellWidth: 28 }, 2: { cellWidth: 40 }, 3: { cellWidth: 22 } },
     });
     doc.save(`${event.name.replace(/\s+/g, "-")}-registrations.pdf`);
@@ -373,7 +388,9 @@ function EventCheckinPage() {
             <FilterClear
               onClick={() => {
                 setDeaneryId(""); setParishId(""); setOutstationId(""); setQ("");
-                setFCdm(undefined); setFName(undefined);
+                setFCdm(undefined); setFName(undefined); setFCategory(undefined);
+                setFPhone(undefined); setFDeanery(undefined); setFParish(undefined);
+                setFOutstation(undefined); setFTime(undefined);
               }}
               visible={hasFilter}
             />
@@ -434,18 +451,62 @@ function EventCheckinPage() {
                       filter={<ColumnFilter label="Name" value={fName} onChange={setFName} />}
                     />
                   </th>
-                  <th className="label-eyebrow px-3.5 py-2.5 text-left">Phone</th>
-                  <th className="label-eyebrow px-3.5 py-2.5 text-left">Deanery</th>
-                  <th className="label-eyebrow px-3.5 py-2.5 text-left">Parish</th>
-                  <th className="label-eyebrow px-3.5 py-2.5 text-left">Outstation</th>
-                  <th className="label-eyebrow px-3.5 py-2.5 text-left">Time</th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
+                    <ColumnHeader
+                      label="Category"
+                      filter={
+                        <ColumnFilter
+                          label="Category"
+                          value={fCategory}
+                          onChange={setFCategory}
+                          mode="select"
+                          options={[
+                            { value: "Primary", label: "Primary" },
+                            { value: "Secondary", label: "Secondary" },
+                            { value: "Tertiary", label: "Tertiary" },
+                            { value: "Working", label: "Working" },
+                          ]}
+                        />
+                      }
+                    />
+                  </th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
+                    <ColumnHeader
+                      label="Phone"
+                      filter={<ColumnFilter label="Phone" value={fPhone} onChange={setFPhone} />}
+                    />
+                  </th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
+                    <ColumnHeader
+                      label="Deanery"
+                      filter={<ColumnFilter label="Deanery" value={fDeanery} onChange={setFDeanery} />}
+                    />
+                  </th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
+                    <ColumnHeader
+                      label="Parish"
+                      filter={<ColumnFilter label="Parish" value={fParish} onChange={setFParish} />}
+                    />
+                  </th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
+                    <ColumnHeader
+                      label="Outstation"
+                      filter={<ColumnFilter label="Outstation" value={fOutstation} onChange={setFOutstation} />}
+                    />
+                  </th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
+                    <ColumnHeader
+                      label="Time"
+                      filter={<ColumnFilter label="Time" value={fTime} onChange={setFTime} />}
+                    />
+                  </th>
                   <th className="label-eyebrow px-3.5 py-2.5 w-8"></th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="px-3.5 py-10 text-center text-[12px] text-text-3">
+                    <td colSpan={9} className="px-3.5 py-10 text-center text-[12px] text-text-3">
                       {attendees.length === 0
                         ? "No registrations yet — use Register, Walk-in, or Scan to add attendees."
                         : "No attendees match the current filters."}
@@ -466,6 +527,9 @@ function EventCheckinPage() {
                           {a.role || "guest"}
                         </span>
                       )}
+                    </td>
+                    <td className="px-3.5 py-2.5 text-[11px] text-text-2">
+                      {a.category || "—"}
                     </td>
                     <td className="px-3.5 py-2.5 text-[11px] text-text-3">{formatPhone(a.phone) || "—"}</td>
                     <td className="px-3.5 py-2.5 text-[11px] text-text-2">{a.deanery || "—"}</td>
