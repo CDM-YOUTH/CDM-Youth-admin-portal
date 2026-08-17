@@ -6,7 +6,8 @@ import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { History, MoreVertical, Plus, Upload } from "lucide-react";
+import { History, MoreVertical } from "lucide-react";
+import { Icon } from "@iconify/react";
 import { type PagedResponse } from "@/lib/api/fetch-api";
 import { YouthSearchInput, type PickedYouth } from "@/components/admin/composables/pickers/youth-search-input";
 import { Topbar, TopbarButton, TopbarTab } from "@/components/admin/layout/topbar";
@@ -183,22 +184,38 @@ function LeadersPage() {
           </>
         }
         action={
-          <>
-            <button
-              type="button"
-              onClick={() => setAddYouthOpen(true)}
-              className="inline-flex h-8 w-24 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-primary px-3 text-[11px] font-bold text-primary-foreground shadow-sm transition-opacity hover:opacity-90"
-            >
-              <Plus className="h-3.5 w-3.5" /> Add Youth
-            </button>
-            <TopbarButton onClick={() => setImportOpen(true)}>Import CSV</TopbarButton>
-            <TopbarButton onClick={() => setAppointOpen(true)}>+ Appoint</TopbarButton>
-          </>
+          <button
+            type="button"
+            onClick={() => setAddYouthOpen(true)}
+            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-[11px] font-bold text-primary-foreground shadow-sm transition-opacity hover:opacity-90"
+          >
+            <Icon icon="mdi:plus" className="h-3.5 w-3.5" /> Add Youth
+          </button>
         }
       />
 
       <div className="flex-1 overflow-y-auto px-5 py-4">
         <Card>
+          {/* Toolbar with import and appoint buttons */}
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-card px-3.5 py-2.5 sm:flex-nowrap">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setImportOpen(true)}
+                className="inline-flex h-8 items-center gap-1.5 rounded-md bg-danger px-2.5 text-[11px] font-bold text-white transition hover:opacity-90"
+              >
+                <Icon icon="mdi:upload" className="h-3.5 w-3.5" /> Import CSV
+              </button>
+              <button
+                type="button"
+                onClick={() => setAppointOpen(true)}
+                className="inline-flex h-8 items-center gap-1.5 rounded-md bg-danger px-2.5 text-[11px] font-bold text-white transition hover:opacity-90"
+              >
+                <Icon icon="mdi:plus" className="h-3.5 w-3.5" /> Appoint
+              </button>
+            </div>
+          </div>
+
           <LeadersTable
             key={tab}
             rows={roles}
@@ -1019,7 +1036,7 @@ function ImportDialog({
 
         <div className="space-y-3">
           <div className="rounded-lg border border-dashed border-border bg-bg-2 p-5 text-center">
-            <Upload className="mx-auto mb-2 h-6 w-6 text-text-3" />
+            <Icon icon="mdi:upload" className="mx-auto mb-2 h-6 w-6 text-text-3" />
             <p className="mb-3 text-[11px] text-text-3">
               {loading ? "Processing…" : "Choose a CSV file to upload"}
             </p>

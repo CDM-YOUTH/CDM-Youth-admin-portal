@@ -9,46 +9,41 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as PortalRouteImport } from './routes/portal'
-import { Route as LoginRouteImport } from './routes/login'
-import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as PortalIndexRouteImport } from './routes/portal.index'
+import { Route as AdminRouteImport } from './routes/admin'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as PortalRouteImport } from './routes/portal'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
-import { Route as PortalFormationRouteImport } from './routes/portal.formation'
-import { Route as PortalEventsRouteImport } from './routes/portal.events'
-import { Route as PortalEnrollRouteImport } from './routes/portal.enroll'
-import { Route as PortalAuthRouteImport } from './routes/portal.auth'
-import { Route as PortalAccountRouteImport } from './routes/portal.account'
-import { Route as CheckinEventIdRouteImport } from './routes/checkin.$eventId'
-import { Route as AdminYouthsRouteImport } from './routes/admin.youths'
-import { Route as AdminWelfareRouteImport } from './routes/admin.welfare'
-import { Route as AdminUsersRouteImport } from './routes/admin.users'
-import { Route as AdminUniformsRouteImport } from './routes/admin.uniforms'
-import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
-import { Route as AdminReportsRouteImport } from './routes/admin.reports'
-import { Route as AdminMissionRouteImport } from './routes/admin.mission'
-import { Route as AdminLeadersRouteImport } from './routes/admin.leaders'
-import { Route as AdminFormationRouteImport } from './routes/admin.formation'
-import { Route as AdminEventsRouteImport } from './routes/admin.events'
-import { Route as AdminEnrollmentRouteImport } from './routes/admin.enrollment'
-import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
-import { Route as AdminCusaRouteImport } from './routes/admin.cusa'
 import { Route as AdminAuditRouteImport } from './routes/admin.audit'
-import { Route as PortalEventsEventIdRouteImport } from './routes/portal.events.$eventId'
-import { Route as ApiSheetsLeadershipRouteImport } from './routes/api/sheets/leadership'
-import { Route as ApiSheetsErrorsRouteImport } from './routes/api/sheets/errors'
-import { Route as AdminEventEventIdRouteImport } from './routes/admin.event.$eventId'
+import { Route as AdminCusaRouteImport } from './routes/admin.cusa'
+import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
+import { Route as AdminEnrollmentRouteImport } from './routes/admin.enrollment'
+import { Route as AdminEventsRouteImport } from './routes/admin.events'
+import { Route as AdminFormationRouteImport } from './routes/admin.formation'
+import { Route as AdminLeadersRouteImport } from './routes/admin.leaders'
+import { Route as AdminMissionRouteImport } from './routes/admin.mission'
+import { Route as AdminReportsRouteImport } from './routes/admin.reports'
+import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
+import { Route as AdminUniformsRouteImport } from './routes/admin.uniforms'
+import { Route as AdminUsersRouteImport } from './routes/admin.users'
+import { Route as AdminWelfareRouteImport } from './routes/admin.welfare'
+import { Route as AdminYouthsRouteImport } from './routes/admin.youths'
+import { Route as CheckinEventIdRouteImport } from './routes/checkin.$eventId'
+import { Route as PortalIndexRouteImport } from './routes/portal.index'
+import { Route as PortalAccountRouteImport } from './routes/portal.account'
+import { Route as PortalAuthRouteImport } from './routes/portal.auth'
+import { Route as PortalEnrollRouteImport } from './routes/portal.enroll'
+import { Route as PortalEventsRouteImport } from './routes/portal.events'
+import { Route as PortalFormationRouteImport } from './routes/portal.formation'
 import { Route as AdminEventCheckinEventIdRouteImport } from './routes/admin.event-checkin.$eventId'
+import { Route as AdminEventEventIdRouteImport } from './routes/admin.event.$eventId'
+import { Route as ApiSheetsErrorsRouteImport } from './routes/api/sheets/errors'
+import { Route as ApiSheetsLeadershipRouteImport } from './routes/api/sheets/leadership'
+import { Route as PortalEventsEventIdRouteImport } from './routes/portal.events.$eventId'
 
-const PortalRoute = PortalRouteImport.update({
-  id: '/portal',
-  path: '/portal',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminRoute = AdminRouteImport.update({
@@ -56,114 +51,19 @@ const AdminRoute = AdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PortalIndexRoute = PortalIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => PortalRoute,
+const PortalRoute = PortalRouteImport.update({
+  id: '/portal',
+  path: '/portal',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => AdminRoute,
-} as any)
-const PortalFormationRoute = PortalFormationRouteImport.update({
-  id: '/formation',
-  path: '/formation',
-  getParentRoute: () => PortalRoute,
-} as any)
-const PortalEventsRoute = PortalEventsRouteImport.update({
-  id: '/events',
-  path: '/events',
-  getParentRoute: () => PortalRoute,
-} as any)
-const PortalEnrollRoute = PortalEnrollRouteImport.update({
-  id: '/enroll',
-  path: '/enroll',
-  getParentRoute: () => PortalRoute,
-} as any)
-const PortalAuthRoute = PortalAuthRouteImport.update({
-  id: '/auth',
-  path: '/auth',
-  getParentRoute: () => PortalRoute,
-} as any)
-const PortalAccountRoute = PortalAccountRouteImport.update({
-  id: '/account',
-  path: '/account',
-  getParentRoute: () => PortalRoute,
-} as any)
-const CheckinEventIdRoute = CheckinEventIdRouteImport.update({
-  id: '/checkin/$eventId',
-  path: '/checkin/$eventId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdminYouthsRoute = AdminYouthsRouteImport.update({
-  id: '/youths',
-  path: '/youths',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminWelfareRoute = AdminWelfareRouteImport.update({
-  id: '/welfare',
-  path: '/welfare',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminUsersRoute = AdminUsersRouteImport.update({
-  id: '/users',
-  path: '/users',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminUniformsRoute = AdminUniformsRouteImport.update({
-  id: '/uniforms',
-  path: '/uniforms',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminSettingsRoute = AdminSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminReportsRoute = AdminReportsRouteImport.update({
-  id: '/reports',
-  path: '/reports',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminMissionRoute = AdminMissionRouteImport.update({
-  id: '/mission',
-  path: '/mission',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminLeadersRoute = AdminLeadersRouteImport.update({
-  id: '/leaders',
-  path: '/leaders',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminFormationRoute = AdminFormationRouteImport.update({
-  id: '/formation',
-  path: '/formation',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminEventsRoute = AdminEventsRouteImport.update({
-  id: '/events',
-  path: '/events',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminEnrollmentRoute = AdminEnrollmentRouteImport.update({
-  id: '/enrollment',
-  path: '/enrollment',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminDashboardRoute = AdminDashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminCusaRoute = AdminCusaRouteImport.update({
-  id: '/cusa',
-  path: '/cusa',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminAuditRoute = AdminAuditRouteImport.update({
@@ -171,25 +71,105 @@ const AdminAuditRoute = AdminAuditRouteImport.update({
   path: '/audit',
   getParentRoute: () => AdminRoute,
 } as any)
-const PortalEventsEventIdRoute = PortalEventsEventIdRouteImport.update({
-  id: '/$eventId',
-  path: '/$eventId',
-  getParentRoute: () => PortalEventsRoute,
-} as any)
-const ApiSheetsLeadershipRoute = ApiSheetsLeadershipRouteImport.update({
-  id: '/api/sheets/leadership',
-  path: '/api/sheets/leadership',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ApiSheetsErrorsRoute = ApiSheetsErrorsRouteImport.update({
-  id: '/api/sheets/errors',
-  path: '/api/sheets/errors',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdminEventEventIdRoute = AdminEventEventIdRouteImport.update({
-  id: '/event/$eventId',
-  path: '/event/$eventId',
+const AdminCusaRoute = AdminCusaRouteImport.update({
+  id: '/cusa',
+  path: '/cusa',
   getParentRoute: () => AdminRoute,
+} as any)
+const AdminDashboardRoute = AdminDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminEnrollmentRoute = AdminEnrollmentRouteImport.update({
+  id: '/enrollment',
+  path: '/enrollment',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminEventsRoute = AdminEventsRouteImport.update({
+  id: '/events',
+  path: '/events',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminFormationRoute = AdminFormationRouteImport.update({
+  id: '/formation',
+  path: '/formation',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminLeadersRoute = AdminLeadersRouteImport.update({
+  id: '/leaders',
+  path: '/leaders',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminMissionRoute = AdminMissionRouteImport.update({
+  id: '/mission',
+  path: '/mission',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminReportsRoute = AdminReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSettingsRoute = AdminSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminUniformsRoute = AdminUniformsRouteImport.update({
+  id: '/uniforms',
+  path: '/uniforms',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminUsersRoute = AdminUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminWelfareRoute = AdminWelfareRouteImport.update({
+  id: '/welfare',
+  path: '/welfare',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminYouthsRoute = AdminYouthsRouteImport.update({
+  id: '/youths',
+  path: '/youths',
+  getParentRoute: () => AdminRoute,
+} as any)
+const CheckinEventIdRoute = CheckinEventIdRouteImport.update({
+  id: '/checkin/$eventId',
+  path: '/checkin/$eventId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PortalIndexRoute = PortalIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => PortalRoute,
+} as any)
+const PortalAccountRoute = PortalAccountRouteImport.update({
+  id: '/account',
+  path: '/account',
+  getParentRoute: () => PortalRoute,
+} as any)
+const PortalAuthRoute = PortalAuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => PortalRoute,
+} as any)
+const PortalEnrollRoute = PortalEnrollRouteImport.update({
+  id: '/enroll',
+  path: '/enroll',
+  getParentRoute: () => PortalRoute,
+} as any)
+const PortalEventsRoute = PortalEventsRouteImport.update({
+  id: '/events',
+  path: '/events',
+  getParentRoute: () => PortalRoute,
+} as any)
+const PortalFormationRoute = PortalFormationRouteImport.update({
+  id: '/formation',
+  path: '/formation',
+  getParentRoute: () => PortalRoute,
 } as any)
 const AdminEventCheckinEventIdRoute =
   AdminEventCheckinEventIdRouteImport.update({
@@ -197,6 +177,26 @@ const AdminEventCheckinEventIdRoute =
     path: '/event-checkin/$eventId',
     getParentRoute: () => AdminRoute,
   } as any)
+const AdminEventEventIdRoute = AdminEventEventIdRouteImport.update({
+  id: '/event/$eventId',
+  path: '/event/$eventId',
+  getParentRoute: () => AdminRoute,
+} as any)
+const ApiSheetsErrorsRoute = ApiSheetsErrorsRouteImport.update({
+  id: '/api/sheets/errors',
+  path: '/api/sheets/errors',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSheetsLeadershipRoute = ApiSheetsLeadershipRouteImport.update({
+  id: '/api/sheets/leadership',
+  path: '/api/sheets/leadership',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PortalEventsEventIdRoute = PortalEventsEventIdRouteImport.update({
+  id: '/$eventId',
+  path: '/$eventId',
+  getParentRoute: () => PortalEventsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -408,18 +408,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/portal': {
-      id: '/portal'
-      path: '/portal'
-      fullPath: '/portal'
-      preLoaderRoute: typeof PortalRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin': {
@@ -429,158 +422,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/portal/': {
-      id: '/portal/'
-      path: '/'
-      fullPath: '/portal/'
-      preLoaderRoute: typeof PortalIndexRouteImport
-      parentRoute: typeof PortalRoute
+    '/portal': {
+      id: '/portal'
+      path: '/portal'
+      fullPath: '/portal'
+      preLoaderRoute: typeof PortalRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/admin/': {
       id: '/admin/'
       path: '/'
       fullPath: '/admin/'
       preLoaderRoute: typeof AdminIndexRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/portal/formation': {
-      id: '/portal/formation'
-      path: '/formation'
-      fullPath: '/portal/formation'
-      preLoaderRoute: typeof PortalFormationRouteImport
-      parentRoute: typeof PortalRoute
-    }
-    '/portal/events': {
-      id: '/portal/events'
-      path: '/events'
-      fullPath: '/portal/events'
-      preLoaderRoute: typeof PortalEventsRouteImport
-      parentRoute: typeof PortalRoute
-    }
-    '/portal/enroll': {
-      id: '/portal/enroll'
-      path: '/enroll'
-      fullPath: '/portal/enroll'
-      preLoaderRoute: typeof PortalEnrollRouteImport
-      parentRoute: typeof PortalRoute
-    }
-    '/portal/auth': {
-      id: '/portal/auth'
-      path: '/auth'
-      fullPath: '/portal/auth'
-      preLoaderRoute: typeof PortalAuthRouteImport
-      parentRoute: typeof PortalRoute
-    }
-    '/portal/account': {
-      id: '/portal/account'
-      path: '/account'
-      fullPath: '/portal/account'
-      preLoaderRoute: typeof PortalAccountRouteImport
-      parentRoute: typeof PortalRoute
-    }
-    '/checkin/$eventId': {
-      id: '/checkin/$eventId'
-      path: '/checkin/$eventId'
-      fullPath: '/checkin/$eventId'
-      preLoaderRoute: typeof CheckinEventIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/admin/youths': {
-      id: '/admin/youths'
-      path: '/youths'
-      fullPath: '/admin/youths'
-      preLoaderRoute: typeof AdminYouthsRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/welfare': {
-      id: '/admin/welfare'
-      path: '/welfare'
-      fullPath: '/admin/welfare'
-      preLoaderRoute: typeof AdminWelfareRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/users': {
-      id: '/admin/users'
-      path: '/users'
-      fullPath: '/admin/users'
-      preLoaderRoute: typeof AdminUsersRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/uniforms': {
-      id: '/admin/uniforms'
-      path: '/uniforms'
-      fullPath: '/admin/uniforms'
-      preLoaderRoute: typeof AdminUniformsRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/settings': {
-      id: '/admin/settings'
-      path: '/settings'
-      fullPath: '/admin/settings'
-      preLoaderRoute: typeof AdminSettingsRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/reports': {
-      id: '/admin/reports'
-      path: '/reports'
-      fullPath: '/admin/reports'
-      preLoaderRoute: typeof AdminReportsRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/mission': {
-      id: '/admin/mission'
-      path: '/mission'
-      fullPath: '/admin/mission'
-      preLoaderRoute: typeof AdminMissionRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/leaders': {
-      id: '/admin/leaders'
-      path: '/leaders'
-      fullPath: '/admin/leaders'
-      preLoaderRoute: typeof AdminLeadersRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/formation': {
-      id: '/admin/formation'
-      path: '/formation'
-      fullPath: '/admin/formation'
-      preLoaderRoute: typeof AdminFormationRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/events': {
-      id: '/admin/events'
-      path: '/events'
-      fullPath: '/admin/events'
-      preLoaderRoute: typeof AdminEventsRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/enrollment': {
-      id: '/admin/enrollment'
-      path: '/enrollment'
-      fullPath: '/admin/enrollment'
-      preLoaderRoute: typeof AdminEnrollmentRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/dashboard': {
-      id: '/admin/dashboard'
-      path: '/dashboard'
-      fullPath: '/admin/dashboard'
-      preLoaderRoute: typeof AdminDashboardRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/cusa': {
-      id: '/admin/cusa'
-      path: '/cusa'
-      fullPath: '/admin/cusa'
-      preLoaderRoute: typeof AdminCusaRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/audit': {
@@ -590,26 +450,152 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAuditRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/portal/events/$eventId': {
-      id: '/portal/events/$eventId'
-      path: '/$eventId'
-      fullPath: '/portal/events/$eventId'
-      preLoaderRoute: typeof PortalEventsEventIdRouteImport
-      parentRoute: typeof PortalEventsRoute
+    '/admin/cusa': {
+      id: '/admin/cusa'
+      path: '/cusa'
+      fullPath: '/admin/cusa'
+      preLoaderRoute: typeof AdminCusaRouteImport
+      parentRoute: typeof AdminRoute
     }
-    '/api/sheets/leadership': {
-      id: '/api/sheets/leadership'
-      path: '/api/sheets/leadership'
-      fullPath: '/api/sheets/leadership'
-      preLoaderRoute: typeof ApiSheetsLeadershipRouteImport
+    '/admin/dashboard': {
+      id: '/admin/dashboard'
+      path: '/dashboard'
+      fullPath: '/admin/dashboard'
+      preLoaderRoute: typeof AdminDashboardRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/enrollment': {
+      id: '/admin/enrollment'
+      path: '/enrollment'
+      fullPath: '/admin/enrollment'
+      preLoaderRoute: typeof AdminEnrollmentRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/events': {
+      id: '/admin/events'
+      path: '/events'
+      fullPath: '/admin/events'
+      preLoaderRoute: typeof AdminEventsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/formation': {
+      id: '/admin/formation'
+      path: '/formation'
+      fullPath: '/admin/formation'
+      preLoaderRoute: typeof AdminFormationRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/leaders': {
+      id: '/admin/leaders'
+      path: '/leaders'
+      fullPath: '/admin/leaders'
+      preLoaderRoute: typeof AdminLeadersRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/mission': {
+      id: '/admin/mission'
+      path: '/mission'
+      fullPath: '/admin/mission'
+      preLoaderRoute: typeof AdminMissionRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/reports': {
+      id: '/admin/reports'
+      path: '/reports'
+      fullPath: '/admin/reports'
+      preLoaderRoute: typeof AdminReportsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/settings': {
+      id: '/admin/settings'
+      path: '/settings'
+      fullPath: '/admin/settings'
+      preLoaderRoute: typeof AdminSettingsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/uniforms': {
+      id: '/admin/uniforms'
+      path: '/uniforms'
+      fullPath: '/admin/uniforms'
+      preLoaderRoute: typeof AdminUniformsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/users': {
+      id: '/admin/users'
+      path: '/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminUsersRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/welfare': {
+      id: '/admin/welfare'
+      path: '/welfare'
+      fullPath: '/admin/welfare'
+      preLoaderRoute: typeof AdminWelfareRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/youths': {
+      id: '/admin/youths'
+      path: '/youths'
+      fullPath: '/admin/youths'
+      preLoaderRoute: typeof AdminYouthsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/checkin/$eventId': {
+      id: '/checkin/$eventId'
+      path: '/checkin/$eventId'
+      fullPath: '/checkin/$eventId'
+      preLoaderRoute: typeof CheckinEventIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/sheets/errors': {
-      id: '/api/sheets/errors'
-      path: '/api/sheets/errors'
-      fullPath: '/api/sheets/errors'
-      preLoaderRoute: typeof ApiSheetsErrorsRouteImport
-      parentRoute: typeof rootRouteImport
+    '/portal/': {
+      id: '/portal/'
+      path: '/'
+      fullPath: '/portal/'
+      preLoaderRoute: typeof PortalIndexRouteImport
+      parentRoute: typeof PortalRoute
+    }
+    '/portal/account': {
+      id: '/portal/account'
+      path: '/account'
+      fullPath: '/portal/account'
+      preLoaderRoute: typeof PortalAccountRouteImport
+      parentRoute: typeof PortalRoute
+    }
+    '/portal/auth': {
+      id: '/portal/auth'
+      path: '/auth'
+      fullPath: '/portal/auth'
+      preLoaderRoute: typeof PortalAuthRouteImport
+      parentRoute: typeof PortalRoute
+    }
+    '/portal/enroll': {
+      id: '/portal/enroll'
+      path: '/enroll'
+      fullPath: '/portal/enroll'
+      preLoaderRoute: typeof PortalEnrollRouteImport
+      parentRoute: typeof PortalRoute
+    }
+    '/portal/events': {
+      id: '/portal/events'
+      path: '/events'
+      fullPath: '/portal/events'
+      preLoaderRoute: typeof PortalEventsRouteImport
+      parentRoute: typeof PortalRoute
+    }
+    '/portal/formation': {
+      id: '/portal/formation'
+      path: '/formation'
+      fullPath: '/portal/formation'
+      preLoaderRoute: typeof PortalFormationRouteImport
+      parentRoute: typeof PortalRoute
+    }
+    '/admin/event-checkin/$eventId': {
+      id: '/admin/event-checkin/$eventId'
+      path: '/event-checkin/$eventId'
+      fullPath: '/admin/event-checkin/$eventId'
+      preLoaderRoute: typeof AdminEventCheckinEventIdRouteImport
+      parentRoute: typeof AdminRoute
     }
     '/admin/event/$eventId': {
       id: '/admin/event/$eventId'
@@ -618,12 +604,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminEventEventIdRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/event-checkin/$eventId': {
-      id: '/admin/event-checkin/$eventId'
-      path: '/event-checkin/$eventId'
-      fullPath: '/admin/event-checkin/$eventId'
-      preLoaderRoute: typeof AdminEventCheckinEventIdRouteImport
-      parentRoute: typeof AdminRoute
+    '/api/sheets/errors': {
+      id: '/api/sheets/errors'
+      path: '/api/sheets/errors'
+      fullPath: '/api/sheets/errors'
+      preLoaderRoute: typeof ApiSheetsErrorsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/sheets/leadership': {
+      id: '/api/sheets/leadership'
+      path: '/api/sheets/leadership'
+      fullPath: '/api/sheets/leadership'
+      preLoaderRoute: typeof ApiSheetsLeadershipRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/portal/events/$eventId': {
+      id: '/portal/events/$eventId'
+      path: '/$eventId'
+      fullPath: '/portal/events/$eventId'
+      preLoaderRoute: typeof PortalEventsEventIdRouteImport
+      parentRoute: typeof PortalEventsRoute
     }
   }
 }
