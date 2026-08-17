@@ -45,7 +45,7 @@ export function CardBody({
   children: ReactNode;
   className?: string;
 }) {
-  return <div className={`px-3.5 py-3 ${className}`}>{children}</div>;
+  return <div className={`overflow-auto px-3.5 py-3 ${className}`}>{children}</div>;
 }
 
 /* ---------- KPI ---------- */

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Download, Filter, Plus, Search, Upload, X } from "lucide-react";
+import { Filter, Search, X } from "lucide-react";
+import { Icon } from "@iconify/react";
 
 /* ---------- Generic chrome ---------- */
 
@@ -146,7 +147,7 @@ export function TableToolbar({
             onClick={onImport}
             className="inline-flex h-8 items-center gap-1.5 rounded-md bg-danger px-2.5 text-[11px] font-bold text-white transition hover:opacity-90"
           >
-            <Upload className="h-3.5 w-3.5" /> Import
+            <Icon icon="mdi:upload" className="h-3.5 w-3.5" /> Import
           </button>
         )}
         {onExport && (
@@ -155,7 +156,7 @@ export function TableToolbar({
             onClick={onExport}
             className="inline-flex h-8 items-center gap-1.5 rounded-md bg-danger px-2.5 text-[11px] font-bold text-white transition hover:opacity-90"
           >
-            <Download className="h-3.5 w-3.5" /> Export
+            <Icon icon="mdi:download" className="h-3.5 w-3.5" /> Export
           </button>
         )}
         {onAdd && (
@@ -164,7 +165,7 @@ export function TableToolbar({
             onClick={onAdd}
             className="inline-flex h-8 items-center gap-1.5 rounded-md bg-danger px-3 text-[11px] font-bold text-primary-foreground transition hover:opacity-90"
           >
-            <Plus className="h-3.5 w-3.5" /> {addLabel}
+            <Icon icon="mdi:plus" className="h-3.5 w-3.5" /> {addLabel}
           </button>
         )}
       </div>

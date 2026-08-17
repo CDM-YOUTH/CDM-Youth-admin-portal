@@ -1,0 +1,9 @@
+Host cs.musical-space-disco-7v9qjvqrp6pvcpq7x.main
+	User codespace
+	ProxyCommand /usr/bin/gh cs ssh -c musical-space-disco-7v9qjvqrp6pvcpq7x --stdio -- -i /home/codespace/.ssh/codespaces.auto
+	UserKnownHostsFile=/dev/null
+	StrictHostKeyChecking no
+	LogLevel quiet
+	ControlMaster auto
+	IdentityFile /home/codespace/.ssh/codespaces.auto
+

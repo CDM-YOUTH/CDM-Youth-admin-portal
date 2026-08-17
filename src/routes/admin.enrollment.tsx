@@ -7,7 +7,8 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { toast } from "sonner";
-import { Download, MoreVertical, Trash2, BadgeCheck, Clock, Plus } from "lucide-react";
+import { MoreVertical, Trash2, BadgeCheck, Clock } from "lucide-react";
+import { Icon } from "@iconify/react";
 import { type PagedResponse } from "@/lib/api/fetch-api";
 import { Topbar } from "@/components/admin/layout/topbar";
 import { Card, CardBody, Pill } from "@/components/admin/composables/ui-bits";
@@ -348,7 +349,7 @@ function EnrollmentPage() {
               onClick={() => setAddOpen(true)}
               className="inline-flex h-8 items-center gap-1.5 rounded-md bg-danger px-3 text-[11px] font-bold text-white transition hover:opacity-90"
             >
-              <Plus className="h-3.5 w-3.5" /> Enroll Youth
+              <Icon icon="mdi:plus" className="h-3.5 w-3.5" /> Enroll Youth
             </button>
           </>
         }
@@ -372,7 +373,7 @@ function EnrollmentPage() {
                 className="inline-flex h-8 items-center gap-1.5 rounded-md bg-danger px-2.5 text-[11px] font-bold text-white transition hover:opacity-90"
                 title="Download Excel import sample"
               >
-                <Download className="h-3.5 w-3.5" /> Import Sample
+                <Icon icon="mdi:download" className="h-3.5 w-3.5" /> Import Sample
               </button>
             }
           />

@@ -81,7 +81,7 @@ function DashboardPage() {
         title="Dashboard"
         tabs={
           <>
-          <TopbarTab active={tab === "general"} onClick={() => setTab("general")}>
+            <TopbarTab active={tab === "general"} onClick={() => setTab("general")}>
               General
             </TopbarTab>
             <TopbarTab active={tab === "leaders"} onClick={() => setTab("leaders")}>
@@ -99,10 +99,9 @@ function DashboardPage() {
           </>
         }
         action={
-          <>
+          <div className="flex items-center gap-2">
             <ChartDisplayToggle value={chartDisplay} onChange={setChartDisplay} />
-            <TopbarButton>Export Report</TopbarButton>
-          </>
+          </div>
         }
       />
 
