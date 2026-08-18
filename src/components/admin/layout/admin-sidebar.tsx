@@ -13,7 +13,6 @@ import {
   BarChart3,
   Settings,
   Shield,
-  ClipboardList,
   PanelLeftClose,
   PanelLeftOpen,
   Crown,
@@ -22,11 +21,13 @@ import type { LucideIcon } from "lucide-react";
 import { useSidebar } from "./sidebar-context";
 import { supabase } from "@/integrations/supabase/client";
 import { getMyProfile } from "@/lib/db/youth-records/profiles";
+import { useModuleAccess } from "@/lib/hooks/use-module-access";
 
 type NavItem = {
   to: string;
   label: string;
   icon: LucideIcon;
+  module: string;
   badge?: { text: string; tone: "danger" | "gold" | "info" };
 };
 
@@ -35,23 +36,27 @@ type NavGroup = { label: string; items: NavItem[] };
 const GROUPS: NavGroup[] = [
   {
     label: "Overview",
-    items: [{ to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard }],
+    items: [
+      { to: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard, module: "dashboard" },
+    ],
   },
   {
     label: "Youth",
     items: [
-      { to: "/admin/youths", label: "Youth Records", icon: Users },
+      { to: "/admin/youths", label: "Youth Records", icon: Users, module: "youths" },
       {
         to: "/admin/enrollment",
         label: "Enrollment",
         icon: UserPlus,
+        module: "enrollment",
         // badge: { text: "", tone: "danger" },
       },
-      { to: "/admin/leaders", label: "Leaders", icon: Crown },
+      { to: "/admin/leaders", label: "Leaders", icon: Crown, module: "leaders" },
       {
         to: "/admin/cusa",
         label: "CUSA",
         icon: GraduationCap,
+        module: "cusa",
         // badge: { text: "312", tone: "info" },
       },
     ],
@@ -59,37 +64,38 @@ const GROUPS: NavGroup[] = [
   {
     label: "Activities",
     items: [
-      { to: "/admin/events", label: "Events", icon: Calendar },
+      { to: "/admin/events", label: "Events", icon: Calendar, module: "events" },
       {
         to: "/admin/mission",
         label: "Mission Week",
         icon: Compass,
+        module: "mission",
         badge: { text: "Active", tone: "gold" },
       },
     ],
   },
-  // {
-  //   label: "Pastoral",
-  //   items: [
-  //     { to: "/admin/formation", label: "Formation", icon: BookOpen },
-  //     {
-  //       to: "/admin/welfare",
-  //       label: "Welfare",
-  //       icon: HeartPulse,
-  //       badge: { text: "5", tone: "danger" },
-  //     },
-  //     { to: "/admin/uniforms", label: "Uniforms", icon: Shirt },
-  //   ],
-  // },
-  // {
-  //   label: "Admin",
-  //   items: [
-  //     { to: "/admin/reports", label: "Reports", icon: BarChart3 },
-  //     { to: "/admin/users", label: "User Mgmt", icon: Shield },
-  //     { to: "/admin/audit", label: "Audit Log", icon: ClipboardList },
-  //     { to: "/admin/settings", label: "Settings", icon: Settings },
-  //   ],
-  // },
+  {
+    label: "Pastoral",
+    items: [
+      { to: "/admin/formation", label: "Formation", icon: BookOpen, module: "formation" },
+      {
+        to: "/admin/welfare",
+        label: "Welfare",
+        icon: HeartPulse,
+        module: "welfare",
+        badge: { text: "5", tone: "danger" },
+      },
+      { to: "/admin/uniforms", label: "Uniforms", icon: Shirt, module: "uniforms" },
+    ],
+  },
+  {
+    label: "Admin",
+    items: [
+      { to: "/admin/reports", label: "Reports", icon: BarChart3, module: "reports" },
+      { to: "/admin/users", label: "User Mgmt", icon: Shield, module: "users" },
+      { to: "/admin/settings", label: "Settings", icon: Settings, module: "settings" },
+    ],
+  },
 ];
 
 function Badge({
@@ -109,8 +115,7 @@ function Badge({
         : "bg-success-soft text-success border border-success/30";
   if (collapsed) {
     // Tiny dot indicator in icon-only mode
-    const dot =
-      tone === "danger" ? "bg-danger" : tone === "gold" ? "bg-gold" : "bg-success";
+    const dot = tone === "danger" ? "bg-danger" : tone === "gold" ? "bg-gold" : "bg-success";
     return (
       <span
         className={`absolute right-1 top-1 h-1.5 w-1.5 rounded-full ${dot}`}
@@ -141,7 +146,9 @@ export function AdminSidebar() {
   const { data: me } = useQuery({
     queryKey: ["current-user"],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return null;
       const profile = await getMyProfile().catch(() => null);
       const name = profile?.full_name || user.email || "";
@@ -154,6 +161,12 @@ export function AdminSidebar() {
   const displayName = me?.name || "—";
   const subtitle = me?.position || me?.email || "";
   const width = collapsed ? "w-[60px]" : "w-[220px]";
+
+  const { data: access = {} } = useModuleAccess();
+  const visibleGroups = GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => access[item.module]?.canView),
+  })).filter((group) => group.items.length > 0);
 
   return (
     <aside
@@ -184,15 +197,12 @@ export function AdminSidebar() {
             )}
           </button>
         </div>
-        {GROUPS.map((group) => (
+        {visibleGroups.map((group) => (
           <div key={group.label} className="mb-1">
-            {!collapsed && (
-              <div className="label-eyebrow px-2 pb-1 pt-2.5">{group.label}</div>
-            )}
+            {!collapsed && <div className="label-eyebrow px-2 pb-1 pt-2.5">{group.label}</div>}
             {collapsed && <div className="my-2 h-px bg-border/60" />}
             {group.items.map((item) => {
-              const isActive =
-                pathname === item.to || pathname.startsWith(item.to + "/");
+              const isActive = pathname === item.to || pathname.startsWith(item.to + "/");
               const Icon = item.icon;
               return (
                 <Link
@@ -200,9 +210,7 @@ export function AdminSidebar() {
                   to={item.to}
                   title={collapsed ? item.label : undefined}
                   className={`relative mb-[2px] flex items-center rounded-lg text-[12px] font-bold transition-colors ${
-                    collapsed
-                      ? "h-9 justify-center"
-                      : "gap-2.5 px-2.5 py-[7px]"
+                    collapsed ? "h-9 justify-center" : "gap-2.5 px-2.5 py-[7px]"
                   } ${
                     isActive
                       ? "bg-accent font-bold text-danger"
@@ -235,9 +243,7 @@ export function AdminSidebar() {
           <>
             <div className="min-w-0 flex-1 leading-tight">
               <div className="truncate text-[10px] font-semibold text-text-1">{displayName}</div>
-              {subtitle && (
-                <div className="truncate text-[9px] text-text-3">{subtitle}</div>
-              )}
+              {subtitle && <div className="truncate text-[9px] text-text-3">{subtitle}</div>}
             </div>
             <span className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-success" />
           </>

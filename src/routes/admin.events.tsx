@@ -20,7 +20,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
+import { Icon } from "@iconify/react";
 import { EventTabsForm } from "@/components/admin/events/event-tabs-form";
 import { createEvent, deleteEvent, getEventsAnalytics, listEventsPaged, type EventRow } from "@/lib/db/activities/events";
 import { fetchOrg } from "@/lib/db/org";
@@ -419,7 +420,7 @@ export function RepeatingRows({
         onClick={add}
         className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-border bg-bg-3 px-3 py-2 text-[11px] font-bold text-text-2 hover:border-gold-3 hover:text-gold"
       >
-        <Plus className="h-3.5 w-3.5" /> Add another {itemLabel}
+        <Icon icon="mdi:plus" className="h-3.5 w-3.5" /> Add another {itemLabel}
       </button>
     </div>
   );
