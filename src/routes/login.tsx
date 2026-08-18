@@ -27,6 +27,31 @@ function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [resetting, setResetting] = useState(false);
+
+  const handleForgotPassword = async () => {
+    setError(null);
+    setMessage(null);
+    if (!email) {
+      setError("Enter your email address above first, then click Forgot your password.");
+      return;
+    }
+    setResetting(true);
+    try {
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/set-password`,
+      });
+      if (resetError) throw resetError;
+      setMessage("Password reset email sent — check your inbox.");
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Could not send reset email. Please try again.",
+      );
+    } finally {
+      setResetting(false);
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,8 +78,7 @@ function LoginPage() {
       <div
         className="relative hidden flex-col items-center justify-center p-12 lg:flex lg:w-[45%]"
         style={{
-          background:
-            "linear-gradient(155deg, var(--color-danger) 0%, var(--color-gold-3) 100%)",
+          background: "linear-gradient(155deg, var(--color-danger) 0%, var(--color-gold-3) 100%)",
         }}
       >
         {/* Decorative circles */}
@@ -187,6 +211,12 @@ function LoginPage() {
               </div>
             )}
 
+            {message && (
+              <div className="rounded-lg border border-success/30 bg-success-soft px-3.5 py-2.5 text-[12px] font-medium text-success">
+                {message}
+              </div>
+            )}
+
             <button
               type="submit"
               disabled={loading}
@@ -199,9 +229,11 @@ function LoginPage() {
           <div className="mt-5 text-center">
             <button
               type="button"
-              className="text-[11px] text-text-3 transition-colors hover:text-gold"
+              onClick={handleForgotPassword}
+              disabled={resetting}
+              className="text-[11px] text-text-3 transition-colors hover:text-gold disabled:opacity-60"
             >
-              Forgot your password?
+              {resetting ? "Sending…" : "Forgot your password?"}
             </button>
           </div>
 

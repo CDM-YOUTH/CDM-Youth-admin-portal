@@ -4,10 +4,16 @@ import { supabase } from "@/integrations/supabase/client";
 export type UserScope = {
   deaneryId: string | null;
   parishId: string | null;
+  outstationId: string | null;
   role: string | null;
 };
 
-export const emptyScope: UserScope = { deaneryId: null, parishId: null, role: null };
+export const emptyScope: UserScope = {
+  deaneryId: null,
+  parishId: null,
+  outstationId: null,
+  role: null,
+};
 
 export const AdminScopeCtx = createContext<UserScope>(emptyScope);
 
@@ -18,18 +24,27 @@ export function useAdminScope(): UserScope {
 
 /** Fetch the logged-in user's scope from their profile. Called once by the admin layout. */
 export async function fetchMyScope(): Promise<UserScope> {
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) return emptyScope;
 
-  const { data } = await (supabase as any)
-    .from("profiles")
-    .select("deanery_id, parish_id, user_roles(role)")
-    .eq("id", user.id)
-    .maybeSingle();
+  // Two flat queries, not a nested `user_roles(role)` embed — there's no direct FK
+  // between profiles and user_roles (both independently reference auth.users(id)),
+  // so PostgREST can't resolve that embed and it silently returns null.
+  const [{ data: profile }, { data: roleRow }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("deanery_id, parish_id, outstation_id")
+      .eq("id", user.id)
+      .maybeSingle(),
+    supabase.from("user_roles").select("role").eq("user_id", user.id).maybeSingle(),
+  ]);
 
   return {
-    deaneryId: data?.deanery_id ?? null,
-    parishId:  data?.parish_id  ?? null,
-    role:      (data?.user_roles as { role: string }[] | null)?.[0]?.role ?? null,
+    deaneryId: profile?.deanery_id ?? null,
+    parishId: profile?.parish_id ?? null,
+    outstationId: profile?.outstation_id ?? null,
+    role: roleRow?.role ?? null,
   };
 }

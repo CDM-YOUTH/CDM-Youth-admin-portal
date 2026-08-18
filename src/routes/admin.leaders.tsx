@@ -9,7 +9,10 @@ import { toast } from "sonner";
 import { History, MoreVertical } from "lucide-react";
 import { Icon } from "@iconify/react";
 import { type PagedResponse } from "@/lib/api/fetch-api";
-import { YouthSearchInput, type PickedYouth } from "@/components/admin/composables/pickers/youth-search-input";
+import {
+  YouthSearchInput,
+  type PickedYouth,
+} from "@/components/admin/composables/pickers/youth-search-input";
 import { Topbar, TopbarButton, TopbarTab } from "@/components/admin/layout/topbar";
 import { Card, CardBody } from "@/components/admin/composables/ui-bits";
 import { TablePagination } from "@/components/admin/composables/tables/table-pagination";
@@ -45,7 +48,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { fetchOrg, type OrgTree } from "@/lib/db/org";
 import { useAdminScope } from "@/lib/hooks/use-admin-scope";
 import {
@@ -67,9 +76,9 @@ import {
 import { AddYouthDialog, type AddYouthResult } from "@/components/admin/youth/add-youth-dialog";
 
 const leadersSearchSchema = z.object({
-  q:             fallback(z.string(), "").default(""),
-  deanery_id:    fallback(z.string(), "").default(""),
-  parish_id:     fallback(z.string(), "").default(""),
+  q: fallback(z.string(), "").default(""),
+  deanery_id: fallback(z.string(), "").default(""),
+  parish_id: fallback(z.string(), "").default(""),
   outstation_id: fallback(z.string(), "").default(""),
 });
 type LeadersSearch = z.infer<typeof leadersSearchSchema>;
@@ -79,7 +88,10 @@ export const Route = createFileRoute("/admin/leaders")({
   head: () => ({
     meta: [
       { title: "Youth Leaders — CDM Youth Office" },
-      { name: "description", content: "Track and manage active youth leaders at all organizational levels." },
+      {
+        name: "description",
+        content: "Track and manage active youth leaders at all organizational levels.",
+      },
     ],
   }),
   component: LeadersPage,
@@ -90,24 +102,24 @@ export const Route = createFileRoute("/admin/leaders")({
 /* ------------------------------------------------------------------ */
 
 function LeadersPage() {
-  const [tab, setTab]             = useState<LeadershipLevel>("diocese");
+  const [tab, setTab] = useState<LeadershipLevel>("diocese");
   const [addYouthOpen, setAddYouthOpen] = useState(false);
   const [appointOpen, setAppointOpen] = useState(false);
-  const [importOpen, setImportOpen]   = useState(false);
-  const [editTarget, setEditTarget]   = useState<LeadershipRoleRow | null>(null);
-  const [endTarget, setEndTarget]     = useState<LeadershipRoleRow | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<LeadershipRoleRow | null>(null);
+  const [endTarget, setEndTarget] = useState<LeadershipRoleRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<LeadershipRoleRow | null>(null);
   const qc = useQueryClient();
 
-  const search  = Route.useSearch();
+  const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const setFilter = (patch: Partial<LeadersSearch>) =>
     navigate({ search: (prev: LeadersSearch) => ({ ...prev, ...patch }), replace: true });
 
   const scope = useAdminScope();
-  const deaneryId    = scope.deaneryId || search.deanery_id;
-  const parishId     = scope.parishId  || search.parish_id;
-  const outstationId = search.outstation_id;
+  const deaneryId = scope.deaneryId || search.deanery_id;
+  const parishId = scope.parishId || search.parish_id;
+  const outstationId = scope.outstationId || search.outstation_id;
 
   const { data: org } = useQuery({ queryKey: ["org"], queryFn: fetchOrg });
   const { data: roleTypes = [] } = useQuery({ queryKey: ["role-types"], queryFn: listRoleTypes });
@@ -115,19 +127,24 @@ function LeadersPage() {
   const [pageSize, setPageSize] = useState(10);
   const { data: resp, isLoading } = useQuery({
     queryKey: [
-      "leadership-roles", tab,
-      search.q, deaneryId, parishId, outstationId,
-      page - 1, pageSize,
+      "leadership-roles",
+      tab,
+      search.q,
+      deaneryId,
+      parishId,
+      outstationId,
+      page - 1,
+      pageSize,
     ],
     queryFn: () =>
       listLeadersPaged({
-        level:         tab,
-        page:          page - 1,
-        size:          pageSize,
-        q:             search.q     || undefined,
-        deaneryId:     deaneryId    || null,
-        parishId:      parishId     || null,
-        outstationId:  outstationId || null,
+        level: tab,
+        page: page - 1,
+        size: pageSize,
+        q: search.q || undefined,
+        deaneryId: deaneryId || null,
+        parishId: parishId || null,
+        outstationId: outstationId || null,
       }),
     placeholderData: keepPreviousData,
   });
@@ -141,7 +158,10 @@ function LeadersPage() {
 
   const appointMut = useMutation({
     mutationFn: appointLeader,
-    onSuccess: () => { toast.success("Leader appointed"); invalidate(); },
+    onSuccess: () => {
+      toast.success("Leader appointed");
+      invalidate();
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -154,19 +174,31 @@ function LeadersPage() {
   const updateMut = useMutation({
     mutationFn: ({ id, input }: { id: string; input: LeadershipRoleUpdate }) =>
       updateLeader(id, input),
-    onSuccess: () => { toast.success("Appointment updated"); invalidate(); setEditTarget(null); },
+    onSuccess: () => {
+      toast.success("Appointment updated");
+      invalidate();
+      setEditTarget(null);
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const endMut = useMutation({
     mutationFn: endLeaderTerm,
-    onSuccess: () => { toast.success("Term ended"); invalidate(); setEndTarget(null); },
+    onSuccess: () => {
+      toast.success("Term ended");
+      invalidate();
+      setEndTarget(null);
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const deleteMut = useMutation({
     mutationFn: deleteLeader,
-    onSuccess: () => { toast.success("Appointment deleted"); invalidate(); setDeleteTarget(null); },
+    onSuccess: () => {
+      toast.success("Appointment deleted");
+      invalidate();
+      setDeleteTarget(null);
+    },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -177,7 +209,14 @@ function LeadersPage() {
         tabs={
           <>
             {LEVELS.map((lvl) => (
-              <TopbarTab key={lvl} active={tab === lvl} onClick={() => { setTab(lvl); setPage(1); }}>
+              <TopbarTab
+                key={lvl}
+                active={tab === lvl}
+                onClick={() => {
+                  setTab(lvl);
+                  setPage(1);
+                }}
+              >
                 {LEVEL_LABELS[lvl]}
               </TopbarTab>
             ))}
@@ -227,7 +266,10 @@ function LeadersPage() {
             total={total}
             totalPages={totalPages}
             onPageChange={setPage}
-            onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
+            onPageSizeChange={(s) => {
+              setPageSize(s);
+              setPage(1);
+            }}
             onEdit={setEditTarget}
             onEndTerm={setEndTarget}
             onDelete={setDeleteTarget}
@@ -237,7 +279,11 @@ function LeadersPage() {
             outstationId={outstationId}
             scopeDeaneryId={scope.deaneryId}
             scopeParishId={scope.parishId}
-            onFilterChange={(patch) => { setFilter(patch); setPage(1); }}
+            scopeOutstationId={scope.outstationId}
+            onFilterChange={(patch) => {
+              setFilter(patch);
+              setPage(1);
+            }}
           />
         </Card>
       </div>
@@ -263,25 +309,31 @@ function LeadersPage() {
         roleTypes={roleTypes}
         isPending={appointMut.isPending}
         onCreateRoleType={createRoleTypeMut.mutateAsync}
-        onSubmit={(input) => { appointMut.mutate(input); setAppointOpen(false); }}
+        onSubmit={(input) => {
+          appointMut.mutate(input);
+          setAppointOpen(false);
+        }}
       />
 
       <EditDialog
         row={editTarget}
         roleTypes={roleTypes}
-        onOpenChange={(o) => { if (!o) setEditTarget(null); }}
+        onOpenChange={(o) => {
+          if (!o) setEditTarget(null);
+        }}
         isPending={updateMut.isPending}
         onCreateRoleType={createRoleTypeMut.mutateAsync}
         onSubmit={(input) => editTarget && updateMut.mutate({ id: editTarget.id, input })}
       />
 
-      <ImportDialog
-        open={importOpen}
-        onOpenChange={setImportOpen}
-        onDone={invalidate}
-      />
+      <ImportDialog open={importOpen} onOpenChange={setImportOpen} onDone={invalidate} />
 
-      <AlertDialog open={!!endTarget} onOpenChange={(o) => { if (!o) setEndTarget(null); }}>
+      <AlertDialog
+        open={!!endTarget}
+        onOpenChange={(o) => {
+          if (!o) setEndTarget(null);
+        }}
+      >
         <AlertDialogContent className="border-border bg-white">
           <AlertDialogHeader>
             <AlertDialogTitle>End term for {endTarget?.youth?.full_name}?</AlertDialogTitle>
@@ -304,13 +356,17 @@ function LeadersPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => { if (!o) setDeleteTarget(null); }}>
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(o) => {
+          if (!o) setDeleteTarget(null);
+        }}
+      >
         <AlertDialogContent className="border-border bg-white">
           <AlertDialogHeader>
             <AlertDialogTitle>Delete appointment?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently remove{" "}
-              <strong>{deleteTarget?.youth?.full_name}</strong>'s{" "}
+              This will permanently remove <strong>{deleteTarget?.youth?.full_name}</strong>'s{" "}
               <strong>{deleteTarget?.role_type?.name}</strong> appointment. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -353,6 +409,7 @@ function LeadersTable({
   outstationId,
   scopeDeaneryId,
   scopeParishId,
+  scopeOutstationId,
   onFilterChange,
 }: {
   rows: LeadershipRoleRow[];
@@ -374,21 +431,24 @@ function LeadersTable({
   outstationId: string;
   scopeDeaneryId: string | null;
   scopeParishId: string | null;
+  scopeOutstationId: string | null;
   onFilterChange: (patch: Partial<LeadersSearch>) => void;
 }) {
   const [showHistory, setShowHistory] = useState(false);
   const [filterPeriod, setFilterPeriod] = useState("all");
   // Local input state for search box; debounces before hitting the server
   const [searchInput, setSearchInput] = useState(q);
-  const [fCdm,  setFCdm]  = useState<ColumnFilterValue | undefined>();
+  const [fCdm, setFCdm] = useState<ColumnFilterValue | undefined>();
   const [fName, setFName] = useState<ColumnFilterValue | undefined>();
   const [fRole, setFRole] = useState<ColumnFilterValue | undefined>();
 
   // Debounce search input → URL (server query)
   useEffect(() => {
-    const t = setTimeout(() => { if (searchInput !== q) onFilterChange({ q: searchInput }); }, 300);
+    const t = setTimeout(() => {
+      if (searchInput !== q) onFilterChange({ q: searchInput });
+    }, 300);
     return () => clearTimeout(t);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchInput]);
 
   // Build dropdown options from live org tree (UUID values for server-side filtering)
@@ -412,8 +472,12 @@ function LeadersTable({
   );
   const roleOptions = useMemo(() => {
     const seen = new Set<string>();
-    rows.forEach((r) => { if (r.role_type?.name) seen.add(r.role_type.name); });
-    return Array.from(seen).sort().map((n) => ({ value: n, label: n }));
+    rows.forEach((r) => {
+      if (r.role_type?.name) seen.add(r.role_type.name);
+    });
+    return Array.from(seen)
+      .sort()
+      .map((n) => ({ value: n, label: n }));
   }, [rows]);
 
   // Client-side filter only for period/history and column-level CDM/name/role refinement.
@@ -433,8 +497,8 @@ function LeadersTable({
       base = rows.filter((r) => !r.end_date);
     }
     return base.filter((r) => {
-      if (!applyColumnFilter(r.youth?.cdm_id,        fCdm))  return false;
-      if (!applyColumnFilter(r.youth?.full_name,      fName)) return false;
+      if (!applyColumnFilter(r.youth?.cdm_id, fCdm)) return false;
+      if (!applyColumnFilter(r.youth?.full_name, fName)) return false;
       if (!applyColumnFilter(r.role_type?.name ?? "", fRole)) return false;
       return true;
     });
@@ -469,7 +533,10 @@ function LeadersTable({
               <option value="all">All periods</option>
               {TERM_PERIODS.map((p) => (
                 <option key={p.value} value={p.value}>
-                  {p.label}{p.value === `${CURRENT_TERM_START}-${CURRENT_TERM_START + 3}` ? " (current)" : ""}
+                  {p.label}
+                  {p.value === `${CURRENT_TERM_START}-${CURRENT_TERM_START + 3}`
+                    ? " (current)"
+                    : ""}
                 </option>
               ))}
             </select>
@@ -513,7 +580,11 @@ function LeadersTable({
                         options={deaneryOptions}
                         value={deaneryId ? { operator: "equals", value: deaneryId } : undefined}
                         onChange={(v) =>
-                          onFilterChange({ deanery_id: v?.value ?? "", parish_id: "", outstation_id: "" })
+                          onFilterChange({
+                            deanery_id: v?.value ?? "",
+                            parish_id: "",
+                            outstation_id: "",
+                          })
                         }
                         disabled={!!scopeDeaneryId}
                       />
@@ -545,10 +616,11 @@ function LeadersTable({
                         label="Outstation"
                         mode="select"
                         options={outstationOptions}
-                        value={outstationId ? { operator: "equals", value: outstationId } : undefined}
-                        onChange={(v) =>
-                          onFilterChange({ outstation_id: v?.value ?? "" })
+                        value={
+                          outstationId ? { operator: "equals", value: outstationId } : undefined
                         }
+                        onChange={(v) => onFilterChange({ outstation_id: v?.value ?? "" })}
+                        disabled={!!scopeOutstationId}
                       />
                     }
                   />
@@ -559,9 +631,7 @@ function LeadersTable({
                     filter={fc("Position", fRole, setFRole, "select", roleOptions)}
                   />
                 </th>
-                {showEndDate && (
-                  <th className="label-eyebrow px-3.5 py-2.5 text-left">Term</th>
-                )}
+                {showEndDate && <th className="label-eyebrow px-3.5 py-2.5 text-left">Term</th>}
                 <th className="label-eyebrow px-3.5 py-2.5 text-right">Actions</th>
               </tr>
             </thead>
@@ -586,7 +656,9 @@ function LeadersTable({
                   <td className="px-3.5 py-2.5 text-[11px] text-text-2">
                     {row.youth?.outstation?.name ?? "—"}
                   </td>
-                  <td className="px-3.5 py-2.5 text-[11px] text-text-1">{row.role_type?.name ?? "—"}</td>
+                  <td className="px-3.5 py-2.5 text-[11px] text-text-1">
+                    {row.role_type?.name ?? "—"}
+                  </td>
                   {showEndDate && (
                     <td className="px-3.5 py-2.5 text-[11px] text-text-3">
                       {row.start_date} — {row.end_date ?? "present"}
@@ -604,9 +676,7 @@ function LeadersTable({
                         </button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-40">
-                        <DropdownMenuItem onSelect={() => onEdit(row)}>
-                          Edit
-                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => onEdit(row)}>Edit</DropdownMenuItem>
                         {!row.end_date && (
                           <DropdownMenuItem
                             onSelect={() => onEndTerm(row)}
@@ -628,7 +698,10 @@ function LeadersTable({
               ))}
               {displayRows.length === 0 && (
                 <tr>
-                  <td colSpan={showEndDate ? 9 : 8} className="px-3.5 py-10 text-center text-[11px] text-text-3">
+                  <td
+                    colSpan={showEndDate ? 9 : 8}
+                    className="px-3.5 py-10 text-center text-[11px] text-text-3"
+                  >
                     No leaders match the selected filters.
                   </td>
                 </tr>
@@ -672,11 +745,11 @@ function EditDialog({
   onCreateRoleType: (name: string) => Promise<RoleTypeRow>;
   onSubmit: (input: LeadershipRoleUpdate) => void;
 }) {
-  const [roleId, setRoleId]         = useState("");
+  const [roleId, setRoleId] = useState("");
   const [roleCustom, setRoleCustom] = useState("");
-  const [level, setLevel]           = useState<LeadershipLevel>("diocese");
-  const [startDate, setStartDate]   = useState("");
-  const [notes, setNotes]           = useState("");
+  const [level, setLevel] = useState<LeadershipLevel>("diocese");
+  const [startDate, setStartDate] = useState("");
+  const [notes, setNotes] = useState("");
 
   useEffect(() => {
     if (row) {
@@ -691,11 +764,17 @@ function EditDialog({
   const handleSubmit = async () => {
     let effectiveRoleId = roleId;
     if (roleId === "__new__") {
-      if (!roleCustom.trim()) { toast.error("Enter a position name"); return; }
+      if (!roleCustom.trim()) {
+        toast.error("Enter a position name");
+        return;
+      }
       const created = await onCreateRoleType(roleCustom.trim());
       effectiveRoleId = created.id;
     }
-    if (!effectiveRoleId) { toast.error("Select a position"); return; }
+    if (!effectiveRoleId) {
+      toast.error("Select a position");
+      return;
+    }
     onSubmit({ roleId: effectiveRoleId, level, startDate, notes: notes.trim() || null });
   };
 
@@ -707,9 +786,13 @@ function EditDialog({
             Edit Appointment
           </DialogTitle>
           <DialogDescription className="text-[12px] text-text-3">
-            {titleCase(row?.youth?.full_name)} · <span className="font-mono">{row?.youth?.cdm_id}</span>
+            {titleCase(row?.youth?.full_name)} ·{" "}
+            <span className="font-mono">{row?.youth?.cdm_id}</span>
             {row?.youth?.phone && (
-              <> · <span className="font-mono">{formatPhone(row.youth.phone)}</span></>
+              <>
+                {" "}
+                · <span className="font-mono">{formatPhone(row.youth.phone)}</span>
+              </>
             )}
           </DialogDescription>
         </DialogHeader>
@@ -724,7 +807,9 @@ function EditDialog({
                 </SelectTrigger>
                 <SelectContent>
                   {roleTypes.map((r) => (
-                    <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                    <SelectItem key={r.id} value={r.id}>
+                      {r.name}
+                    </SelectItem>
                   ))}
                   <SelectItem value="__new__">New position…</SelectItem>
                 </SelectContent>
@@ -746,10 +831,14 @@ function EditDialog({
             <label className="space-y-1 text-[10px] font-bold uppercase tracking-wide text-text-3">
               <span>Level *</span>
               <Select value={level} onValueChange={(v) => setLevel(v as LeadershipLevel)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   {LEVELS.map((l) => (
-                    <SelectItem key={l} value={l}>{LEVEL_LABELS[l]}</SelectItem>
+                    <SelectItem key={l} value={l}>
+                      {LEVEL_LABELS[l]}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -757,11 +846,7 @@ function EditDialog({
 
             <label className="space-y-1 text-[10px] font-bold uppercase tracking-wide text-text-3">
               <span>Start Date</span>
-              <Input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-              />
+              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
             </label>
           </div>
 
@@ -820,17 +905,18 @@ function AppointDialog({
   onCreateRoleType: (name: string) => Promise<RoleTypeRow>;
   onSubmit: (input: LeadershipRoleInput) => void;
 }) {
-  const [youth, setYouth]         = useState<PickedYouth | null>(null);
-  const [roleId, setRoleId]       = useState("");
+  const [youth, setYouth] = useState<PickedYouth | null>(null);
+  const [roleId, setRoleId] = useState("");
   const [roleCustom, setRoleCustom] = useState("");
-  const [level, setLevel]         = useState<LeadershipLevel>(defaultLevel);
+  const [level, setLevel] = useState<LeadershipLevel>(defaultLevel);
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
-  const [notes, setNotes]         = useState("");
+  const [notes, setNotes] = useState("");
 
   useEffect(() => {
     if (open) {
       setYouth(null);
-      setRoleId(""); setRoleCustom("");
+      setRoleId("");
+      setRoleCustom("");
       setLevel(defaultLevel);
       setStartDate(new Date().toISOString().slice(0, 10));
       setNotes("");
@@ -838,21 +924,30 @@ function AppointDialog({
   }, [open, defaultLevel]);
 
   const handleSubmit = async () => {
-    if (!youth) { toast.error("Select a youth first"); return; }
+    if (!youth) {
+      toast.error("Select a youth first");
+      return;
+    }
     let effectiveRoleId = roleId;
     if (roleId === "__new__") {
-      if (!roleCustom.trim()) { toast.error("Enter a position name"); return; }
+      if (!roleCustom.trim()) {
+        toast.error("Enter a position name");
+        return;
+      }
       const created = await onCreateRoleType(roleCustom.trim());
       effectiveRoleId = created.id;
     }
-    if (!effectiveRoleId) { toast.error("Select a position"); return; }
+    if (!effectiveRoleId) {
+      toast.error("Select a position");
+      return;
+    }
 
     onSubmit({
-      youthId:      youth.id,
-      roleId:       effectiveRoleId,
+      youthId: youth.id,
+      roleId: effectiveRoleId,
       level,
-      deaneryId:    youth.deanery_id,
-      parishId:     youth.parish_id,
+      deaneryId: youth.deanery_id,
+      parishId: youth.parish_id,
       outstationId: youth.outstation_id,
       startDate,
       notes: notes.trim() || null,
@@ -886,7 +981,9 @@ function AppointDialog({
                 </SelectTrigger>
                 <SelectContent>
                   {roleTypes.map((r) => (
-                    <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                    <SelectItem key={r.id} value={r.id}>
+                      {r.name}
+                    </SelectItem>
                   ))}
                   <SelectItem value="__new__">New position…</SelectItem>
                 </SelectContent>
@@ -908,10 +1005,14 @@ function AppointDialog({
             <label className="space-y-1 text-[10px] font-bold uppercase tracking-wide text-text-3">
               <span>Level *</span>
               <Select value={level} onValueChange={(v) => setLevel(v as LeadershipLevel)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   {LEVELS.map((l) => (
-                    <SelectItem key={l} value={l}>{LEVEL_LABELS[l]}</SelectItem>
+                    <SelectItem key={l} value={l}>
+                      {LEVEL_LABELS[l]}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -919,11 +1020,7 @@ function AppointDialog({
 
             <label className="space-y-1 text-[10px] font-bold uppercase tracking-wide text-text-3">
               <span>Start Date</span>
-              <Input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-              />
+              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
             </label>
           </div>
 
@@ -974,13 +1071,16 @@ function ImportDialog({
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
-  const [result, setResult]   = useState<{
+  const [result, setResult] = useState<{
     inserted: number;
     skipped: number;
     errors: string[];
   } | null>(null);
 
-  const handleClose = () => { setResult(null); onOpenChange(false); };
+  const handleClose = () => {
+    setResult(null);
+    onOpenChange(false);
+  };
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -993,13 +1093,12 @@ function ImportDialog({
       skipEmptyLines: true,
       complete: async ({ data }) => {
         const rows: BulkLeaderRow[] = data.map((row) => ({
-          cdmId:          (row["cdm_id"]      ?? row["CDM ID"]      ?? "").trim(),
-          roleName:       (row["role"]        ?? row["Role"]        ?? "").trim(),
-          level:          ((row["level"]      ?? row["Level"]       ?? "parish")
-                            .toLowerCase().trim()) as LeadershipLevel,
-          deaneryName:    (row["deanery"]     ?? row["Deanery"]     ?? "").trim(),
-          parishName:     (row["parish"]      ?? row["Parish"]      ?? "").trim(),
-          outstationName: (row["outstation"]  ?? row["Outstation"]  ?? "").trim(),
+          cdmId: (row["cdm_id"] ?? row["CDM ID"] ?? "").trim(),
+          roleName: (row["role"] ?? row["Role"] ?? "").trim(),
+          level: (row["level"] ?? row["Level"] ?? "parish").toLowerCase().trim() as LeadershipLevel,
+          deaneryName: (row["deanery"] ?? row["Deanery"] ?? "").trim(),
+          parishName: (row["parish"] ?? row["Parish"] ?? "").trim(),
+          outstationName: (row["outstation"] ?? row["Outstation"] ?? "").trim(),
         }));
         try {
           const res = await bulkImportLeaders(rows);
@@ -1016,7 +1115,12 @@ function ImportDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(o) => { if (!o) handleClose(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) handleClose();
+      }}
+    >
       <DialogContent className="max-w-md border-border bg-white text-foreground">
         <DialogHeader>
           <DialogTitle className="text-display text-xl font-black text-gold">
@@ -1028,7 +1132,8 @@ function ImportDialog({
               cdm_id, role, level, deanery, parish, outstation
             </code>
             <br />
-            Valid levels: <code className="font-mono">diocese / deanery / parish / outstation</code>.
+            Valid levels: <code className="font-mono">diocese / deanery / parish / outstation</code>
+            .
             <br />
             Leaders must already exist as registered youths — unmatched CDM IDs are skipped.
           </DialogDescription>
@@ -1061,7 +1166,9 @@ function ImportDialog({
               {result.errors.length > 0 && (
                 <div className="mt-2 max-h-32 space-y-0.5 overflow-y-auto">
                   {result.errors.map((e, i) => (
-                    <div key={i} className="text-danger">{e}</div>
+                    <div key={i} className="text-danger">
+                      {e}
+                    </div>
                   ))}
                 </div>
               )}
@@ -1089,9 +1196,9 @@ function ImportDialog({
 
 const LEVELS: LeadershipLevel[] = ["diocese", "deanery", "parish", "outstation"];
 const LEVEL_LABELS: Record<LeadershipLevel, string> = {
-  diocese:    "Diocese",
-  deanery:    "Deanery",
-  parish:     "Parish",
+  diocese: "Diocese",
+  deanery: "Deanery",
+  parish: "Parish",
   outstation: "Outstation",
 };
 

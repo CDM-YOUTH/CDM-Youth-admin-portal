@@ -1,7 +1,16 @@
-import { Outlet, createFileRoute, redirect } from "@tanstack/react-router";
+import { useEffect } from "react";
+import {
+  Outlet,
+  createFileRoute,
+  redirect,
+  useNavigate,
+  useRouterState,
+} from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { AdminScopeCtx, emptyScope, fetchMyScope } from "@/lib/hooks/use-admin-scope";
+import { MODULE_BY_PATH, useModuleAccess } from "@/lib/hooks/use-module-access";
 import { AdminSidebar } from "@/components/admin/layout/admin-sidebar";
 import { SidebarProvider } from "@/components/admin/layout/sidebar-context";
 import { GlobalNavbar } from "@/components/admin/layout/topbar";
@@ -37,10 +46,32 @@ function AdminLayout() {
           <AdminSidebar />
           <div className="flex flex-1 flex-col overflow-hidden">
             <GlobalNavbar />
-            <Outlet />
+            <ModuleGuard>
+              <Outlet />
+            </ModuleGuard>
           </div>
         </div>
       </SidebarProvider>
     </AdminScopeCtx.Provider>
   );
+}
+
+// Blocks direct navigation to a module the current role can't view.
+// UX-layer defense-in-depth — the sidebar already hides these links;
+// the real security boundary is RLS + the API's applyCallerScope checks.
+function ModuleGuard({ children }: { children: React.ReactNode }) {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const navigate = useNavigate();
+  const { data: access, isSuccess } = useModuleAccess();
+
+  useEffect(() => {
+    if (!isSuccess) return;
+    const module = MODULE_BY_PATH[pathname];
+    if (module && access[module]?.canView === false) {
+      toast.error("You don't have access to that section");
+      navigate({ to: "/admin/dashboard" });
+    }
+  }, [pathname, isSuccess, access, navigate]);
+
+  return <>{children}</>;
 }

@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as PortalRouteImport } from './routes/portal'
+import { Route as SetPasswordRouteImport } from './routes/set-password'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminAuditRouteImport } from './routes/admin.audit'
 import { Route as AdminCusaRouteImport } from './routes/admin.cusa'
@@ -28,6 +29,12 @@ import { Route as AdminUniformsRouteImport } from './routes/admin.uniforms'
 import { Route as AdminUsersRouteImport } from './routes/admin.users'
 import { Route as AdminWelfareRouteImport } from './routes/admin.welfare'
 import { Route as AdminYouthsRouteImport } from './routes/admin.youths'
+import { Route as ApiCusaRouteImport } from './routes/api/cusa'
+import { Route as ApiEnrollmentsRouteImport } from './routes/api/enrollments'
+import { Route as ApiEventsRouteImport } from './routes/api/events'
+import { Route as ApiLeadersRouteImport } from './routes/api/leaders'
+import { Route as ApiWelfareRouteImport } from './routes/api/welfare'
+import { Route as ApiYouthsRouteImport } from './routes/api/youths'
 import { Route as CheckinEventIdRouteImport } from './routes/checkin.$eventId'
 import { Route as PortalIndexRouteImport } from './routes/portal.index'
 import { Route as PortalAccountRouteImport } from './routes/portal.account'
@@ -37,8 +44,11 @@ import { Route as PortalEventsRouteImport } from './routes/portal.events'
 import { Route as PortalFormationRouteImport } from './routes/portal.formation'
 import { Route as AdminEventCheckinEventIdRouteImport } from './routes/admin.event-checkin.$eventId'
 import { Route as AdminEventEventIdRouteImport } from './routes/admin.event.$eventId'
+import { Route as ApiAdminInviteUserRouteImport } from './routes/api/admin/invite-user'
 import { Route as ApiSheetsErrorsRouteImport } from './routes/api/sheets/errors'
 import { Route as ApiSheetsLeadershipRouteImport } from './routes/api/sheets/leadership'
+import { Route as ApiUniformsOrdersRouteImport } from './routes/api/uniforms/orders'
+import { Route as ApiUniformsSkusRouteImport } from './routes/api/uniforms/skus'
 import { Route as PortalEventsEventIdRouteImport } from './routes/portal.events.$eventId'
 
 const IndexRoute = IndexRouteImport.update({
@@ -59,6 +69,11 @@ const LoginRoute = LoginRouteImport.update({
 const PortalRoute = PortalRouteImport.update({
   id: '/portal',
   path: '/portal',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SetPasswordRoute = SetPasswordRouteImport.update({
+  id: '/set-password',
+  path: '/set-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
@@ -136,6 +151,36 @@ const AdminYouthsRoute = AdminYouthsRouteImport.update({
   path: '/youths',
   getParentRoute: () => AdminRoute,
 } as any)
+const ApiCusaRoute = ApiCusaRouteImport.update({
+  id: '/api/cusa',
+  path: '/api/cusa',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiEnrollmentsRoute = ApiEnrollmentsRouteImport.update({
+  id: '/api/enrollments',
+  path: '/api/enrollments',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiEventsRoute = ApiEventsRouteImport.update({
+  id: '/api/events',
+  path: '/api/events',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiLeadersRoute = ApiLeadersRouteImport.update({
+  id: '/api/leaders',
+  path: '/api/leaders',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWelfareRoute = ApiWelfareRouteImport.update({
+  id: '/api/welfare',
+  path: '/api/welfare',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiYouthsRoute = ApiYouthsRouteImport.update({
+  id: '/api/youths',
+  path: '/api/youths',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CheckinEventIdRoute = CheckinEventIdRouteImport.update({
   id: '/checkin/$eventId',
   path: '/checkin/$eventId',
@@ -182,6 +227,11 @@ const AdminEventEventIdRoute = AdminEventEventIdRouteImport.update({
   path: '/event/$eventId',
   getParentRoute: () => AdminRoute,
 } as any)
+const ApiAdminInviteUserRoute = ApiAdminInviteUserRouteImport.update({
+  id: '/api/admin/invite-user',
+  path: '/api/admin/invite-user',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSheetsErrorsRoute = ApiSheetsErrorsRouteImport.update({
   id: '/api/sheets/errors',
   path: '/api/sheets/errors',
@@ -190,6 +240,16 @@ const ApiSheetsErrorsRoute = ApiSheetsErrorsRouteImport.update({
 const ApiSheetsLeadershipRoute = ApiSheetsLeadershipRouteImport.update({
   id: '/api/sheets/leadership',
   path: '/api/sheets/leadership',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiUniformsOrdersRoute = ApiUniformsOrdersRouteImport.update({
+  id: '/api/uniforms/orders',
+  path: '/api/uniforms/orders',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiUniformsSkusRoute = ApiUniformsSkusRouteImport.update({
+  id: '/api/uniforms/skus',
+  path: '/api/uniforms/skus',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PortalEventsEventIdRoute = PortalEventsEventIdRouteImport.update({
@@ -203,6 +263,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRouteWithChildren
   '/login': typeof LoginRoute
   '/portal': typeof PortalRouteWithChildren
+  '/set-password': typeof SetPasswordRoute
   '/admin/audit': typeof AdminAuditRoute
   '/admin/cusa': typeof AdminCusaRoute
   '/admin/dashboard': typeof AdminDashboardRoute
@@ -217,6 +278,12 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof AdminUsersRoute
   '/admin/welfare': typeof AdminWelfareRoute
   '/admin/youths': typeof AdminYouthsRoute
+  '/api/cusa': typeof ApiCusaRoute
+  '/api/enrollments': typeof ApiEnrollmentsRoute
+  '/api/events': typeof ApiEventsRoute
+  '/api/leaders': typeof ApiLeadersRoute
+  '/api/welfare': typeof ApiWelfareRoute
+  '/api/youths': typeof ApiYouthsRoute
   '/checkin/$eventId': typeof CheckinEventIdRoute
   '/portal/account': typeof PortalAccountRoute
   '/portal/auth': typeof PortalAuthRoute
@@ -227,13 +294,17 @@ export interface FileRoutesByFullPath {
   '/portal/': typeof PortalIndexRoute
   '/admin/event-checkin/$eventId': typeof AdminEventCheckinEventIdRoute
   '/admin/event/$eventId': typeof AdminEventEventIdRoute
+  '/api/admin/invite-user': typeof ApiAdminInviteUserRoute
   '/api/sheets/errors': typeof ApiSheetsErrorsRoute
   '/api/sheets/leadership': typeof ApiSheetsLeadershipRoute
+  '/api/uniforms/orders': typeof ApiUniformsOrdersRoute
+  '/api/uniforms/skus': typeof ApiUniformsSkusRoute
   '/portal/events/$eventId': typeof PortalEventsEventIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/set-password': typeof SetPasswordRoute
   '/admin/audit': typeof AdminAuditRoute
   '/admin/cusa': typeof AdminCusaRoute
   '/admin/dashboard': typeof AdminDashboardRoute
@@ -248,6 +319,12 @@ export interface FileRoutesByTo {
   '/admin/users': typeof AdminUsersRoute
   '/admin/welfare': typeof AdminWelfareRoute
   '/admin/youths': typeof AdminYouthsRoute
+  '/api/cusa': typeof ApiCusaRoute
+  '/api/enrollments': typeof ApiEnrollmentsRoute
+  '/api/events': typeof ApiEventsRoute
+  '/api/leaders': typeof ApiLeadersRoute
+  '/api/welfare': typeof ApiWelfareRoute
+  '/api/youths': typeof ApiYouthsRoute
   '/checkin/$eventId': typeof CheckinEventIdRoute
   '/portal/account': typeof PortalAccountRoute
   '/portal/auth': typeof PortalAuthRoute
@@ -258,8 +335,11 @@ export interface FileRoutesByTo {
   '/portal': typeof PortalIndexRoute
   '/admin/event-checkin/$eventId': typeof AdminEventCheckinEventIdRoute
   '/admin/event/$eventId': typeof AdminEventEventIdRoute
+  '/api/admin/invite-user': typeof ApiAdminInviteUserRoute
   '/api/sheets/errors': typeof ApiSheetsErrorsRoute
   '/api/sheets/leadership': typeof ApiSheetsLeadershipRoute
+  '/api/uniforms/orders': typeof ApiUniformsOrdersRoute
+  '/api/uniforms/skus': typeof ApiUniformsSkusRoute
   '/portal/events/$eventId': typeof PortalEventsEventIdRoute
 }
 export interface FileRoutesById {
@@ -268,6 +348,7 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteWithChildren
   '/login': typeof LoginRoute
   '/portal': typeof PortalRouteWithChildren
+  '/set-password': typeof SetPasswordRoute
   '/admin/audit': typeof AdminAuditRoute
   '/admin/cusa': typeof AdminCusaRoute
   '/admin/dashboard': typeof AdminDashboardRoute
@@ -282,6 +363,12 @@ export interface FileRoutesById {
   '/admin/users': typeof AdminUsersRoute
   '/admin/welfare': typeof AdminWelfareRoute
   '/admin/youths': typeof AdminYouthsRoute
+  '/api/cusa': typeof ApiCusaRoute
+  '/api/enrollments': typeof ApiEnrollmentsRoute
+  '/api/events': typeof ApiEventsRoute
+  '/api/leaders': typeof ApiLeadersRoute
+  '/api/welfare': typeof ApiWelfareRoute
+  '/api/youths': typeof ApiYouthsRoute
   '/checkin/$eventId': typeof CheckinEventIdRoute
   '/portal/account': typeof PortalAccountRoute
   '/portal/auth': typeof PortalAuthRoute
@@ -292,8 +379,11 @@ export interface FileRoutesById {
   '/portal/': typeof PortalIndexRoute
   '/admin/event-checkin/$eventId': typeof AdminEventCheckinEventIdRoute
   '/admin/event/$eventId': typeof AdminEventEventIdRoute
+  '/api/admin/invite-user': typeof ApiAdminInviteUserRoute
   '/api/sheets/errors': typeof ApiSheetsErrorsRoute
   '/api/sheets/leadership': typeof ApiSheetsLeadershipRoute
+  '/api/uniforms/orders': typeof ApiUniformsOrdersRoute
+  '/api/uniforms/skus': typeof ApiUniformsSkusRoute
   '/portal/events/$eventId': typeof PortalEventsEventIdRoute
 }
 export interface FileRouteTypes {
@@ -303,6 +393,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/login'
     | '/portal'
+    | '/set-password'
     | '/admin/audit'
     | '/admin/cusa'
     | '/admin/dashboard'
@@ -317,6 +408,12 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/admin/welfare'
     | '/admin/youths'
+    | '/api/cusa'
+    | '/api/enrollments'
+    | '/api/events'
+    | '/api/leaders'
+    | '/api/welfare'
+    | '/api/youths'
     | '/checkin/$eventId'
     | '/portal/account'
     | '/portal/auth'
@@ -327,13 +424,17 @@ export interface FileRouteTypes {
     | '/portal/'
     | '/admin/event-checkin/$eventId'
     | '/admin/event/$eventId'
+    | '/api/admin/invite-user'
     | '/api/sheets/errors'
     | '/api/sheets/leadership'
+    | '/api/uniforms/orders'
+    | '/api/uniforms/skus'
     | '/portal/events/$eventId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/login'
+    | '/set-password'
     | '/admin/audit'
     | '/admin/cusa'
     | '/admin/dashboard'
@@ -348,6 +449,12 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/admin/welfare'
     | '/admin/youths'
+    | '/api/cusa'
+    | '/api/enrollments'
+    | '/api/events'
+    | '/api/leaders'
+    | '/api/welfare'
+    | '/api/youths'
     | '/checkin/$eventId'
     | '/portal/account'
     | '/portal/auth'
@@ -358,8 +465,11 @@ export interface FileRouteTypes {
     | '/portal'
     | '/admin/event-checkin/$eventId'
     | '/admin/event/$eventId'
+    | '/api/admin/invite-user'
     | '/api/sheets/errors'
     | '/api/sheets/leadership'
+    | '/api/uniforms/orders'
+    | '/api/uniforms/skus'
     | '/portal/events/$eventId'
   id:
     | '__root__'
@@ -367,6 +477,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/login'
     | '/portal'
+    | '/set-password'
     | '/admin/audit'
     | '/admin/cusa'
     | '/admin/dashboard'
@@ -381,6 +492,12 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/admin/welfare'
     | '/admin/youths'
+    | '/api/cusa'
+    | '/api/enrollments'
+    | '/api/events'
+    | '/api/leaders'
+    | '/api/welfare'
+    | '/api/youths'
     | '/checkin/$eventId'
     | '/portal/account'
     | '/portal/auth'
@@ -391,8 +508,11 @@ export interface FileRouteTypes {
     | '/portal/'
     | '/admin/event-checkin/$eventId'
     | '/admin/event/$eventId'
+    | '/api/admin/invite-user'
     | '/api/sheets/errors'
     | '/api/sheets/leadership'
+    | '/api/uniforms/orders'
+    | '/api/uniforms/skus'
     | '/portal/events/$eventId'
   fileRoutesById: FileRoutesById
 }
@@ -401,9 +521,19 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRouteWithChildren
   LoginRoute: typeof LoginRoute
   PortalRoute: typeof PortalRouteWithChildren
+  SetPasswordRoute: typeof SetPasswordRoute
+  ApiCusaRoute: typeof ApiCusaRoute
+  ApiEnrollmentsRoute: typeof ApiEnrollmentsRoute
+  ApiEventsRoute: typeof ApiEventsRoute
+  ApiLeadersRoute: typeof ApiLeadersRoute
+  ApiWelfareRoute: typeof ApiWelfareRoute
+  ApiYouthsRoute: typeof ApiYouthsRoute
   CheckinEventIdRoute: typeof CheckinEventIdRoute
+  ApiAdminInviteUserRoute: typeof ApiAdminInviteUserRoute
   ApiSheetsErrorsRoute: typeof ApiSheetsErrorsRoute
   ApiSheetsLeadershipRoute: typeof ApiSheetsLeadershipRoute
+  ApiUniformsOrdersRoute: typeof ApiUniformsOrdersRoute
+  ApiUniformsSkusRoute: typeof ApiUniformsSkusRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -434,6 +564,13 @@ declare module '@tanstack/react-router' {
       path: '/portal'
       fullPath: '/portal'
       preLoaderRoute: typeof PortalRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/set-password': {
+      id: '/set-password'
+      path: '/set-password'
+      fullPath: '/set-password'
+      preLoaderRoute: typeof SetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/admin/': {
@@ -541,6 +678,48 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminYouthsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/api/cusa': {
+      id: '/api/cusa'
+      path: '/api/cusa'
+      fullPath: '/api/cusa'
+      preLoaderRoute: typeof ApiCusaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/enrollments': {
+      id: '/api/enrollments'
+      path: '/api/enrollments'
+      fullPath: '/api/enrollments'
+      preLoaderRoute: typeof ApiEnrollmentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/events': {
+      id: '/api/events'
+      path: '/api/events'
+      fullPath: '/api/events'
+      preLoaderRoute: typeof ApiEventsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/leaders': {
+      id: '/api/leaders'
+      path: '/api/leaders'
+      fullPath: '/api/leaders'
+      preLoaderRoute: typeof ApiLeadersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/welfare': {
+      id: '/api/welfare'
+      path: '/api/welfare'
+      fullPath: '/api/welfare'
+      preLoaderRoute: typeof ApiWelfareRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/youths': {
+      id: '/api/youths'
+      path: '/api/youths'
+      fullPath: '/api/youths'
+      preLoaderRoute: typeof ApiYouthsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/checkin/$eventId': {
       id: '/checkin/$eventId'
       path: '/checkin/$eventId'
@@ -604,6 +783,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminEventEventIdRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/api/admin/invite-user': {
+      id: '/api/admin/invite-user'
+      path: '/api/admin/invite-user'
+      fullPath: '/api/admin/invite-user'
+      preLoaderRoute: typeof ApiAdminInviteUserRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/sheets/errors': {
       id: '/api/sheets/errors'
       path: '/api/sheets/errors'
@@ -616,6 +802,20 @@ declare module '@tanstack/react-router' {
       path: '/api/sheets/leadership'
       fullPath: '/api/sheets/leadership'
       preLoaderRoute: typeof ApiSheetsLeadershipRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/uniforms/orders': {
+      id: '/api/uniforms/orders'
+      path: '/api/uniforms/orders'
+      fullPath: '/api/uniforms/orders'
+      preLoaderRoute: typeof ApiUniformsOrdersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/uniforms/skus': {
+      id: '/api/uniforms/skus'
+      path: '/api/uniforms/skus'
+      fullPath: '/api/uniforms/skus'
+      preLoaderRoute: typeof ApiUniformsSkusRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/portal/events/$eventId': {
@@ -708,9 +908,19 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRouteWithChildren,
   LoginRoute: LoginRoute,
   PortalRoute: PortalRouteWithChildren,
+  SetPasswordRoute: SetPasswordRoute,
+  ApiCusaRoute: ApiCusaRoute,
+  ApiEnrollmentsRoute: ApiEnrollmentsRoute,
+  ApiEventsRoute: ApiEventsRoute,
+  ApiLeadersRoute: ApiLeadersRoute,
+  ApiWelfareRoute: ApiWelfareRoute,
+  ApiYouthsRoute: ApiYouthsRoute,
   CheckinEventIdRoute: CheckinEventIdRoute,
+  ApiAdminInviteUserRoute: ApiAdminInviteUserRoute,
   ApiSheetsErrorsRoute: ApiSheetsErrorsRoute,
   ApiSheetsLeadershipRoute: ApiSheetsLeadershipRoute,
+  ApiUniformsOrdersRoute: ApiUniformsOrdersRoute,
+  ApiUniformsSkusRoute: ApiUniformsSkusRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
