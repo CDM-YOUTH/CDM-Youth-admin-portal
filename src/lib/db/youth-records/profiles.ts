@@ -24,11 +24,7 @@ export async function getMyProfile(): Promise<Profile | null> {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", user.id)
-    .single();
+  const { data, error } = await supabase.from("profiles").select("*").eq("id", user.id).single();
 
   if (error) throw error;
   return data;
@@ -48,17 +44,14 @@ export async function getAllProfiles(): Promise<ProfileWithOrg[]> {
 /** Update a profile by id (user updates their own, admin updates any). */
 export async function updateProfile(
   id: string,
-  input: Partial<Omit<Profile, "id" | "created_at" | "updated_at">>
+  input: Partial<Omit<Profile, "id" | "created_at" | "updated_at">>,
 ): Promise<void> {
   const { error } = await supabase.from("profiles").update(input).eq("id", id);
   if (error) throw error;
 }
 
-/** Upsert role for a user (admin only). */
-export async function setUserRole(
-  userId: string,
-  role: "admin" | "moderator" | "office" | "user"
-): Promise<void> {
+/** Upsert role for a user (admin only). Roles are dynamic — see src/lib/db/roles.ts. */
+export async function setUserRole(userId: string, role: string): Promise<void> {
   const { error } = await supabase
     .from("user_roles")
     .upsert({ user_id: userId, role }, { onConflict: "user_id,role" });
@@ -66,9 +59,7 @@ export async function setUserRole(
 }
 
 /** Get the role for a given user id. */
-export async function getUserRole(
-  userId: string
-): Promise<"admin" | "moderator" | "office" | "user" | null> {
+export async function getUserRole(userId: string): Promise<string | null> {
   const { data, error } = await supabase
     .from("user_roles")
     .select("role")
