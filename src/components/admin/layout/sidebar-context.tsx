@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 type SidebarCtx = {
   collapsed: boolean;
@@ -9,7 +10,13 @@ type SidebarCtx = {
 const Ctx = createContext<SidebarCtx | null>(null);
 
 export function SidebarProvider({ children }: { children: ReactNode }) {
-  const [collapsed, setCollapsed] = useState(false);
+  const isMobile = useIsMobile();
+  const [collapsed, setCollapsed] = useState(isMobile);
+
+  useEffect(() => {
+    setCollapsed(isMobile);
+  }, [isMobile]);
+
   return (
     <Ctx.Provider
       value={{ collapsed, setCollapsed, toggle: () => setCollapsed((v) => !v) }}

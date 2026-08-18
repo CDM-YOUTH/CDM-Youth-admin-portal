@@ -34,7 +34,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { MoreVertical, Trash2, Upload, Download, Plus, Shuffle, Search, X } from "lucide-react";
+import { MoreVertical, Trash2, Shuffle, Search, X } from "lucide-react";
+import { Icon } from "@iconify/react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -295,21 +296,21 @@ const pairingByYouth = useMemo(() => {
                 onClick={() => setNominateOpen(true)}
                 className="inline-flex h-8 items-center gap-1.5 rounded-md bg-danger px-2.5 text-[11px] font-bold text-white transition hover:opacity-90"
               >
-                <Plus className="h-3.5 w-3.5" /> Nominate
+                <Icon icon="mdi:plus" className="h-3.5 w-3.5" /> Nominate
               </button>
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 className="inline-flex h-8 items-center gap-1.5 rounded-md bg-danger px-2.5 text-[11px] font-bold text-white transition hover:opacity-90"
               >
-                <Upload className="h-3.5 w-3.5" /> Import
+                <Icon icon="mdi:upload" className="h-3.5 w-3.5" /> Import
               </button>
               <button
                 type="button"
                 onClick={handleExport}
                 className="inline-flex h-8 items-center gap-1.5 rounded-md bg-danger px-2.5 text-[11px] font-bold text-white transition hover:opacity-90"
               >
-                <Download className="h-3.5 w-3.5" /> Export
+                <Icon icon="mdi:download" className="h-3.5 w-3.5" /> Export
               </button>
             </div>
           </div>

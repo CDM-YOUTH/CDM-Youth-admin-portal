@@ -16,7 +16,7 @@ export function ViewRecordDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[88vh] max-w-xl overflow-y-auto border-border bg-white text-foreground">
+      <DialogContent className="max-h-[calc(100vh-1rem)] w-[calc(100vw-1rem)] max-w-xl overflow-y-auto border-border bg-white p-4 text-foreground sm:p-6">
         <DialogHeader>
           <DialogTitle className="text-display text-xl font-black text-gold">{title}</DialogTitle>
         </DialogHeader>

@@ -5,7 +5,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Upload, Loader2, X } from "lucide-react";
+import { Loader2, X } from "lucide-react";
+import { Icon } from "@iconify/react";
 
 export type FieldDef = {
   key: string;
@@ -93,18 +94,18 @@ export function RecordFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[88vh] max-w-2xl overflow-y-auto border-border bg-white text-foreground">
+      <DialogContent className="max-h-[calc(100vh-1rem)] w-[calc(100vw-1rem)] max-w-2xl overflow-y-auto border-border bg-white p-4 text-foreground sm:p-6">
         <DialogHeader>
           <DialogTitle className="text-display text-xl font-black text-gold">{title}</DialogTitle>
           {description && <DialogDescription className="text-[12px] text-text-3">{description}</DialogDescription>}
         </DialogHeader>
 
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {fields.map((f) => {
             const val = values[f.key] ?? "";
             const opts = f.dynamicOptions ? f.dynamicOptions(values) : f.options;
             const isErr = errors[f.key];
-            const wrapperClass = `space-y-1 text-[10px] font-bold uppercase tracking-wide ${isErr ? "text-danger" : "text-text-3"} ${f.full || f.type === "textarea" ? "sm:col-span-2" : ""}`;
+            const wrapperClass = `w-full space-y-1 text-[10px] font-bold uppercase tracking-wide ${isErr ? "text-danger" : "text-text-3"} ${f.full || f.type === "textarea" ? "sm:col-span-2" : ""}`;
             return (
               <label key={f.key} className={wrapperClass}>
                 <span>{f.label}{f.required ? " *" : ""}</span>
@@ -114,18 +115,18 @@ export function RecordFormDialog({
           })}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="gap-2 sm:gap-0">
           <button
             type="button"
             onClick={() => onOpenChange(false)}
-            className="rounded-lg border border-border bg-bg-3 px-3 py-2 text-[11px] font-bold text-text-2"
+            className="w-full rounded-lg border border-border bg-bg-3 px-3 py-2 text-[11px] font-bold text-text-2 sm:w-auto"
           >
             Cancel
           </button>
           <button
             type="button"
             onClick={handleSubmit}
-            className="rounded-lg bg-primary px-4 py-2 text-[11px] font-bold text-primary-foreground hover:opacity-90"
+            className="w-full rounded-lg bg-primary px-4 py-2 text-[11px] font-bold text-primary-foreground hover:opacity-90 sm:w-auto"
           >
             {submitLabel}
           </button>
@@ -217,12 +218,12 @@ function ImageUpload({ value, onChange, bucket }: { value: string; onChange: (v:
         <img src={value} alt="Passport" className="h-16 w-16 rounded-md border border-border object-cover" />
       ) : (
         <div className="flex h-16 w-16 items-center justify-center rounded-md border border-dashed border-border bg-bg-3 text-text-4">
-          <Upload className="h-5 w-5" />
+          <Icon icon="mdi:upload" className="h-5 w-5" />
         </div>
       )}
       <div className="flex flex-1 flex-col gap-1.5">
         <label className="inline-flex w-fit cursor-pointer items-center gap-1.5 rounded-md border border-border bg-bg-3 px-2.5 py-1.5 text-[11px] font-bold text-text-1 hover:bg-bg-4">
-          {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+          {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Icon icon="mdi:upload" className="h-3.5 w-3.5" />}
           {uploading ? "Uploading…" : value ? "Replace photo" : "Choose passport photo"}
           <input type="file" accept="image/*" className="hidden" onChange={handleUpload} disabled={uploading} />
         </label>
@@ -299,7 +300,7 @@ function FileUpload({
       )}
       <div className="flex items-center gap-2">
         <label className="inline-flex w-fit cursor-pointer items-center gap-1.5 rounded-md border border-border bg-bg-3 px-2.5 py-1.5 text-[11px] font-bold text-text-1 hover:bg-bg-4">
-          {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+          {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Icon icon="mdi:upload" className="h-3.5 w-3.5" />}
           {uploading ? "Uploading…" : value ? "Replace file" : "Choose file"}
           <input type="file" accept={accept} className="hidden" onChange={handleUpload} disabled={uploading} />
         </label>

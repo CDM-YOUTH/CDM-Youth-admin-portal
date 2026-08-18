@@ -5,7 +5,8 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
 import { toast } from "sonner";
-import { MoreVertical, Pencil, Trash2, BadgeCheck, Download, Plus } from "lucide-react";
+import { MoreVertical, Pencil, Trash2, BadgeCheck } from "lucide-react";
+import { Icon } from "@iconify/react";
 import { downloadXlsx } from "@/lib/export-xlsx";
 import { fetchOrg } from "@/lib/db/org";
 import { useAdminScope } from "@/lib/hooks/use-admin-scope";
@@ -21,7 +22,10 @@ import {
   applyColumnFilter,
   type ColumnFilterValue,
 } from "@/components/admin/composables/tables/table-filters";
-import { RecordFormDialog, type FieldDef } from "@/components/admin/composables/forms/record-form-dialog";
+import {
+  RecordFormDialog,
+  type FieldDef,
+} from "@/components/admin/composables/forms/record-form-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -82,7 +86,11 @@ export const Route = createFileRoute("/admin/youths")({
   head: () => ({
     meta: [
       { title: "Youth Records — CDM Youth Office" },
-      { name: "description", content: "Searchable directory of all youth registered in the Catholic Diocese of Murang'a." },
+      {
+        name: "description",
+        content:
+          "Searchable directory of all youth registered in the Catholic Diocese of Murang'a.",
+      },
     ],
   }),
   validateSearch: zodValidator(youthSearchSchema),
@@ -94,11 +102,17 @@ function YouthsPage() {
   const navigate = useNavigate({ from: Route.fullPath });
   const [addOpen, setAddOpen] = useState(false);
   const [editing, setEditing] = useState<null | { id: string; initial: YouthFormInitial }>(null);
-  const [deleteTarget, setDeleteTarget] = useState<null | { id: string; name: string; cdmId: string }>(null);
+  const [deleteTarget, setDeleteTarget] = useState<null | {
+    id: string;
+    name: string;
+    cdmId: string;
+  }>(null);
   const [enrollTarget, setEnrollTarget] = useState<null | { cdmId: string; name: string }>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importResult, setImportResult] = useState<null | ImportResult>(null);
-  const [importProgress, setImportProgress] = useState<null | { current: number; total: number }>(null);
+  const [importProgress, setImportProgress] = useState<null | { current: number; total: number }>(
+    null,
+  );
   const qc = useQueryClient();
 
   const { data: org } = useQuery({ queryKey: ["org"], queryFn: fetchOrg });
@@ -106,7 +120,8 @@ function YouthsPage() {
 
   // Scope takes precedence over URL params — scoped users can't widen their view
   const deaneryId = scope.deaneryId || search.deanery_id;
-  const parishId  = scope.parishId  || search.parish_id;
+  const parishId = scope.parishId || search.parish_id;
+  const outstationId = scope.outstationId || search.outstation_id;
 
   const { data: resp, isLoading } = useQuery({
     queryKey: [
@@ -116,7 +131,7 @@ function YouthsPage() {
       search.q,
       deaneryId,
       parishId,
-      search.outstation_id,
+      outstationId,
       search.category,
       search.status,
     ],
@@ -126,8 +141,8 @@ function YouthsPage() {
         size: search.size,
         q: search.q,
         deaneryId: deaneryId || null,
-        parishId:  parishId  || null,
-        outstationId: search.outstation_id || null,
+        parishId: parishId || null,
+        outstationId: outstationId || null,
         category: search.category || null,
         status: search.status || null,
       }),
@@ -228,37 +243,82 @@ function YouthsPage() {
     { key: "altPhone", label: "Alternative phone (optional)", type: "tel", placeholder: "+254…" },
     { key: "email", label: "Email (optional)", type: "email", placeholder: "name@example.com" },
     {
-      key: "deanery", label: "Deanery", type: "select", required: true,
+      key: "deanery",
+      label: "Deanery",
+      type: "select",
+      required: true,
       options: (org?.deaneries ?? []).map((d) => d.name),
     },
     {
-      key: "parish", label: "Parish", type: "select", required: true,
-      dynamicOptions: (v) =>
-        (org?.parishesByDeaneryName.get(v.deanery) ?? []).map((p) => p.name),
+      key: "parish",
+      label: "Parish",
+      type: "select",
+      required: true,
+      dynamicOptions: (v) => (org?.parishesByDeaneryName.get(v.deanery) ?? []).map((p) => p.name),
     },
     {
-      key: "outstation", label: "Outstation / Local church", type: "select",
-      dynamicOptions: (v) =>
-        (org?.outstationsByParishName.get(v.parish) ?? []).map((o) => o.name),
+      key: "outstation",
+      label: "Outstation / Local church",
+      type: "select",
+      dynamicOptions: (v) => (org?.outstationsByParishName.get(v.parish) ?? []).map((o) => o.name),
     },
-    { key: "category", label: "Category", type: "select", options: [...YOUTH_CATEGORIES], required: true },
-    { key: "institution", label: "Institution (if Tertiary)", placeholder: "e.g. Murang'a University" },
+    {
+      key: "category",
+      label: "Category",
+      type: "select",
+      options: [...YOUTH_CATEGORIES],
+      required: true,
+    },
+    {
+      key: "institution",
+      label: "Institution (if Tertiary)",
+      placeholder: "e.g. Murang'a University",
+    },
     { key: "yearOfStudy", label: "Year of study (if Tertiary)", placeholder: "e.g. Year 2" },
-    { key: "notes", label: "Notes (optional)", type: "textarea", placeholder: "Anything worth recording" },
-    { key: "passportUrl", label: "Passport photo (optional)", type: "image", full: true, bucket: "passports" },
+    {
+      key: "notes",
+      label: "Notes (optional)",
+      type: "textarea",
+      placeholder: "Anything worth recording",
+    },
+    {
+      key: "passportUrl",
+      label: "Passport photo (optional)",
+      type: "image",
+      full: true,
+      bucket: "passports",
+    },
   ];
 
   const enrollFields: FieldDef[] = [
     { key: "cdmId", label: "CDM No.", required: true, placeholder: "CDM-2026-00001" },
     { key: "fullName", label: "Full Name", placeholder: "Youth name" },
-    { key: "paymentRef", label: "Payment reference (optional)", placeholder: "Bank slip / transaction ref" },
+    {
+      key: "paymentRef",
+      label: "Payment reference (optional)",
+      placeholder: "Bank slip / transaction ref",
+    },
   ];
 
   const IMPORT_HEADERS = [
-    "full_name", "gender", "age", "phone", "alt_phone", "email",
-    "deanery", "parish", "outstation",
-    "category", "institution", "year_of_study", "course", "notes",
-    "Diocese", "Deanery", "Parish", "Outstation",
+    "full_name",
+    "gender",
+    "age",
+    "phone",
+    "alt_phone",
+    "email",
+    "deanery",
+    "parish",
+    "outstation",
+    "category",
+    "institution",
+    "year_of_study",
+    "course",
+    "notes",
+    "Diocese",
+    "Deanery",
+    "Parish",
+    "Outstation",
   ];
 
   const downloadSample = async () => {
@@ -266,39 +326,62 @@ function YouthsPage() {
       const opts = await buildTemplateOpts();
       const sampleRows: (string | number | null)[][] = [
         [
-          "Grace Wanjiku Kamau", "Female", 16, "+254700000000", "", "grace@example.com",
-          "Gaichanjiru Deanery", "St. Pius X, Mariira", "Mariira", "Secondary", "", "", "", "",
-          "", "", "", "",
+          "Grace Wanjiku Kamau",
+          "Female",
+          16,
+          "+254700000000",
+          "",
+          "grace@example.com",
+          "Gaichanjiru Deanery",
+          "St. Pius X, Mariira",
+          "Mariira",
+          "Secondary",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
         ],
         [
-          "Peter Mwangi Njoroge", "Male", 22, "+254711000000", "", "",
-          "Mwea Deanery", "Our Lady of Consolata, Sagana", "", "Tertiary",
-          "Murang’a University of Technology", "Year 2", "Computer Science", "",
-          "Coordinator", "Secretary", "", "",
+          "Peter Mwangi Njoroge",
+          "Male",
+          22,
+          "+254711000000",
+          "",
+          "",
+          "Mwea Deanery",
+          "Our Lady of Consolata, Sagana",
+          "",
+          "Tertiary",
+          "Murang’a University of Technology",
+          "Year 2",
+          "Computer Science",
+          "",
+          "Coordinator",
+          "Secretary",
+          "",
+          "",
         ],
       ];
-      await downloadXlsx(
-        "youth-import-template",
-        "Youth Import",
-        IMPORT_HEADERS,
-        sampleRows,
-        {
-          flat: {
-            gender:      ["Female", "Male"],
-            deanery:     opts.deaneryNames,
-            category:    ["Primary", "Secondary", "Tertiary", "Working"],
-            year_of_study: ["Year 1", "Year 2", "Year 3", "Year 4", "Postgraduate", "Alumni"],
-            Diocese:     opts.roleTypeNames,
-            Deanery:     opts.roleTypeNames,
-            Parish:      opts.roleTypeNames,
-            Outstation:  opts.roleTypeNames,
-          },
-          cascade: {
-            parish:     { parent: "deanery", map: opts.parishByDeanery },
-            outstation: { parent: "parish",  map: opts.outstationByParish },
-          },
+      await downloadXlsx("youth-import-template", "Youth Import", IMPORT_HEADERS, sampleRows, {
+        flat: {
+          gender: ["Female", "Male"],
+          deanery: opts.deaneryNames,
+          category: ["Primary", "Secondary", "Tertiary", "Working"],
+          year_of_study: ["Year 1", "Year 2", "Year 3", "Year 4", "Postgraduate", "Alumni"],
+          Diocese: opts.roleTypeNames,
+          Deanery: opts.roleTypeNames,
+          Parish: opts.roleTypeNames,
+          Outstation: opts.roleTypeNames,
         },
-      );
+        cascade: {
+          parish: { parent: "deanery", map: opts.parishByDeanery },
+          outstation: { parent: "parish", map: opts.outstationByParish },
+        },
+      });
       toast.success("Import template downloaded");
     } catch (e) {
       toast.error((e as Error).message);
@@ -329,7 +412,9 @@ function YouthsPage() {
           .then((res) => res.json())
           .then((body: unknown) => {
             const b = body as { logged?: number };
-            toast.info(`${result.errors.length} import error${result.errors.length !== 1 ? "s" : ""} logged to Google Sheet (row${(b.logged ?? 0) !== 1 ? "s" : ""} appended)`);
+            toast.info(
+              `${result.errors.length} import error${result.errors.length !== 1 ? "s" : ""} logged to Google Sheet (row${(b.logged ?? 0) !== 1 ? "s" : ""} appended)`,
+            );
           })
           .catch(() => {
             toast.warning("Could not log import errors to Google Sheet");
@@ -341,7 +426,12 @@ function YouthsPage() {
     }
   };
 
-  const fc = (key: keyof YouthSearch, label: string, mode: "text" | "select" = "text", options?: { value: string; label: string }[]) => (
+  const fc = (
+    key: keyof YouthSearch,
+    label: string,
+    mode: "text" | "select" = "text",
+    options?: { value: string; label: string }[],
+  ) => (
     <ColumnFilter
       label={label}
       mode={mode}
@@ -355,14 +445,18 @@ function YouthsPage() {
     <>
       <Topbar
         title="Youth Directory"
-        description={isLoading ? "Loading youths…" : `${total.toLocaleString()} youth${total !== 1 ? "s" : ""} · share this URL to share the same view.`}
+        description={
+          isLoading
+            ? "Loading youths…"
+            : `${total.toLocaleString()} youth${total !== 1 ? "s" : ""} · share this URL to share the same view.`
+        }
         action={
           <button
             type="button"
             onClick={() => setAddOpen(true)}
             className="inline-flex h-8 items-center gap-1.5 rounded-md bg-danger px-3 text-[11px] font-bold text-white transition hover:opacity-90"
           >
-            <Plus className="h-3.5 w-3.5" /> Register Youth
+            <Icon icon="mdi:plus" className="h-3.5 w-3.5" /> Register Youth
           </button>
         }
       />
@@ -376,7 +470,8 @@ function YouthsPage() {
             onExport={async () => {
               try {
                 const all = await listYouthsPaged({
-                  page: 0, size: 2000,
+                  page: 0,
+                  size: 2000,
                   q: search.q,
                   deaneryId: search.deanery_id || null,
                   parishId: search.parish_id || null,
@@ -384,8 +479,38 @@ function YouthsPage() {
                   category: search.category || null,
                   status: search.status || null,
                 });
-                const headers = ["CDM No.", "Full Name", "Gender", "Age", "Phone", "Alt Phone", "Email", "Deanery", "Parish", "Outstation", "Category", "Institution", "Year of Study", "Status"];
-                const data: (string | number | null)[][] = (all.data ?? []).map((y) => [y.cdm_id, y.full_name, y.gender ?? null, y.age_range ?? String(y.age ?? ""), y.phone ?? null, y.alt_phone ?? null, y.email ?? null, y.deanery?.name ?? null, y.parish?.name ?? null, y.outstation?.name ?? null, y.category ?? null, y.institution ?? null, y.year_of_study ?? null, y.status ?? null]);
+                const headers = [
+                  "CDM No.",
+                  "Full Name",
+                  "Gender",
+                  "Age",
+                  "Phone",
+                  "Alt Phone",
+                  "Email",
+                  "Deanery",
+                  "Parish",
+                  "Outstation",
+                  "Category",
+                  "Institution",
+                  "Year of Study",
+                  "Status",
+                ];
+                const data: (string | number | null)[][] = (all.data ?? []).map((y) => [
+                  y.cdm_id,
+                  y.full_name,
+                  y.gender ?? null,
+                  y.age_range ?? String(y.age ?? ""),
+                  y.phone ?? null,
+                  y.alt_phone ?? null,
+                  y.email ?? null,
+                  y.deanery?.name ?? null,
+                  y.parish?.name ?? null,
+                  y.outstation?.name ?? null,
+                  y.category ?? null,
+                  y.institution ?? null,
+                  y.year_of_study ?? null,
+                  y.status ?? null,
+                ]);
                 await downloadXlsx("youths-export", "Youth Records", headers, data);
                 toast.success(`Exported ${all.total} youths`);
               } catch (e) {
@@ -399,7 +524,7 @@ function YouthsPage() {
                 className="inline-flex h-8 items-center gap-1.5 rounded-md bg-danger px-2.5 text-[11px] font-bold text-white transition hover:opacity-90"
                 title="Download Excel import sample"
               >
-                <Download className="h-3.5 w-3.5" /> Import Sample
+                <Icon icon="mdi:download" className="h-3.5 w-3.5" /> Import Sample
               </button>
             }
           />
@@ -417,7 +542,10 @@ function YouthsPage() {
           {importProgress !== null && (
             <div className="flex items-center gap-2 px-3.5 py-2 text-[11px] text-text-2 border-b border-border bg-bg-2">
               <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-gold border-t-transparent" />
-              Importing… {importProgress.total > 0 ? `${importProgress.current} / ${importProgress.total}` : "preparing"}
+              Importing…{" "}
+              {importProgress.total > 0
+                ? `${importProgress.current} / ${importProgress.total}`
+                : "preparing"}
             </div>
           )}
           <CardBody className="p-0">
@@ -433,7 +561,12 @@ function YouthsPage() {
                   <th className="label-eyebrow px-3.5 py-2.5 text-left">
                     <ColumnHeader
                       label="Sex"
-                      filter={fc("f_sex", "Sex", "select", YOUTH_GENDERS.map((g) => ({ value: g, label: g })))}
+                      filter={fc(
+                        "f_sex",
+                        "Sex",
+                        "select",
+                        YOUTH_GENDERS.map((g) => ({ value: g, label: g })),
+                      )}
                     />
                   </th>
 
@@ -446,7 +579,13 @@ function YouthsPage() {
                           mode="select"
                           options={deaneryOptions}
                           value={deaneryId ? { operator: "equals", value: deaneryId } : undefined}
-                          onChange={(v) => setFilter({ deanery_id: v?.value ?? "", parish_id: "", outstation_id: "" })}
+                          onChange={(v) =>
+                            setFilter({
+                              deanery_id: v?.value ?? "",
+                              parish_id: "",
+                              outstation_id: "",
+                            })
+                          }
                           disabled={!!scope.deaneryId}
                         />
                       }
@@ -461,7 +600,9 @@ function YouthsPage() {
                           mode="select"
                           options={parishOptions}
                           value={parishId ? { operator: "equals", value: parishId } : undefined}
-                          onChange={(v) => setFilter({ parish_id: v?.value ?? "", outstation_id: "" })}
+                          onChange={(v) =>
+                            setFilter({ parish_id: v?.value ?? "", outstation_id: "" })
+                          }
                           disabled={!!scope.parishId}
                         />
                       }
@@ -475,8 +616,11 @@ function YouthsPage() {
                           label="Outstation"
                           mode="select"
                           options={outstationOptions}
-                          value={search.outstation_id ? { operator: "equals", value: search.outstation_id } : undefined}
+                          value={
+                            outstationId ? { operator: "equals", value: outstationId } : undefined
+                          }
                           onChange={(v) => setFilter({ outstation_id: v?.value ?? "" })}
+                          disabled={!!scope.outstationId}
                         />
                       }
                     />
@@ -489,7 +633,11 @@ function YouthsPage() {
                           label="Category"
                           mode="select"
                           options={YOUTH_CATEGORIES.map((c) => ({ value: c, label: c }))}
-                          value={search.category ? { operator: "equals", value: search.category } : undefined}
+                          value={
+                            search.category
+                              ? { operator: "equals", value: search.category }
+                              : undefined
+                          }
                           onChange={(v) => setFilter({ category: v?.value ?? "" })}
                         />
                       }
@@ -502,8 +650,13 @@ function YouthsPage() {
                         <ColumnFilter
                           label="Status"
                           mode="select"
-                          options={[{ value: "active", label: "Active" }, { value: "inactive", label: "Inactive" }]}
-                          value={search.status ? { operator: "equals", value: search.status } : undefined}
+                          options={[
+                            { value: "active", label: "Active" },
+                            { value: "inactive", label: "Inactive" },
+                          ]}
+                          value={
+                            search.status ? { operator: "equals", value: search.status } : undefined
+                          }
                           onChange={(v) => setFilter({ status: v?.value ?? "" })}
                         />
                       }
@@ -514,17 +667,28 @@ function YouthsPage() {
               </thead>
               <tbody>
                 {displayRows.map((row) => (
-                  <tr key={row.id} className="border-b border-border/30 last:border-0 hover:bg-bg-3">
-                    <td className="px-3.5 py-2.5 font-mono text-[10px] font-bold text-gold">{row.cdmId}</td>
-                    <td className="px-3.5 py-2.5 text-[11px] font-semibold text-foreground">{titleCase(row.name)}</td>
-                    <td className="px-3.5 py-2.5 text-[11px] text-text-1">{row.gender === "Female" ? "F" : "M"}</td>
+                  <tr
+                    key={row.id}
+                    className="border-b border-border/30 last:border-0 hover:bg-bg-3"
+                  >
+                    <td className="px-3.5 py-2.5 font-mono text-[10px] font-bold text-gold">
+                      {row.cdmId}
+                    </td>
+                    <td className="px-3.5 py-2.5 text-[11px] font-semibold text-foreground">
+                      {titleCase(row.name)}
+                    </td>
+                    <td className="px-3.5 py-2.5 text-[11px] text-text-1">
+                      {row.gender === "Female" ? "F" : "M"}
+                    </td>
 
                     <td className="px-3.5 py-2.5 text-[11px] text-text-2">{row.deaneryName}</td>
                     <td className="px-3.5 py-2.5 text-[11px] text-text-1">{row.parishName}</td>
                     <td className="px-3.5 py-2.5 text-[11px] text-text-2">{row.churchName}</td>
                     <td className="px-3.5 py-2.5 text-[11px] text-text-1">{row.category}</td>
                     <td className="px-3.5 py-2.5">
-                      <Pill tone={row.status === "active" ? "success" : "neutral"}>{row.status}</Pill>
+                      <Pill tone={row.status === "active" ? "success" : "neutral"}>
+                        {row.status}
+                      </Pill>
                     </td>
                     <td className="px-3.5 py-2.5 text-right">
                       <DropdownMenu>
@@ -544,7 +708,8 @@ function YouthsPage() {
                                 id: row.id,
                                 initial: {
                                   fullName: row.name,
-                                  gender: row.gender as import("@/lib/db/youth-records/youths").Gender,
+                                  gender:
+                                    row.gender as import("@/lib/db/youth-records/youths").Gender,
                                   age: String(row.age),
                                   phone: row.phone,
                                   altPhone: row.altPhone,
@@ -570,7 +735,9 @@ function YouthsPage() {
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             className="text-danger focus:text-danger"
-                            onClick={() => setDeleteTarget({ id: row.id, name: row.name, cdmId: row.cdmId })}
+                            onClick={() =>
+                              setDeleteTarget({ id: row.id, name: row.name, cdmId: row.cdmId })
+                            }
                           >
                             <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
                           </DropdownMenuItem>
@@ -593,8 +760,15 @@ function YouthsPage() {
               pageSize={search.size}
               total={total}
               totalPages={totalPages}
-              onPageChange={(p) => navigate({ search: (prev: YouthSearch) => ({ ...prev, page: p }), replace: true })}
-              onPageSizeChange={(s) => navigate({ search: (prev: YouthSearch) => ({ ...prev, size: s, page: 1 }), replace: true })}
+              onPageChange={(p) =>
+                navigate({ search: (prev: YouthSearch) => ({ ...prev, page: p }), replace: true })
+              }
+              onPageSizeChange={(s) =>
+                navigate({
+                  search: (prev: YouthSearch) => ({ ...prev, size: s, page: 1 }),
+                  replace: true,
+                })
+              }
             />
           </CardBody>
         </Card>
@@ -631,7 +805,9 @@ function YouthsPage() {
         title="Confirm Enrollment · 2026"
         description="Review details and add a payment reference before confirming enrollment."
         fields={enrollFields}
-        initial={enrollTarget ? { cdmId: enrollTarget.cdmId, fullName: enrollTarget.name } : undefined}
+        initial={
+          enrollTarget ? { cdmId: enrollTarget.cdmId, fullName: enrollTarget.name } : undefined
+        }
         submitLabel="Confirm Enrollment"
         onSubmit={(values) => {
           enrollMut.mutate({ cdmId: values.cdmId.trim(), paymentRef: values.paymentRef });
@@ -643,7 +819,8 @@ function YouthsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete youth record?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently remove <strong>{deleteTarget?.name}</strong> ({deleteTarget?.cdmId}) and any linked enrollment. This cannot be undone.
+              This will permanently remove <strong>{deleteTarget?.name}</strong> (
+              {deleteTarget?.cdmId}) and any linked enrollment. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -668,15 +845,21 @@ function YouthsPage() {
                 {/* Summary row */}
                 <div className="grid grid-cols-3 gap-2">
                   <div className="rounded-lg border border-border bg-bg-2 p-3 text-center">
-                    <div className="text-2xl font-black text-gold">{importResult?.inserted ?? 0}</div>
+                    <div className="text-2xl font-black text-gold">
+                      {importResult?.inserted ?? 0}
+                    </div>
                     <div className="text-[10px] text-text-3">New records</div>
                   </div>
                   <div className="rounded-lg border border-border bg-bg-2 p-3 text-center">
-                    <div className="text-2xl font-black text-info">{importResult?.updated ?? 0}</div>
+                    <div className="text-2xl font-black text-info">
+                      {importResult?.updated ?? 0}
+                    </div>
                     <div className="text-[10px] text-text-3">Updated existing</div>
                   </div>
                   <div className="rounded-lg border border-border bg-bg-2 p-3 text-center">
-                    <div className="text-2xl font-black text-text-2">{importResult?.skipped ?? 0}</div>
+                    <div className="text-2xl font-black text-text-2">
+                      {importResult?.skipped ?? 0}
+                    </div>
                     <div className="text-[10px] text-text-3">Skipped</div>
                   </div>
                 </div>
@@ -687,7 +870,9 @@ function YouthsPage() {
                     <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-yellow-700">
                       New parishes created ({importResult!.createdParishes.length})
                     </div>
-                    <div className="text-[10px] text-yellow-800">{importResult!.createdParishes.join(", ")}</div>
+                    <div className="text-[10px] text-yellow-800">
+                      {importResult!.createdParishes.join(", ")}
+                    </div>
                   </div>
                 )}
                 {(importResult?.createdOutstations.length ?? 0) > 0 && (
@@ -695,7 +880,9 @@ function YouthsPage() {
                     <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-blue-700">
                       New outstations created ({importResult!.createdOutstations.length})
                     </div>
-                    <div className="text-[10px] text-blue-800">{importResult!.createdOutstations.join(", ")}</div>
+                    <div className="text-[10px] text-blue-800">
+                      {importResult!.createdOutstations.join(", ")}
+                    </div>
                   </div>
                 )}
                 {(importResult?.createdRoleTypes.length ?? 0) > 0 && (
@@ -703,7 +890,9 @@ function YouthsPage() {
                     <div className="mb-1 text-[10px] font-bold uppercase tracking-wide text-purple-700">
                       New leadership roles created ({importResult!.createdRoleTypes.length})
                     </div>
-                    <div className="text-[10px] text-purple-800">{importResult!.createdRoleTypes.join(", ")}</div>
+                    <div className="text-[10px] text-purple-800">
+                      {importResult!.createdRoleTypes.join(", ")}
+                    </div>
                   </div>
                 )}
 

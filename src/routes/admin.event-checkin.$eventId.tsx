@@ -2,7 +2,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { titleCase, formatPhone } from "@/lib/utils";
 import { useEffect, useMemo, useState, type ComponentType } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, QrCode, Search, UserPlus, X, BadgeCheck, Download, Loader2, UserCog, MoreVertical, Trash2, FileText, Sheet, Pencil } from "lucide-react";
+import { ArrowLeft, QrCode, Search, X, BadgeCheck, Loader2, UserCog, MoreVertical, Trash2, FileText, Sheet, Pencil } from "lucide-react";
+import { Icon } from "@iconify/react";
 import { toast } from "sonner";
 import { Topbar } from "@/components/admin/layout/topbar";
 import { Card, CardBody, Kpi } from "@/components/admin/composables/ui-bits";
@@ -407,7 +408,7 @@ function EventCheckinPage() {
                   <BadgeCheck className="h-3.5 w-3.5" /> Register
                 </button>
                 <button onClick={() => setWalkInOpen(true)} className={btnCls("primary")}>
-                  <UserPlus className="h-3.5 w-3.5" /> Walk-in
+                  <Icon icon="mdi:account-plus" className="h-3.5 w-3.5" /> Walk-in
                 </button>
                 <button onClick={() => setAddYouthOpen(true)} className={btnCls("ghost")}>
                   <UserCog className="h-3.5 w-3.5" /> New Youth
@@ -1031,7 +1032,7 @@ function WalkInDialog({
           </div>
 
           <button onClick={submit} className={btnCls("primary", "w-full justify-center")}>
-            <UserPlus className="h-3.5 w-3.5" /> Add Walk-in
+            <Icon icon="mdi:account-plus" className="h-3.5 w-3.5" /> Add Walk-in
           </button>
         </div>
       </DialogContent>
@@ -1118,7 +1119,7 @@ function ScanDialog({
           </div>
 
           <button onClick={downloadQr} className={btnCls("ghost", "w-full justify-center")}>
-            <Download className="h-3.5 w-3.5" /> Download QR (SVG)
+            <Icon icon="mdi:download" className="h-3.5 w-3.5" /> Download QR (SVG)
           </button>
         </div>
       </DialogContent>

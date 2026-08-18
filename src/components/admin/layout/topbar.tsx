@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { LogOut } from "lucide-react";
+import { LogOut, Plus } from "lucide-react";
 import cdmLogo from "@/assets/cdm-logo.jpeg";
 import { supabase } from "@/integrations/supabase/client";
 import { getMyProfile } from "@/lib/db/youth-records/profiles";
@@ -190,13 +190,23 @@ export function Topbar({
 }) {
   if (tabs) {
     return (
-      <div className="flex min-h-12 shrink-0 items-center gap-0 border-b border-border bg-card px-5">
-        <div className="mr-4 shrink-0 text-[13px] font-extrabold text-foreground">
-          {title}
+      <>
+        <div className="flex min-h-12 shrink-0 items-center gap-0 border-b border-border bg-card px-3 sm:px-5">
+          <div className="mr-3 shrink-0 text-[12px] font-extrabold text-foreground sm:mr-4 sm:text-[13px]">
+            {title}
+          </div>
+          <div className="flex min-w-0 flex-1 gap-0 overflow-x-auto overflow-y-hidden whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {tabs}
+          </div>
+          {action && <div className="hidden ml-2 shrink-0 sm:block sm:ml-auto">{action}</div>}
         </div>
-        <div className="flex flex-1 gap-0">{tabs}</div>
-        {action && <div className="ml-auto flex items-center gap-2.5">{action}</div>}
-      </div>
+        {/* Mobile: show action buttons below tabs */}
+        {action && (
+          <div className="flex sm:hidden items-center justify-end gap-2 border-b border-border bg-card px-3 py-2.5">
+            {action}
+          </div>
+        )}
+      </>
     );
   }
 
@@ -227,7 +237,7 @@ export function TopbarTab({
   return (
     <button
       onClick={onClick}
-      className={`flex h-12 items-center whitespace-nowrap border-b-2 px-3.5 text-[11px] font-semibold transition-colors ${
+      className={`flex h-12 shrink-0 items-center whitespace-nowrap border-b-2 px-3.5 text-[11px] font-semibold transition-colors ${
         active
           ? "border-danger text-danger"
           : "border-transparent text-text-3 hover:text-text-1"
@@ -245,12 +255,19 @@ export function TopbarButton({
   children: ReactNode;
   onClick?: () => void;
 }) {
+  const label = typeof children === "string" ? children : "Action";
+
   return (
     <button
+      type="button"
       onClick={onClick}
-      className="rounded-lg bg-primary px-3.5 py-1.5 text-[11px] font-bold text-primary-foreground shadow-sm transition-opacity hover:opacity-90"
+      aria-label={label}
+      title={label}
+      className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm transition-opacity hover:opacity-90 sm:w-auto sm:gap-1.5 sm:px-3.5 sm:py-1.5"
     >
-      {children}
+      <Plus className="h-3.5 w-3.5 shrink-0 sm:hidden" />
+      <span className="hidden text-[11px] font-bold sm:inline">{children}</span>
+      <span className="sr-only">{label}</span>
     </button>
   );
 }
