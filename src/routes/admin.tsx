@@ -12,10 +12,18 @@ import { supabase } from "@/integrations/supabase/client";
 import { AdminScopeCtx, emptyScope, fetchMyScope } from "@/lib/hooks/use-admin-scope";
 import { MODULE_BY_PATH, useModuleAccess } from "@/lib/hooks/use-module-access";
 import { AdminSidebar } from "@/components/admin/layout/admin-sidebar";
+import { AdminPwaRegister } from "@/components/admin/layout/pwa-register";
 import { SidebarProvider } from "@/components/admin/layout/sidebar-context";
 import { GlobalNavbar } from "@/components/admin/layout/topbar";
 
 export const Route = createFileRoute("/admin")({
+  head: () => ({
+    meta: [{ name: "theme-color", content: "#d01d21" }],
+    links: [
+      { rel: "manifest", href: "/admin-manifest.webmanifest" },
+      { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
+    ],
+  }),
   beforeLoad: async ({ location }) => {
     // Skip on the server — localStorage doesn't exist there, so getSession()
     // always returns null and would redirect every SSR page load to /login.
@@ -41,6 +49,7 @@ function AdminLayout() {
 
   return (
     <AdminScopeCtx.Provider value={scope}>
+      <AdminPwaRegister />
       <SidebarProvider>
         <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
           <AdminSidebar />
