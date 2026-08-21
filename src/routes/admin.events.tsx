@@ -279,19 +279,33 @@ function EventList({
           const endDay = endD ? String(endD.getDate()).padStart(2, "0") : null;
           const endMonth = endD ? MONTHS[endD.getMonth()] : null;
           return (
-          <div key={event.id} className="flex items-center gap-3 rounded-lg border border-border bg-bg-2 p-3">
-            <div className="min-w-[52px] shrink-0 rounded-lg bg-bg-4 px-2.5 py-2 text-center">
-              <div className="text-[8px] font-bold uppercase tracking-wide text-gold">{month}</div>
-              <div className="text-display text-[22px] font-black leading-none text-foreground">{day}</div>
-              {endDay && endMonth && (
-                <div className="mt-0.5 text-[7px] font-semibold uppercase tracking-wide text-text-3">→ {endDay} {endMonth}</div>
-              )}
+          <div key={event.id} className="rounded-lg border border-border bg-bg-2 p-3">
+            <div className="flex items-center gap-3">
+              <div className="min-w-[52px] shrink-0 rounded-lg bg-bg-4 px-2.5 py-2 text-center">
+                <div className="text-[8px] font-bold uppercase tracking-wide text-gold">{month}</div>
+                <div className="text-display text-[22px] font-black leading-none text-foreground">{day}</div>
+                {endDay && endMonth && (
+                  <div className="mt-0.5 text-[7px] font-semibold uppercase tracking-wide text-text-3">→ {endDay} {endMonth}</div>
+                )}
+              </div>
+              <div className="min-w-0 flex-1 leading-tight">
+                <div className="truncate text-[12px] font-semibold text-text-1">{event.name}</div>
+                <div className="truncate text-[10px] text-text-3">{event.venue ?? "—"} · {event.parish?.name ?? event.deanery?.name ?? "Diocese-wide"}</div>
+              </div>
+              <div className="hidden shrink-0 items-center gap-2 sm:flex">
+                <Pill tone={pillTone}>{period}</Pill>
+                <Link to="/admin/event/$eventId" params={{ eventId: event.id }} className="rounded-md border border-border bg-bg-3 px-3 py-1.5 text-[10px] font-semibold text-text-1 hover:border-gold-3 hover:text-gold">
+                  View / Edit
+                </Link>
+                <button
+                  onClick={() => onDelete(event.id, event.name)}
+                  className="rounded border border-border p-1.5 text-text-3 hover:border-danger/50 hover:text-danger"
+                >
+                  <Trash2 className="h-3 w-3" />
+                </button>
+              </div>
             </div>
-            <div className="min-w-0 flex-1 leading-tight">
-              <div className="truncate text-[12px] font-semibold text-text-1">{event.name}</div>
-              <div className="text-[10px] text-text-3">{event.venue ?? "—"} · {event.parish?.name ?? event.deanery?.name ?? "Diocese-wide"}</div>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="mt-2 flex items-center justify-end gap-2 sm:hidden">
               <Pill tone={pillTone}>{period}</Pill>
               <Link to="/admin/event/$eventId" params={{ eventId: event.id }} className="rounded-md border border-border bg-bg-3 px-3 py-1.5 text-[10px] font-semibold text-text-1 hover:border-gold-3 hover:text-gold">
                 View / Edit

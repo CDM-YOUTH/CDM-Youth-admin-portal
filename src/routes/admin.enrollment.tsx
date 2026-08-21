@@ -566,7 +566,6 @@ function EnrollmentPage() {
                       )}
                     />
                   </th>
-                  <th className="label-eyebrow px-3.5 py-2.5 text-left">Fee</th>
                   <th className="label-eyebrow px-3.5 py-2.5 text-left">
                     <ColumnHeader
                       label="Payment"
@@ -595,7 +594,6 @@ function EnrollmentPage() {
                     <td className="px-3.5 py-2.5 text-[11px] text-text-1">{row.parishName}</td>
                     <td className="px-3.5 py-2.5 text-[11px] text-text-2">{row.outstationName}</td>
                     <td className="px-3.5 py-2.5 text-[11px] text-text-1">{row.category}</td>
-                    <td className="px-3.5 py-2.5 text-[11px] text-text-1">{row.fee}</td>
                     <td className="px-3.5 py-2.5">
                       <Pill tone={row.paymentStatus === "approved" ? "success" : "gold"}>
                         {row.paymentStatus}
@@ -648,7 +646,7 @@ function EnrollmentPage() {
                 ))}
                 {displayRows.length === 0 && !isLoading && (
                   <tr>
-                    <td colSpan={9} className="px-3.5 py-6 text-center text-[11px] text-text-3">
+                    <td colSpan={8} className="px-3.5 py-6 text-center text-[11px] text-text-3">
                       No enrollments match your search.
                     </td>
                   </tr>

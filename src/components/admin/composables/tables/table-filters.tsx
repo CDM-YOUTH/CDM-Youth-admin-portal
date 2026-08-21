@@ -139,7 +139,7 @@ export function TableToolbar({
           </button>
         )}
       </div>
-      <div className="ml-auto flex items-center gap-1.5">
+      <div className="ml-auto flex min-w-0 items-center gap-1.5 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0">
         {extra}
         {onImport && (
           <button

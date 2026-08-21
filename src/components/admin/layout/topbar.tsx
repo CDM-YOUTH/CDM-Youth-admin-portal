@@ -5,6 +5,7 @@ import { LogOut, Plus } from "lucide-react";
 import cdmLogo from "@/assets/cdm-logo.jpeg";
 import { supabase } from "@/integrations/supabase/client";
 import { getMyProfile } from "@/lib/db/youth-records/profiles";
+import { PwaInstallButton } from "@/components/admin/layout/pwa-register";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -167,6 +168,7 @@ export function GlobalNavbar() {
           <span className="h-1.5 w-1.5 rounded-full bg-success" />
           Live
         </span>
+        <PwaInstallButton />
         <UserMenu />
       </div>
     </div>
@@ -183,7 +185,7 @@ export function Topbar({
   tabs,
   action,
 }: {
-  title: string;
+  title: ReactNode;
   description?: string;
   tabs?: ReactNode;
   action?: ReactNode;
@@ -215,7 +217,7 @@ export function Topbar({
       <div>
         <div className="text-[17px] font-extrabold leading-tight text-danger">{title}</div>
         {description && (
-          <div className="mt-0.5 text-[11px] text-text-3">{description}</div>
+          <div className="mt-0.5 hidden text-[11px] text-text-3 sm:block">{description}</div>
         )}
       </div>
       {action && (

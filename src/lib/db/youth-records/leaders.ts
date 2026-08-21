@@ -7,6 +7,7 @@ export type LeadershipLevel = "diocese" | "deanery" | "parish" | "outstation";
 export type RoleTypeRow = {
   id: string;
   name: string;
+  sort_order: number;
   created_at: string;
 };
 
@@ -22,6 +23,7 @@ export type LeadershipRoleRow = {
   end_date: string | null;
   notes: string | null;
   created_at: string;
+  role_sort_order: number;
   youth?: {
     full_name: string;
     cdm_id: string;
@@ -67,6 +69,7 @@ export async function listRoleTypes(): Promise<RoleTypeRow[]> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .from("leadership_role_types" as any)
     .select("*")
+    .order("sort_order")
     .order("name");
   if (error) throw error;
   return (data ?? []) as unknown as RoleTypeRow[];
@@ -84,7 +87,10 @@ export async function createRoleType(name: string): Promise<RoleTypeRow> {
 }
 
 export async function listLeadershipRoles(): Promise<LeadershipRoleRow[]> {
-  const { data, error } = await db().select(SEL).order("start_date", { ascending: false });
+  const { data, error } = await db()
+    .select(SEL)
+    .order("role_sort_order")
+    .order("start_date", { ascending: false });
   if (error) throw error;
   return (data ?? []) as LeadershipRoleRow[];
 }
@@ -111,6 +117,7 @@ export async function listLeadersPaged(opts: {
 
   let query = db()
     .select(sel, { count: "exact" })
+    .order("role_sort_order")
     .order("start_date", { ascending: false })
     .range(page * size, page * size + size - 1);
 

@@ -286,7 +286,12 @@ function CusaPage() {
   return (
     <>
       <Topbar
-        title="Colleges & Universities Students Association (CUSA)"
+        title={
+          <>
+            <span className="hidden sm:inline">Colleges & Universities Students Association (CUSA)</span>
+            <span className="sm:hidden">CUSA</span>
+          </>
+        }
         description={
           isLoading
             ? "Loading CUSA members…"
@@ -297,7 +302,7 @@ function CusaPage() {
             <button
               type="button"
               onClick={() => setAddYouthOpen(true)}
-              className="inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-bg-2 px-3 text-[11px] font-bold text-text-1 transition hover:border-gold-3 hover:text-gold"
+              className="inline-flex h-8 items-center gap-1.5 rounded-md bg-danger px-3 text-[11px] font-bold text-white transition hover:opacity-90"
             >
               <Icon icon="mdi:plus" className="h-3.5 w-3.5" /> Add Youth
             </button>
