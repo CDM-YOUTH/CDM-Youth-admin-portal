@@ -42,6 +42,8 @@ import { fetchOrg, type OrgTree } from "@/lib/db/org";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { AddYouthDialog, type AddYouthResult } from "@/components/admin/youth/add-youth-dialog";
+import { useAdminScope } from "@/lib/hooks/use-admin-scope";
+import { useScopedOrgFields } from "@/lib/hooks/use-scoped-org";
 
 export const Route = createFileRoute("/admin/event-checkin/$eventId")({
   head: () => ({
@@ -679,42 +681,46 @@ function RegisterDialog({
     retry: false,
   });
 
+  const scope = useAdminScope();
+  const isOutsideScope = (y: { deanery_id: string | null; parish_id: string | null; outstation_id: string | null }) =>
+    (!!scope.outstationId && y.outstation_id !== scope.outstationId) ||
+    (!!scope.parishId && y.parish_id !== scope.parishId) ||
+    (!!scope.deaneryId && y.deanery_id !== scope.deaneryId);
+  const previewOutsideScope = !!preview && isOutsideScope(preview);
+
   const cdmError = lookupKey && !lookingUp && preview === null
     ? `No youth found with CDM No. "${lookupKey}"`
-    : "";
+    : previewOutsideScope
+      ? `${preview!.full_name} is outside your assigned scope.`
+      : "";
 
   /* ── Browse mode ── */
-  const [bDeaneryId, setBDeaneryId] = useState(defaultDeaneryId);
-  const [bParishId, setBParishId] = useState(defaultParishId);
-  const [bOutstationId, setBOutstationId] = useState(defaultOutstationId);
+  const {
+    deaneryId: bDeaneryId,
+    parishId: bParishId,
+    outstationId: bOutstationId,
+    setDeaneryId: setBDeaneryId,
+    setParishId: setBParishId,
+    setOutstationId: setBOutstationId,
+    parishOptions: browseParishes,
+    outstationOptions: browseOutstations,
+    deaneryLocked: bDeaneryLocked,
+    parishLocked: bParishLocked,
+    outstationLocked: bOutstationLocked,
+  } = useScopedOrgFields(org, scope, {
+    initialDeaneryId: defaultDeaneryId,
+    initialParishId: defaultParishId,
+    initialOutstationId: defaultOutstationId,
+    resetKey: open,
+  });
   const [bSearch, setBSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-
-  // Seed from page-level filters when dialog opens
-  useEffect(() => {
-    if (open) {
-      setBDeaneryId(defaultDeaneryId);
-      setBParishId(defaultParishId);
-      setBOutstationId(defaultOutstationId);
-    }
-  }, [open, defaultDeaneryId, defaultParishId, defaultOutstationId]);
 
   // Debounce the search input (250 ms) to avoid a query per keystroke
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(bSearch), 250);
     return () => clearTimeout(t);
   }, [bSearch]);
-
-  /* Cascade options — pure JS from the cached org tree, zero DB calls */
-  const browseParishes = bDeaneryId
-    ? org.parishes.filter((p) => p.deanery_id === bDeaneryId)
-    : org.parishes;
-
-  const browseOutstations = bParishId
-    ? org.outstations.filter((o) => o.parish_id === bParishId)
-    : bDeaneryId
-      ? org.outstations.filter((o) => browseParishes.some((p) => p.id === o.parish_id))
-      : org.outstations;
 
   /* Youth search — one debounced query combining name + all org filters */
   const { data: browseData, isFetching: searching } = useQuery({
@@ -785,7 +791,7 @@ function RegisterDialog({
               </button>
             </div>
             {cdmError && <p className="text-[11px] text-danger">{cdmError}</p>}
-            {preview && (
+            {preview && !previewOutsideScope && (
               <div className="rounded-lg border border-border bg-bg-2 p-3 space-y-1">
                 <div className="font-bold text-[13px] text-text-1">{titleCase(preview.full_name)}</div>
                 <div className="text-[11px] text-text-3">
@@ -808,40 +814,46 @@ function RegisterDialog({
           <div className="space-y-3">
             {/* Cascading location selects — no DB calls, cascade from cached org tree */}
             <div className="flex flex-wrap gap-2">
-              <select
-                value={bDeaneryId}
-                onChange={(e) => { setBDeaneryId(e.target.value); setBParishId(""); setBOutstationId(""); }}
-                className={SEL_CLS}
-              >
-                <option value="">All Deaneries</option>
-                {org.deaneries.map((d) => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
-                ))}
-              </select>
+              {!bDeaneryLocked && (
+                <select
+                  value={bDeaneryId}
+                  onChange={(e) => setBDeaneryId(e.target.value)}
+                  className={SEL_CLS}
+                >
+                  <option value="">All Deaneries</option>
+                  {org.deaneries.map((d) => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+                </select>
+              )}
 
-              <select
-                value={bParishId}
-                onChange={(e) => { setBParishId(e.target.value); setBOutstationId(""); }}
-                className={SEL_CLS}
-                disabled={browseParishes.length === 0}
-              >
-                <option value="">All Parishes</option>
-                {browseParishes.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
+              {!bParishLocked && (
+                <select
+                  value={bParishId}
+                  onChange={(e) => setBParishId(e.target.value)}
+                  className={SEL_CLS}
+                  disabled={browseParishes.length === 0}
+                >
+                  <option value="">All Parishes</option>
+                  {browseParishes.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              )}
 
-              <select
-                value={bOutstationId}
-                onChange={(e) => setBOutstationId(e.target.value)}
-                className={SEL_CLS}
-                disabled={browseOutstations.length === 0}
-              >
-                <option value="">All Outstations</option>
-                {browseOutstations.map((o) => (
-                  <option key={o.id} value={o.id}>{o.name}</option>
-                ))}
-              </select>
+              {!bOutstationLocked && (
+                <select
+                  value={bOutstationId}
+                  onChange={(e) => setBOutstationId(e.target.value)}
+                  className={SEL_CLS}
+                  disabled={browseOutstations.length === 0}
+                >
+                  <option value="">All Outstations</option>
+                  {browseOutstations.map((o) => (
+                    <option key={o.id} value={o.id}>{o.name}</option>
+                  ))}
+                </select>
+              )}
             </div>
 
             {/* Name search — debounced, one call covers name + all org filters */}
@@ -921,26 +933,27 @@ function WalkInDialog({
 }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [deaneryId, setDeaneryId] = useState("");
-  const [parishId, setParishId] = useState("");
-  const [outstationId, setOutstationId] = useState("");
   const [role, setRole] = useState<string>("guest");
+
+  const scope = useAdminScope();
+  const {
+    deaneryId,
+    parishId,
+    outstationId,
+    setDeaneryId,
+    setParishId,
+    setOutstationId,
+    parishOptions,
+    outstationOptions,
+    deaneryLocked,
+    parishLocked,
+    outstationLocked,
+  } = useScopedOrgFields(org, scope, { resetKey: open });
 
   const reset = () => {
     setName(""); setPhone("");
-    setDeaneryId(""); setParishId(""); setOutstationId("");
     setRole("guest");
   };
-
-  const parishOptions = deaneryId
-    ? (org?.parishes ?? []).filter((p) => p.deanery_id === deaneryId)
-    : (org?.parishes ?? []);
-
-  const outstationOptions = parishId
-    ? (org?.outstations ?? []).filter((o) => o.parish_id === parishId)
-    : deaneryId
-      ? (org?.outstations ?? []).filter((o) => parishOptions.some((p) => p.id === o.parish_id))
-      : (org?.outstations ?? []);
 
   const submit = () => {
     if (!name.trim()) { toast.error("Name is required"); return; }
@@ -976,39 +989,47 @@ function WalkInDialog({
           </div>
 
           <div className="grid grid-cols-1 gap-2">
-            <label className="text-[11px] font-bold text-text-3">Location (optional)</label>
-            <select
-              value={deaneryId}
-              onChange={(e) => { setDeaneryId(e.target.value); setParishId(""); setOutstationId(""); }}
-              className={SEL_CLS}
-            >
-              <option value="">Select Deanery</option>
-              {(org?.deaneries ?? []).map((d) => (
-                <option key={d.id} value={d.id}>{d.name}</option>
-              ))}
-            </select>
-            <select
-              value={parishId}
-              onChange={(e) => { setParishId(e.target.value); setOutstationId(""); }}
-              disabled={!deaneryId || parishOptions.length === 0}
-              className={SEL_CLS}
-            >
-              <option value="">Select Parish</option>
-              {parishOptions.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-            <select
-              value={outstationId}
-              onChange={(e) => setOutstationId(e.target.value)}
-              disabled={!parishId || outstationOptions.length === 0}
-              className={SEL_CLS}
-            >
-              <option value="">Select Outstation</option>
-              {outstationOptions.map((o) => (
-                <option key={o.id} value={o.id}>{o.name}</option>
-              ))}
-            </select>
+            {(!deaneryLocked || !parishLocked || !outstationLocked) && (
+              <label className="text-[11px] font-bold text-text-3">Location (optional)</label>
+            )}
+            {!deaneryLocked && (
+              <select
+                value={deaneryId}
+                onChange={(e) => setDeaneryId(e.target.value)}
+                className={SEL_CLS}
+              >
+                <option value="">Select Deanery</option>
+                {(org?.deaneries ?? []).map((d) => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </select>
+            )}
+            {!parishLocked && (
+              <select
+                value={parishId}
+                onChange={(e) => setParishId(e.target.value)}
+                disabled={!deaneryId || parishOptions.length === 0}
+                className={SEL_CLS}
+              >
+                <option value="">Select Parish</option>
+                {parishOptions.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            )}
+            {!outstationLocked && (
+              <select
+                value={outstationId}
+                onChange={(e) => setOutstationId(e.target.value)}
+                disabled={!parishId || outstationOptions.length === 0}
+                className={SEL_CLS}
+              >
+                <option value="">Select Outstation</option>
+                {outstationOptions.map((o) => (
+                  <option key={o.id} value={o.id}>{o.name}</option>
+                ))}
+              </select>
+            )}
           </div>
 
           <div>
@@ -1139,31 +1160,35 @@ function EditGuestDialog({
 }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
-  const [deaneryId, setDeaneryId] = useState("");
-  const [parishId, setParishId] = useState("");
-  const [outstationId, setOutstationId] = useState("");
   const [role, setRole] = useState<string>("guest");
 
   // Re-seed whenever the target changes (dialog opens for a different guest)
   useEffect(() => {
-    if (!target || !org) return;
+    if (!target) return;
     setName(target.name);
     setPhone(target.phone);
     setRole(target.role || "guest");
-    setDeaneryId(org.deaneries.find((d) => d.name === target.deanery)?.id ?? "");
-    setParishId(org.parishes.find((p) => p.name === target.parish)?.id ?? "");
-    setOutstationId(org.outstations.find((o) => o.name === target.outstation)?.id ?? "");
-  }, [target, org]);
+  }, [target]);
 
-  const parishOptions = deaneryId
-    ? (org?.parishes ?? []).filter((p) => p.deanery_id === deaneryId)
-    : (org?.parishes ?? []);
-
-  const outstationOptions = parishId
-    ? (org?.outstations ?? []).filter((o) => o.parish_id === parishId)
-    : deaneryId
-      ? (org?.outstations ?? []).filter((o) => parishOptions.some((p) => p.id === o.parish_id))
-      : (org?.outstations ?? []);
+  const scope = useAdminScope();
+  const {
+    deaneryId,
+    parishId,
+    outstationId,
+    setDeaneryId,
+    setParishId,
+    setOutstationId,
+    parishOptions,
+    outstationOptions,
+    deaneryLocked,
+    parishLocked,
+    outstationLocked,
+  } = useScopedOrgFields(org, scope, {
+    initialDeaneryId: org?.deaneries.find((d) => d.name === target?.deanery)?.id,
+    initialParishId: org?.parishes.find((p) => p.name === target?.parish)?.id,
+    initialOutstationId: org?.outstations.find((o) => o.name === target?.outstation)?.id,
+    resetKey: target?.id,
+  });
 
   const submit = () => {
     if (!name.trim()) { toast.error("Name is required"); return; }
@@ -1195,39 +1220,47 @@ function EditGuestDialog({
           </div>
 
           <div className="grid grid-cols-1 gap-2">
-            <label className="text-[11px] font-bold text-text-3">Location (optional)</label>
-            <select
-              value={deaneryId}
-              onChange={(e) => { setDeaneryId(e.target.value); setParishId(""); setOutstationId(""); }}
-              className={SEL_CLS}
-            >
-              <option value="">Select Deanery</option>
-              {(org?.deaneries ?? []).map((d) => (
-                <option key={d.id} value={d.id}>{d.name}</option>
-              ))}
-            </select>
-            <select
-              value={parishId}
-              onChange={(e) => { setParishId(e.target.value); setOutstationId(""); }}
-              disabled={!deaneryId || parishOptions.length === 0}
-              className={SEL_CLS}
-            >
-              <option value="">Select Parish</option>
-              {parishOptions.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-            <select
-              value={outstationId}
-              onChange={(e) => setOutstationId(e.target.value)}
-              disabled={!parishId || outstationOptions.length === 0}
-              className={SEL_CLS}
-            >
-              <option value="">Select Outstation</option>
-              {outstationOptions.map((o) => (
-                <option key={o.id} value={o.id}>{o.name}</option>
-              ))}
-            </select>
+            {(!deaneryLocked || !parishLocked || !outstationLocked) && (
+              <label className="text-[11px] font-bold text-text-3">Location (optional)</label>
+            )}
+            {!deaneryLocked && (
+              <select
+                value={deaneryId}
+                onChange={(e) => setDeaneryId(e.target.value)}
+                className={SEL_CLS}
+              >
+                <option value="">Select Deanery</option>
+                {(org?.deaneries ?? []).map((d) => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </select>
+            )}
+            {!parishLocked && (
+              <select
+                value={parishId}
+                onChange={(e) => setParishId(e.target.value)}
+                disabled={!deaneryId || parishOptions.length === 0}
+                className={SEL_CLS}
+              >
+                <option value="">Select Parish</option>
+                {parishOptions.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            )}
+            {!outstationLocked && (
+              <select
+                value={outstationId}
+                onChange={(e) => setOutstationId(e.target.value)}
+                disabled={!parishId || outstationOptions.length === 0}
+                className={SEL_CLS}
+              >
+                <option value="">Select Outstation</option>
+                {outstationOptions.map((o) => (
+                  <option key={o.id} value={o.id}>{o.name}</option>
+                ))}
+              </select>
+            )}
           </div>
 
           <div>

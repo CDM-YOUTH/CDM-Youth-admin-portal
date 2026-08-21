@@ -316,7 +316,7 @@ function genderRows(units: AnalyticsUnit[], metric: "enrolled" | "missionNominee
 
 function GeneralTab({ chartDisplay }: { chartDisplay: ChartDisplay }) {
   const rpc = useRpcFilters();
-  const { scopeParams, groupBy } = rpc;
+  const { scopeParams, groupBy, adminScope } = rpc;
 
   const { data: summary, isLoading: summaryLoading } = useQuery({
     queryKey: [
@@ -364,8 +364,9 @@ function GeneralTab({ chartDisplay }: { chartDisplay: ChartDisplay }) {
     staleTime: 30_000,
   });
   const { data: dashboardEvents = [] } = useQuery({
-    queryKey: ["dashboard-events"],
-    queryFn: () => listDashboardEvents(4),
+    queryKey: ["dashboard-events", adminScope.deaneryId, adminScope.parishId],
+    queryFn: () =>
+      listDashboardEvents(4, { deaneryId: adminScope.deaneryId, parishId: adminScope.parishId }),
     staleTime: 60_000,
   });
 

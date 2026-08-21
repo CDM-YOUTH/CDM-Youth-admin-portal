@@ -1,6 +1,9 @@
 import { supabase } from "@/integrations/supabase/client";
 import { likePattern } from "@/lib/utils";
 
+const EVENT_ROW_SELECT =
+  "id, name, event_date, end_date, venue, description, poster_url, organization_level, deanery:deaneries(name), parish:parishes(name), open_to_all";
+
 export type EventRow = {
   id: string;
   name: string;
@@ -12,6 +15,8 @@ export type EventRow = {
   organization_level: "Diocese" | "Deanery" | "Parish" | "Outstation" | null;
   deanery: { name: string } | null;
   parish: { name: string } | null;
+  /** Admin override: visible to every org scope regardless of deanery/parish. */
+  open_to_all: boolean;
 };
 
 export type EventProgramItem = {
@@ -83,6 +88,8 @@ export type EventInput = {
   organizationLevel?: EventRow["organization_level"];
   deaneryName?: string | null;
   parishName?: string | null;
+  /** Admin override: visible to every org scope regardless of deanery/parish. */
+  openToAll?: boolean;
 };
 
 async function resolveOrgIds(deaneryName?: string | null, parishName?: string | null) {
@@ -102,7 +109,7 @@ async function resolveOrgIds(deaneryName?: string | null, parishName?: string | 
 export async function listEvents(): Promise<EventRow[]> {
   const { data, error } = await supabase
     .from("events")
-    .select("id, name, event_date, end_date, venue, description, poster_url, organization_level, deanery:deaneries(name), parish:parishes(name)")
+    .select(EVENT_ROW_SELECT)
     .order("event_date", { ascending: false })
     .limit(500);
   if (error) throw error;
@@ -123,8 +130,9 @@ export async function createEvent(input: EventInput): Promise<EventRow> {
       organization_level: input.organizationLevel || null,
       deanery_id,
       parish_id,
+      open_to_all: input.openToAll ?? false,
     })
-    .select("id, name, event_date, end_date, venue, description, poster_url, organization_level, deanery:deaneries(name), parish:parishes(name)")
+    .select(EVENT_ROW_SELECT)
     .single();
   if (error) throw error;
   return data as unknown as EventRow;
@@ -144,9 +152,10 @@ export async function updateEvent(id: string, input: EventInput): Promise<EventR
       organization_level: input.organizationLevel || null,
       deanery_id,
       parish_id,
+      open_to_all: input.openToAll ?? false,
     })
     .eq("id", id)
-    .select("id, name, event_date, end_date, venue, description, poster_url, organization_level, deanery:deaneries(name), parish:parishes(name)")
+    .select(EVENT_ROW_SELECT)
     .single();
   if (error) throw error;
   return data as unknown as EventRow;
@@ -267,7 +276,7 @@ export async function getEventFull(eventId: string): Promise<EventFull> {
   const [eventRes, programRes, categoriesRes, registrationsRes, checkinRes] = await Promise.all([
     supabase
       .from("events")
-      .select("id, name, event_date, end_date, venue, description, poster_url, organization_level, deanery:deaneries(name), parish:parishes(name)")
+      .select(EVENT_ROW_SELECT)
       .eq("id", eventId)
       .single(),
     supabase
@@ -427,12 +436,38 @@ export async function listRegistrations(eventId: string) {
   return data ?? [];
 }
 
+/**
+ * Restrict a caller's org scope to what they're allowed to *see*: events explicitly marked
+ * `open_to_all` by an admin, plus anything within their own scope — never another
+ * deanery/parish's events, and a plain diocese-wide event (`deanery_id IS NULL`) is *not*
+ * auto-visible on its own — it needs `open_to_all` too. Distinct from a user-chosen
+ * narrowing filter (a plain `.eq()`), which stays strict. A parish/outstation-scoped caller
+ * also sees deanery-wide events in their own deanery (`parish_id IS NULL`), since those
+ * cover their parish too.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function applyEventScopeFilter(query: any, scopeDeaneryId?: string | null, scopeParishId?: string | null) {
+  if (scopeParishId) {
+    return query.or(
+      `open_to_all.eq.true,parish_id.eq.${scopeParishId},and(deanery_id.eq.${scopeDeaneryId},parish_id.is.null)`,
+    );
+  }
+  if (scopeDeaneryId) {
+    return query.or(`open_to_all.eq.true,deanery_id.eq.${scopeDeaneryId}`);
+  }
+  return query;
+}
+
 export async function listEventsPaged(opts: {
   page?: number;
   size?: number;
   q?: string;
+  /** User-chosen narrowing filter — applied as a strict match. */
   deaneryId?: string | null;
   parishId?: string | null;
+  /** Caller's org scope — a visibility boundary, not a narrowing filter (see `applyEventScopeFilter`). */
+  scopeDeaneryId?: string | null;
+  scopeParishId?: string | null;
   period?: "upcoming" | "ongoing" | "done" | null;
 }): Promise<{ data: EventRow[]; total: number; page: number; size: number }> {
   const page = opts.page ?? 0;
@@ -443,12 +478,13 @@ export async function listEventsPaged(opts: {
   let query = (supabase as any)
     .from("events")
     .select(
-      "id, name, event_date, end_date, venue, description, poster_url, organization_level, deanery:deaneries(name), parish:parishes(name)",
+      EVENT_ROW_SELECT,
       { count: "exact" },
     )
     .order("event_date", { ascending: opts.period === "upcoming" })
     .range(page * size, page * size + size - 1);
 
+  query = applyEventScopeFilter(query, opts.scopeDeaneryId, opts.scopeParishId);
   if (opts.deaneryId) query = query.eq("deanery_id", opts.deaneryId);
   if (opts.parishId)  query = query.eq("parish_id",  opts.parishId);
   // upcoming: starts strictly in the future
@@ -467,22 +503,33 @@ export async function listEventsPaged(opts: {
   return { data: (data ?? []) as unknown as EventRow[], total: count ?? 0, page, size };
 }
 
-export async function listDashboardEvents(limit = 4): Promise<EventRow[]> {
+export async function listDashboardEvents(
+  limit = 4,
+  scope?: { deaneryId?: string | null; parishId?: string | null },
+): Promise<EventRow[]> {
   const today = new Date().toISOString().slice(0, 10);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db = supabase as any;
-  const sel = "id, name, event_date, end_date, venue, description, poster_url, organization_level, deanery:deaneries(name), parish:parishes(name)";
+  const sel = EVENT_ROW_SELECT;
 
   const [ongoingRes, upcomingRes] = await Promise.all([
-    db.from("events").select(sel)
-      .lte("event_date", today)
-      .or(`end_date.gte.${today},and(end_date.is.null,event_date.eq.${today})`)
-      .order("event_date", { ascending: true })
-      .limit(limit),
-    db.from("events").select(sel)
-      .gt("event_date", today)
-      .order("event_date", { ascending: true })
-      .limit(limit),
+    applyEventScopeFilter(
+      db.from("events").select(sel)
+        .lte("event_date", today)
+        .or(`end_date.gte.${today},and(end_date.is.null,event_date.eq.${today})`)
+        .order("event_date", { ascending: true })
+        .limit(limit),
+      scope?.deaneryId,
+      scope?.parishId,
+    ),
+    applyEventScopeFilter(
+      db.from("events").select(sel)
+        .gt("event_date", today)
+        .order("event_date", { ascending: true })
+        .limit(limit),
+      scope?.deaneryId,
+      scope?.parishId,
+    ),
   ]);
 
   const combined = [...(ongoingRes.data ?? []), ...(upcomingRes.data ?? [])];

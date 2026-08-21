@@ -29,6 +29,7 @@ import {
   YouthSearchInput,
   type PickedYouth,
 } from "@/components/admin/composables/pickers/youth-search-input";
+import { AddYouthDialog } from "@/components/admin/youth/add-youth-dialog";
 import { fetchOrg, type OrgTree } from "@/lib/db/org";
 import { useAdminScope } from "@/lib/hooks/use-admin-scope";
 import {
@@ -796,67 +797,115 @@ function EnrollDialog({
 }) {
   const [youth, setYouth] = useState<PickedYouth | null>(null);
   const [paymentRef, setPaymentRef] = useState("");
+  const [addYouthOpen, setAddYouthOpen] = useState(false);
+  const [addYouthName, setAddYouthName] = useState("");
+  const qc = useQueryClient();
 
   useEffect(() => {
     if (open) {
       setYouth(null);
       setPaymentRef("");
+      setAddYouthOpen(false);
+      setAddYouthName("");
     }
   }, [open]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg border-border bg-white text-foreground">
-        <DialogHeader>
-          <DialogTitle className="text-display text-xl font-black text-gold">
-            Enroll Youth · {year}
-          </DialogTitle>
-          <DialogDescription className="text-[12px] text-text-3">
-            Find by CDM No. or browse by location. Name, phone and parish are filled automatically.
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-lg border-border bg-white text-foreground">
+          <DialogHeader>
+            <DialogTitle className="text-display text-xl font-black text-gold">
+              Enroll Youth · {year}
+            </DialogTitle>
+            <DialogDescription className="text-[12px] text-text-3">
+              Find by CDM No. or browse by location. Name, phone and parish are filled
+              automatically.
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="space-y-3">
-          <div className="space-y-1">
-            <p className="text-[10px] font-bold uppercase tracking-wide text-text-3">Youth *</p>
-            <YouthSearchInput value={youth} onChange={setYouth} org={org} />
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-text-3">Youth *</p>
+              <YouthSearchInput
+                value={youth}
+                onChange={setYouth}
+                org={org}
+                onAddNew={(prefillName) => {
+                  setAddYouthName(prefillName ?? "");
+                  setAddYouthOpen(true);
+                }}
+              />
+            </div>
+
+            <label className="block space-y-1 text-[10px] font-bold uppercase tracking-wide text-text-3">
+              <span>Payment reference (optional)</span>
+              <Input
+                value={paymentRef}
+                onChange={(e) => setPaymentRef(e.target.value)}
+                placeholder="Bank slip / transaction ref"
+              />
+            </label>
           </div>
 
-          <label className="block space-y-1 text-[10px] font-bold uppercase tracking-wide text-text-3">
-            <span>Payment reference (optional)</span>
-            <Input
-              value={paymentRef}
-              onChange={(e) => setPaymentRef(e.target.value)}
-              placeholder="Bank slip / transaction ref"
-            />
-          </label>
-        </div>
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => onOpenChange(false)}
+              className="rounded-lg border border-border bg-bg-3 px-3 py-2 text-[11px] font-bold text-text-2"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (!youth) {
+                  toast.error("Select a youth first");
+                  return;
+                }
+                onSubmit(youth.cdm_id, paymentRef.trim() || undefined);
+              }}
+              disabled={isPending}
+              className="rounded-lg bg-primary px-4 py-2 text-[11px] font-bold text-primary-foreground hover:opacity-90 disabled:opacity-60"
+            >
+              {isPending ? "Saving…" : "Save Enrollment"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-        <DialogFooter>
-          <button
-            type="button"
-            onClick={() => onOpenChange(false)}
-            className="rounded-lg border border-border bg-bg-3 px-3 py-2 text-[11px] font-bold text-text-2"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              if (!youth) {
-                toast.error("Select a youth first");
-                return;
-              }
-              onSubmit(youth.cdm_id, paymentRef.trim() || undefined);
-            }}
-            disabled={isPending}
-            className="rounded-lg bg-primary px-4 py-2 text-[11px] font-bold text-primary-foreground hover:opacity-90 disabled:opacity-60"
-          >
-            {isPending ? "Saving…" : "Save Enrollment"}
-          </button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      {org && (
+        <AddYouthDialog
+          open={addYouthOpen}
+          onClose={() => setAddYouthOpen(false)}
+          org={org}
+          title="Add Youth & Enroll"
+          description={`Registers a new youth record and enrolls them for ${year} automatically on save.`}
+          initial={{
+            fullName: addYouthName,
+            gender: "Female",
+            age: "",
+            phone: "",
+            altPhone: "",
+            email: "",
+            deaneryId: "",
+            parishId: "",
+            outstationId: "",
+            category: "Secondary",
+            institution: "",
+            yearOfStudy: "",
+            notes: "",
+          }}
+          onSuccess={(newYouth) => {
+            setAddYouthOpen(false);
+            qc.invalidateQueries({ queryKey: ["youths"] });
+            qc.invalidateQueries({ queryKey: ["dashboard-counts"] });
+            qc.invalidateQueries({ queryKey: ["live-analytics"] });
+            onSubmit(newYouth.cdm_id, paymentRef.trim() || undefined);
+          }}
+        />
+      )}
+    </>
   );
 }
 
