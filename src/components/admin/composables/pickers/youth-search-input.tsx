@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Search, X } from "lucide-react";
+import { Search, UserPlus, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import type { OrgTree } from "@/lib/db/org";
@@ -75,10 +75,13 @@ export function YouthSearchInput({
   value,
   onChange,
   org,
+  onAddNew,
 }: {
   value: PickedYouth | null;
   onChange: (youth: PickedYouth | null) => void;
   org?: OrgTree;
+  /** When provided, an "Add youth" action is shown once a search comes up empty. */
+  onAddNew?: (prefillName?: string) => void;
 }) {
   const [mode, setMode] = useState<"cdm" | "browse">("cdm");
 
@@ -221,7 +224,20 @@ export function YouthSearchInput({
               {cdmBusy ? "Looking…" : "Look up"}
             </button>
           </div>
-          {cdmError && <p className="text-[11px] text-danger">{cdmError}</p>}
+          {cdmError && (
+            <div className="space-y-1.5">
+              <p className="text-[11px] text-danger">{cdmError}</p>
+              {onAddNew && (
+                <button
+                  type="button"
+                  onClick={() => onAddNew()}
+                  className="inline-flex h-7 items-center gap-1.5 rounded-md border border-gold-3 px-3 text-[11px] font-bold text-gold hover:bg-gold-3/10"
+                >
+                  <UserPlus className="h-3.5 w-3.5" /> Add youth
+                </button>
+              )}
+            </div>
+          )}
           {cdmPreview && (
             <YouthCard
               youth={cdmPreview}
@@ -288,9 +304,20 @@ export function YouthSearchInput({
                 {(bDeanery || bParish) ? " within the selected location" : ""}.
               </p>
             ) : bResults.length === 0 ? (
-              <p className="p-3 text-center text-[11px] text-text-3">
-                No youth found. Try widening filters or checking the spelling.
-              </p>
+              <div className="space-y-1.5 p-3 text-center">
+                <p className="text-[11px] text-text-3">
+                  No youth found. Try widening filters or checking the spelling.
+                </p>
+                {onAddNew && (
+                  <button
+                    type="button"
+                    onClick={() => onAddNew(bSearch.trim())}
+                    className="mx-auto inline-flex h-7 items-center gap-1.5 rounded-md border border-gold-3 px-3 text-[11px] font-bold text-gold hover:bg-gold-3/10"
+                  >
+                    <UserPlus className="h-3.5 w-3.5" /> Add "{bSearch.trim()}" as new youth
+                  </button>
+                )}
+              </div>
             ) : (
               bResults.map((y) => (
                 <button
