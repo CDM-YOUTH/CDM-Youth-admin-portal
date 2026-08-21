@@ -36,6 +36,8 @@ import {
 } from "@/lib/db/youth-records/leaders";
 import { createCusaMember } from "@/lib/db/youth-records/cusa";
 import type { OrgTree } from "@/lib/db/org";
+import { useAdminScope } from "@/lib/hooks/use-admin-scope";
+import { useScopedOrgFields } from "@/lib/hooks/use-scoped-org";
 
 /* ── constants ─────────────────────────────────────────────────── */
 
@@ -112,13 +114,31 @@ export function AddYouthDialog({
   const [phone, setPhone] = useState(initial?.phone ?? "");
   const [altPhone, setAltPhone] = useState(initial?.altPhone ?? "");
   const [email, setEmail] = useState(initial?.email ?? "");
-  const [deaneryId, setDeaneryId] = useState(initial?.deaneryId ?? "");
-  const [parishId, setParishId] = useState(initial?.parishId ?? "");
-  const [outstationId, setOutstationId] = useState(initial?.outstationId ?? "");
   const [category, setCategory] = useState<YouthCategory>(initial?.category ?? "Secondary");
   const [institution, setInstitution] = useState(initial?.institution ?? "");
   const [yearOfStudy, setYearOfStudy] = useState(initial?.yearOfStudy ?? "");
   const [notes, setNotes] = useState(initial?.notes ?? "");
+
+  /* ── scope-aware org fields ── */
+  const scope = useAdminScope();
+  const {
+    deaneryId,
+    parishId,
+    outstationId,
+    setDeaneryId,
+    setParishId,
+    setOutstationId,
+    parishOptions,
+    outstationOptions,
+    deaneryLocked,
+    parishLocked,
+    outstationLocked,
+  } = useScopedOrgFields(org, scope, {
+    initialDeaneryId: initial?.deaneryId,
+    initialParishId: initial?.parishId,
+    initialOutstationId: initial?.outstationId,
+    resetKey: open,
+  });
 
   /* ── leadership state ── */
   const [isLeader, setIsLeader] = useState(false);
@@ -152,9 +172,6 @@ export function AddYouthDialog({
     setPhone(initial?.phone ?? "");
     setAltPhone(initial?.altPhone ?? "");
     setEmail(initial?.email ?? "");
-    setDeaneryId(initial?.deaneryId ?? "");
-    setParishId(initial?.parishId ?? "");
-    setOutstationId(initial?.outstationId ?? "");
     setCategory(initial?.category ?? "Secondary");
     setInstitution(initial?.institution ?? "");
     setYearOfStudy(initial?.yearOfStudy ?? "");
@@ -183,17 +200,6 @@ export function AddYouthDialog({
     setSelectedLevels(levels);
     setLevelPositions(positions);
   }, [open, youthId, activeRoles]);
-
-  /* cascading org selects */
-  const parishOptions = deaneryId
-    ? org.parishes.filter((p) => p.deanery_id === deaneryId)
-    : org.parishes;
-
-  const outstationOptions = parishId
-    ? org.outstations.filter((o) => o.parish_id === parishId)
-    : deaneryId
-      ? org.outstations.filter((o) => parishOptions.some((p) => p.id === o.parish_id))
-      : org.outstations;
 
   /* ── mutation ── */
   const mut = useMutation({
@@ -401,48 +407,43 @@ export function AddYouthDialog({
           </label>
 
           {/* ── deanery ── */}
-          <label className={LBL}>
-            <span>Deanery *</span>
-            <Select
-              value={deaneryId}
-              onValueChange={(v) => { setDeaneryId(v); setParishId(""); setOutstationId(""); }}
-            >
-              <SelectTrigger><SelectValue placeholder="Select Deanery" /></SelectTrigger>
-              <SelectContent>
-                {org.deaneries.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </label>
+          {!deaneryLocked && (
+            <label className={LBL}>
+              <span>Deanery *</span>
+              <Select value={deaneryId} onValueChange={setDeaneryId}>
+                <SelectTrigger><SelectValue placeholder="Select Deanery" /></SelectTrigger>
+                <SelectContent>
+                  {org.deaneries.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </label>
+          )}
 
           {/* ── parish ── */}
-          <label className={LBL}>
-            <span>Parish *</span>
-            <Select
-              value={parishId}
-              onValueChange={(v) => { setParishId(v); setOutstationId(""); }}
-              disabled={!deaneryId}
-            >
-              <SelectTrigger><SelectValue placeholder={deaneryId ? "Select Parish" : "Choose deanery first"} /></SelectTrigger>
-              <SelectContent>
-                {parishOptions.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </label>
+          {!parishLocked && (
+            <label className={LBL}>
+              <span>Parish *</span>
+              <Select value={parishId} onValueChange={setParishId} disabled={!deaneryId}>
+                <SelectTrigger><SelectValue placeholder={deaneryId ? "Select Parish" : "Choose deanery first"} /></SelectTrigger>
+                <SelectContent>
+                  {parishOptions.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </label>
+          )}
 
           {/* ── outstation ── */}
-          <label className={LBL}>
-            <span>Outstation</span>
-            <Select
-              value={outstationId}
-              onValueChange={setOutstationId}
-              disabled={!parishId}
-            >
-              <SelectTrigger><SelectValue placeholder={parishId ? "Select Outstation" : "Choose parish first"} /></SelectTrigger>
-              <SelectContent>
-                {outstationOptions.map((o) => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </label>
+          {!outstationLocked && (
+            <label className={LBL}>
+              <span>Outstation</span>
+              <Select value={outstationId} onValueChange={setOutstationId} disabled={!parishId}>
+                <SelectTrigger><SelectValue placeholder={parishId ? "Select Outstation" : "Choose parish first"} /></SelectTrigger>
+                <SelectContent>
+                  {outstationOptions.map((o) => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </label>
+          )}
 
           {/* ── tertiary fields ── */}
           {category === "Tertiary" && (

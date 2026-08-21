@@ -75,24 +75,30 @@ function EventsPage() {
   const deaneryId = scope.deaneryId || search.deanery_id;
   const parishId  = scope.parishId  || search.parish_id;
 
+  // A scoped caller's own deanery/parish is a visibility *boundary* (diocese-wide events
+  // plus their own scope — see `applyEventScopeFilter`), not a strict narrowing filter.
+  // Only pass a manual filter choice through as strict once that level isn't already scoped.
+  const filterDeaneryId = scope.deaneryId ? null : (search.deanery_id || null);
+  const filterParishId  = scope.parishId  ? null : (search.parish_id  || null);
+
   const { data: org } = useQuery({ queryKey: ["org"], queryFn: fetchOrg });
   const { data: analytics } = useQuery({ queryKey: ["events-analytics"], queryFn: getEventsAnalytics });
 
   const { data: upcomingResp } = useQuery({
     queryKey: ["events", "upcoming", search.q, deaneryId, parishId, search.upcoming_page, search.size],
-    queryFn: () => listEventsPaged({ page: search.upcoming_page - 1, size: search.size, q: search.q, deaneryId: deaneryId || null, parishId: parishId || null, period: "upcoming" }),
+    queryFn: () => listEventsPaged({ page: search.upcoming_page - 1, size: search.size, q: search.q, deaneryId: filterDeaneryId, parishId: filterParishId, scopeDeaneryId: scope.deaneryId, scopeParishId: scope.parishId, period: "upcoming" }),
     placeholderData: keepPreviousData,
   });
 
   const { data: ongoingResp } = useQuery({
     queryKey: ["events", "ongoing", search.q, deaneryId, parishId, search.ongoing_page, search.size],
-    queryFn: () => listEventsPaged({ page: search.ongoing_page - 1, size: search.size, q: search.q, deaneryId: deaneryId || null, parishId: parishId || null, period: "ongoing" }),
+    queryFn: () => listEventsPaged({ page: search.ongoing_page - 1, size: search.size, q: search.q, deaneryId: filterDeaneryId, parishId: filterParishId, scopeDeaneryId: scope.deaneryId, scopeParishId: scope.parishId, period: "ongoing" }),
     placeholderData: keepPreviousData,
   });
 
   const { data: doneResp } = useQuery({
     queryKey: ["events", "done", search.q, deaneryId, parishId, search.done_page, search.size],
-    queryFn: () => listEventsPaged({ page: search.done_page - 1, size: search.size, q: search.q, deaneryId: deaneryId || null, parishId: parishId || null, period: "done" }),
+    queryFn: () => listEventsPaged({ page: search.done_page - 1, size: search.size, q: search.q, deaneryId: filterDeaneryId, parishId: filterParishId, scopeDeaneryId: scope.deaneryId, scopeParishId: scope.parishId, period: "done" }),
     placeholderData: keepPreviousData,
   });
 
@@ -316,7 +322,7 @@ function EventList({
   );
 }
 
-function CreateEventDialog({ onCreate }: { onCreate: (data: { name: string; eventDate?: string | null; endDate?: string | null; venue?: string | null; description?: string | null; deaneryName?: string | null; parishName?: string | null; organizationLevel?: "Diocese"|"Deanery"|"Parish"|"Outstation"|null }) => void }) {
+function CreateEventDialog({ onCreate }: { onCreate: (data: { name: string; eventDate?: string | null; endDate?: string | null; venue?: string | null; description?: string | null; deaneryName?: string | null; parishName?: string | null; organizationLevel?: "Diocese"|"Deanery"|"Parish"|"Outstation"|null; openToAll?: boolean }) => void }) {
   const [open, setOpen] = useState(false);
   const qc = useQueryClient();
 
@@ -336,6 +342,7 @@ function CreateEventDialog({ onCreate }: { onCreate: (data: { name: string; even
         deaneryName: state.details.deanery || null,
         parishName: state.details.parish || null,
         organizationLevel: (state.details.level || null) as "Diocese"|"Deanery"|"Parish"|"Outstation"|null,
+        openToAll: state.details.openToAll,
       });
     }
     setOpen(false);
