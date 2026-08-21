@@ -91,6 +91,7 @@ function eventToFormSeed(event: EventFull): EventFormState {
       level: (event.organization_level as EventFormState["details"]["level"]) ?? "",
       deanery: event.deanery?.name ?? "",
       parish: event.parish?.name ?? "",
+      openToAll: event.open_to_all,
       description: event.description ?? "",
       posterUrl: event.poster_url ?? "",
       hasDuties,
@@ -224,6 +225,9 @@ function EventDetailPage() {
                   )}
                   {event.organization_level !== "Diocese" && event.organization_level !== "Deanery" && (
                     <ReadField label="Parish" value={event.parish?.name ?? "—"} />
+                  )}
+                  {event.open_to_all && (
+                    <ReadField label="Visibility" value="Open to all deaneries/parishes" />
                   )}
                   {event.description && (
                     <div className="md:col-span-2">
