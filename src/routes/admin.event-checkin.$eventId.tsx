@@ -412,17 +412,17 @@ function EventCheckinPage() {
                 <button onClick={() => setWalkInOpen(true)} className={btnCls("primary")}>
                   <Icon icon="mdi:account-plus" className="h-3.5 w-3.5" /> Walk-in
                 </button>
-                <button onClick={() => setAddYouthOpen(true)} className={btnCls("ghost")}>
+                <button onClick={() => setAddYouthOpen(true)} className={btnCls("primary")}>
                   <UserCog className="h-3.5 w-3.5" /> New Youth
                 </button>
-                <button onClick={() => exportPdf(filtered)} className={btnCls("ghost")} title="Export current view as PDF">
+                <button onClick={() => exportPdf(filtered)} className={btnCls("primary")} title="Export current view as PDF">
                   <FileText className="h-3.5 w-3.5" /> Export PDF
                 </button>
                 {isLeadershipWorkshop && (
                   <button
                     onClick={syncToSheets}
                     disabled={sheetSyncing}
-                    className={btnCls("ghost")}
+                    className={btnCls("primary")}
                     title="Sync all registrations to Google Sheet"
                   >
                     {sheetSyncing
@@ -431,7 +431,7 @@ function EventCheckinPage() {
                     {sheetSyncing ? "Syncing…" : "Sync to Sheets"}
                   </button>
                 )}
-                <button onClick={() => setScanOpen(true)} className={btnCls("ghost")}>
+                <button onClick={() => setScanOpen(true)} className={btnCls("primary")}>
                   <QrCode className="h-3.5 w-3.5" /> Show QR
                 </button>
               </>

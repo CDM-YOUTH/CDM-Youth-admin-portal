@@ -53,7 +53,7 @@ function AdminLayout() {
       <SidebarProvider>
         <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
           <AdminSidebar />
-          <div className="flex flex-1 flex-col overflow-hidden">
+          <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
             <GlobalNavbar />
             <ModuleGuard>
               <Outlet />
