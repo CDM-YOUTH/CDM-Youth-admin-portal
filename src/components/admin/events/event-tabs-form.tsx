@@ -12,7 +12,10 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ORGANIZATION } from "@/lib/mock-data";
 import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
 import { createEvent, updateEvent, saveEventProgram, saveEventDuties } from "@/lib/db/activities/events";
+import { fetchOrg } from "@/lib/db/org";
+import { useAdminScope } from "@/lib/hooks/use-admin-scope";
 import { YouthPicker } from "@/components/admin/composables/pickers/youth-picker";
 import { supabase } from "@/integrations/supabase/client";
 import { Upload, Loader2 } from "lucide-react";
@@ -29,6 +32,8 @@ export type EventDetails = {
   level: "Diocese" | "Deanery" | "Parish" | "Outstation" | "";
   deanery: string;
   parish: string;
+  /** Admin override: visible to every org scope regardless of deanery/parish. */
+  openToAll: boolean;
   description: string;
   posterUrl: string;
   hasDuties: boolean;
@@ -115,6 +120,7 @@ export function emptyEventState(): EventFormState {
       level: "",
       deanery: "",
       parish: "",
+      openToAll: false,
       description: "",
       posterUrl: "",
       hasDuties: false,
@@ -207,6 +213,7 @@ export function EventTabsForm({
     organizationLevel: (state.details.level || null) as "Diocese" | "Deanery" | "Parish" | "Outstation" | null,
     deaneryName: state.details.deanery || null,
     parishName: state.details.parish || null,
+    openToAll: state.details.openToAll,
   });
 
   const ensureEventSaved = async (): Promise<string> => {
@@ -409,9 +416,45 @@ function DetailsTab({
   details: EventDetails;
   onChange: (patch: Partial<EventDetails>) => void;
 }) {
+  const { data: org } = useQuery({ queryKey: ["org"], queryFn: fetchOrg, staleTime: Infinity });
+  const scope = useAdminScope();
+
   const parishes =
-    ORGANIZATION.find((d) => d.name === details.deanery)?.parishes.map((p) => p.name) ?? [];
+    details.deanery && org ? (org.parishesByDeaneryName.get(details.deanery) ?? []).map((p) => p.name) : [];
   const dateValue = details.date ? new Date(details.date) : undefined;
+
+  /* ── scope lock: hide deanery/parish once the caller's scope determines them ── */
+  const scopeDeaneryName = scope.deaneryId ? org?.deaneries.find((d) => d.id === scope.deaneryId)?.name : undefined;
+  const scopeParishName = scope.parishId ? org?.parishes.find((p) => p.id === scope.parishId)?.name : undefined;
+  const currentDeaneryId = details.deanery ? org?.byDeaneryName.get(details.deanery)?.id : undefined;
+  const currentParishId = details.parish ? org?.parishes.find((p) => p.name === details.parish)?.id : undefined;
+  const deaneryMismatched = !!(scope.deaneryId && currentDeaneryId && currentDeaneryId !== scope.deaneryId);
+  const parishMismatched = !!(scope.parishId && currentParishId && currentParishId !== scope.parishId);
+  const deaneryLocked = !!scope.deaneryId && !deaneryMismatched;
+  const parishLocked = !!scope.parishId && !parishMismatched;
+
+  useEffect(() => {
+    const patch: Partial<EventDetails> = {};
+    if (deaneryLocked && scopeDeaneryName && details.deanery !== scopeDeaneryName) {
+      patch.deanery = scopeDeaneryName;
+      patch.parish = parishLocked && scopeParishName ? scopeParishName : "";
+    } else if (parishLocked && scopeParishName && details.parish !== scopeParishName) {
+      patch.parish = scopeParishName;
+    }
+    if (Object.keys(patch).length) onChange(patch);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deaneryLocked, parishLocked, scopeDeaneryName, scopeParishName, details.deanery, details.parish]);
+
+  /* Level options — a scoped user can't create/edit an event above their own org tier */
+  const baseLevels = scope.outstationId
+    ? ["Outstation"]
+    : scope.parishId
+      ? ["Parish", "Outstation"]
+      : scope.deaneryId
+        ? ["Deanery", "Parish", "Outstation"]
+        : ["Diocese", "Deanery", "Parish", "Outstation"];
+  const levelOptions =
+    details.level && !baseLevels.includes(details.level) ? [details.level, ...baseLevels] : baseLevels;
 
   return (
     <div className="grid gap-3 md:grid-cols-2">
@@ -503,14 +546,21 @@ function DetailsTab({
         <Select
           value={details.level}
           onValueChange={(v) =>
-            onChange({ level: v as EventDetails["level"], deanery: "", parish: "" })
+            onChange({
+              level: v as EventDetails["level"],
+              deanery: deaneryLocked ? details.deanery : "",
+              parish: parishLocked ? details.parish : "",
+              // Diocese-level only reaches every scope once "open to all" is on too —
+              // default it on here so picking "Diocese" doesn't silently stay scoped.
+              openToAll: v === "Diocese" ? true : details.openToAll,
+            })
           }
         >
           <SelectTrigger>
             <SelectValue placeholder="Diocese / Deanery / Parish / Outstation" />
           </SelectTrigger>
           <SelectContent>
-            {["Diocese", "Deanery", "Parish", "Outstation"].map((l) => (
+            {levelOptions.map((l) => (
               <SelectItem key={l} value={l}>
                 {l}
               </SelectItem>
@@ -518,41 +568,63 @@ function DetailsTab({
           </SelectContent>
         </Select>
       </FieldLabel>
-      <FieldLabel label="Deanery (optional)">
-        <Select
-          value={details.deanery}
-          onValueChange={(v) => onChange({ deanery: v, parish: "" })}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Select deanery" />
-          </SelectTrigger>
-          <SelectContent>
-            {ORGANIZATION.map((d) => (
-              <SelectItem key={d.code} value={d.name}>
-                {d.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </FieldLabel>
-      <FieldLabel label="Parish (optional)">
-        <Select
-          value={details.parish}
-          onValueChange={(v) => onChange({ parish: v })}
-          disabled={!details.deanery}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder={details.deanery ? "Select parish" : "Pick deanery first"} />
-          </SelectTrigger>
-          <SelectContent>
-            {parishes.map((p) => (
-              <SelectItem key={p} value={p}>
-                {p}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </FieldLabel>
+      {!deaneryLocked && (
+        <FieldLabel label="Deanery (optional)">
+          <Select
+            value={details.deanery}
+            onValueChange={(v) => onChange({ deanery: v, parish: "" })}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Select deanery" />
+            </SelectTrigger>
+            <SelectContent>
+              {(org?.deaneries ?? []).map((d) => (
+                <SelectItem key={d.id} value={d.name}>
+                  {d.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </FieldLabel>
+      )}
+      {!parishLocked && (
+        <FieldLabel label="Parish (optional)">
+          <Select
+            value={details.parish}
+            onValueChange={(v) => onChange({ parish: v })}
+            disabled={!details.deanery}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder={details.deanery ? "Select parish" : "Pick deanery first"} />
+            </SelectTrigger>
+            <SelectContent>
+              {parishes.map((p) => (
+                <SelectItem key={p} value={p}>
+                  {p}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </FieldLabel>
+      )}
+      <div className="md:col-span-2">
+        <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-border bg-bg-2 px-3 py-2.5">
+          <input
+            type="checkbox"
+            checked={details.openToAll}
+            onChange={(e) => onChange({ openToAll: e.target.checked })}
+            className="mt-0.5 h-4 w-4 accent-danger"
+          />
+          <span>
+            <span className="block text-[11px] font-bold text-text-1">Open to all deaneries/parishes</span>
+            <span className="block text-[10px] text-text-3">
+              Visible and open for registration to every scope, even outside its own deanery/parish
+              — use this for a diocesan event hosted by one office that other reps still need to
+              register people for.
+            </span>
+          </span>
+        </label>
+      </div>
       <div className="md:col-span-2">
         <FieldLabel label="Description">
           <Textarea

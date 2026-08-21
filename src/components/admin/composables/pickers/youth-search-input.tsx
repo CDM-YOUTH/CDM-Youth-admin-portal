@@ -3,6 +3,7 @@ import { Search, UserPlus, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import type { OrgTree } from "@/lib/db/org";
+import { useAdminScope } from "@/lib/hooks/use-admin-scope";
 
 export type PickedYouth = {
   id: string;
@@ -85,6 +86,15 @@ export function YouthSearchInput({
 }) {
   const [mode, setMode] = useState<"cdm" | "browse">("cdm");
 
+  const scope = useAdminScope();
+  const deaneryLocked = !!scope.deaneryId;
+  const parishLocked = !!scope.parishId;
+  const outstationLocked = !!scope.outstationId;
+  const isOutsideScope = (y: PickedYouth) =>
+    (!!scope.outstationId && y.outstation_id !== scope.outstationId) ||
+    (!!scope.parishId && y.parish_id !== scope.parishId) ||
+    (!!scope.deaneryId && y.deanery_id !== scope.deaneryId);
+
   // CDM mode
   const [cdmInput,   setCdmInput]   = useState("");
   const [cdmPreview, setCdmPreview] = useState<PickedYouth | null>(null);
@@ -109,6 +119,23 @@ export function YouthSearchInput({
     return org.outstationsByParishName.get(bParish) ?? [];
   }, [org, bParish]);
 
+  // Seed the browse cascade from the caller's org scope once the org tree is loaded
+  useEffect(() => {
+    if (!org) return;
+    if (scope.deaneryId) {
+      const name = org.deaneries.find((d) => d.id === scope.deaneryId)?.name;
+      if (name) setBDeanery(name);
+    }
+    if (scope.parishId) {
+      const name = org.parishes.find((p) => p.id === scope.parishId)?.name;
+      if (name) setBParish(name);
+    }
+    if (scope.outstationId) {
+      const name = org.outstations.find((o) => o.id === scope.outstationId)?.name;
+      if (name) setBOutstation(name);
+    }
+  }, [org, scope.deaneryId, scope.parishId, scope.outstationId]);
+
   // CDM lookup
   const lookupCdm = async () => {
     const cdm = cdmInput.trim();
@@ -120,7 +147,12 @@ export function YouthSearchInput({
     const { data } = await (supabase as any).from("youths").select(SEL).eq("cdm_id", cdm).maybeSingle();
     setCdmBusy(false);
     if (!data) { setCdmError(`No youth found with CDM No. "${cdm}"`); return; }
-    setCdmPreview(map(data));
+    const picked = map(data);
+    if (isOutsideScope(picked)) {
+      setCdmError(`${picked.full_name} is outside your assigned scope.`);
+      return;
+    }
+    setCdmPreview(picked);
   };
 
   // Browse search — debounced, filtered by org unit IDs
@@ -259,32 +291,38 @@ export function YouthSearchInput({
       {mode === "browse" && (
         <div className="space-y-2">
           <div className="flex flex-wrap gap-1.5">
-            <select
-              value={bDeanery}
-              onChange={(e) => { setBDeanery(e.target.value); setBParish(""); setBOutstation(""); }}
-              className={selCls}
-            >
-              <option value="">All Deaneries</option>
-              {deaneries.map((d) => <option key={d.id} value={d.name}>{d.name}</option>)}
-            </select>
-            <select
-              value={bParish}
-              onChange={(e) => { setBParish(e.target.value); setBOutstation(""); }}
-              className={selCls}
-              disabled={parishes.length === 0}
-            >
-              <option value="">All Parishes</option>
-              {parishes.map((p) => <option key={p.id} value={p.name}>{p.name}</option>)}
-            </select>
-            <select
-              value={bOutstation}
-              onChange={(e) => setBOutstation(e.target.value)}
-              className={selCls}
-              disabled={outstations.length === 0}
-            >
-              <option value="">All Outstations</option>
-              {outstations.map((o) => <option key={o.id} value={o.name}>{o.name}</option>)}
-            </select>
+            {!deaneryLocked && (
+              <select
+                value={bDeanery}
+                onChange={(e) => { setBDeanery(e.target.value); setBParish(""); setBOutstation(""); }}
+                className={selCls}
+              >
+                <option value="">All Deaneries</option>
+                {deaneries.map((d) => <option key={d.id} value={d.name}>{d.name}</option>)}
+              </select>
+            )}
+            {!parishLocked && (
+              <select
+                value={bParish}
+                onChange={(e) => { setBParish(e.target.value); setBOutstation(""); }}
+                className={selCls}
+                disabled={parishes.length === 0}
+              >
+                <option value="">All Parishes</option>
+                {parishes.map((p) => <option key={p.id} value={p.name}>{p.name}</option>)}
+              </select>
+            )}
+            {!outstationLocked && (
+              <select
+                value={bOutstation}
+                onChange={(e) => setBOutstation(e.target.value)}
+                className={selCls}
+                disabled={outstations.length === 0}
+              >
+                <option value="">All Outstations</option>
+                {outstations.map((o) => <option key={o.id} value={o.name}>{o.name}</option>)}
+              </select>
+            )}
           </div>
 
           <div className="relative">
