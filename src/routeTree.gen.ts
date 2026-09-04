@@ -44,6 +44,8 @@ import { Route as PortalEventsRouteImport } from './routes/portal.events'
 import { Route as PortalFormationRouteImport } from './routes/portal.formation'
 import { Route as AdminEventCheckinEventIdRouteImport } from './routes/admin.event-checkin.$eventId'
 import { Route as AdminEventEventIdRouteImport } from './routes/admin.event.$eventId'
+import { Route as AdminFormationBulletinRouteImport } from './routes/admin.formation.bulletin'
+import { Route as AdminFormationYfpRouteImport } from './routes/admin.formation.yfp'
 import { Route as ApiAdminInviteUserRouteImport } from './routes/api/admin/invite-user'
 import { Route as ApiSheetsErrorsRouteImport } from './routes/api/sheets/errors'
 import { Route as ApiSheetsLeadershipRouteImport } from './routes/api/sheets/leadership'
@@ -227,6 +229,16 @@ const AdminEventEventIdRoute = AdminEventEventIdRouteImport.update({
   path: '/event/$eventId',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminFormationBulletinRoute = AdminFormationBulletinRouteImport.update({
+  id: '/bulletin',
+  path: '/bulletin',
+  getParentRoute: () => AdminFormationRoute,
+} as any)
+const AdminFormationYfpRoute = AdminFormationYfpRouteImport.update({
+  id: '/yfp',
+  path: '/yfp',
+  getParentRoute: () => AdminFormationRoute,
+} as any)
 const ApiAdminInviteUserRoute = ApiAdminInviteUserRouteImport.update({
   id: '/api/admin/invite-user',
   path: '/api/admin/invite-user',
@@ -269,7 +281,7 @@ export interface FileRoutesByFullPath {
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/enrollment': typeof AdminEnrollmentRoute
   '/admin/events': typeof AdminEventsRoute
-  '/admin/formation': typeof AdminFormationRoute
+  '/admin/formation': typeof AdminFormationRouteWithChildren
   '/admin/leaders': typeof AdminLeadersRoute
   '/admin/mission': typeof AdminMissionRoute
   '/admin/reports': typeof AdminReportsRoute
@@ -294,6 +306,8 @@ export interface FileRoutesByFullPath {
   '/portal/': typeof PortalIndexRoute
   '/admin/event-checkin/$eventId': typeof AdminEventCheckinEventIdRoute
   '/admin/event/$eventId': typeof AdminEventEventIdRoute
+  '/admin/formation/bulletin': typeof AdminFormationBulletinRoute
+  '/admin/formation/yfp': typeof AdminFormationYfpRoute
   '/api/admin/invite-user': typeof ApiAdminInviteUserRoute
   '/api/sheets/errors': typeof ApiSheetsErrorsRoute
   '/api/sheets/leadership': typeof ApiSheetsLeadershipRoute
@@ -310,7 +324,7 @@ export interface FileRoutesByTo {
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/enrollment': typeof AdminEnrollmentRoute
   '/admin/events': typeof AdminEventsRoute
-  '/admin/formation': typeof AdminFormationRoute
+  '/admin/formation': typeof AdminFormationRouteWithChildren
   '/admin/leaders': typeof AdminLeadersRoute
   '/admin/mission': typeof AdminMissionRoute
   '/admin/reports': typeof AdminReportsRoute
@@ -335,6 +349,8 @@ export interface FileRoutesByTo {
   '/portal': typeof PortalIndexRoute
   '/admin/event-checkin/$eventId': typeof AdminEventCheckinEventIdRoute
   '/admin/event/$eventId': typeof AdminEventEventIdRoute
+  '/admin/formation/bulletin': typeof AdminFormationBulletinRoute
+  '/admin/formation/yfp': typeof AdminFormationYfpRoute
   '/api/admin/invite-user': typeof ApiAdminInviteUserRoute
   '/api/sheets/errors': typeof ApiSheetsErrorsRoute
   '/api/sheets/leadership': typeof ApiSheetsLeadershipRoute
@@ -354,7 +370,7 @@ export interface FileRoutesById {
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/enrollment': typeof AdminEnrollmentRoute
   '/admin/events': typeof AdminEventsRoute
-  '/admin/formation': typeof AdminFormationRoute
+  '/admin/formation': typeof AdminFormationRouteWithChildren
   '/admin/leaders': typeof AdminLeadersRoute
   '/admin/mission': typeof AdminMissionRoute
   '/admin/reports': typeof AdminReportsRoute
@@ -379,6 +395,8 @@ export interface FileRoutesById {
   '/portal/': typeof PortalIndexRoute
   '/admin/event-checkin/$eventId': typeof AdminEventCheckinEventIdRoute
   '/admin/event/$eventId': typeof AdminEventEventIdRoute
+  '/admin/formation/bulletin': typeof AdminFormationBulletinRoute
+  '/admin/formation/yfp': typeof AdminFormationYfpRoute
   '/api/admin/invite-user': typeof ApiAdminInviteUserRoute
   '/api/sheets/errors': typeof ApiSheetsErrorsRoute
   '/api/sheets/leadership': typeof ApiSheetsLeadershipRoute
@@ -424,6 +442,8 @@ export interface FileRouteTypes {
     | '/portal/'
     | '/admin/event-checkin/$eventId'
     | '/admin/event/$eventId'
+    | '/admin/formation/bulletin'
+    | '/admin/formation/yfp'
     | '/api/admin/invite-user'
     | '/api/sheets/errors'
     | '/api/sheets/leadership'
@@ -465,6 +485,8 @@ export interface FileRouteTypes {
     | '/portal'
     | '/admin/event-checkin/$eventId'
     | '/admin/event/$eventId'
+    | '/admin/formation/bulletin'
+    | '/admin/formation/yfp'
     | '/api/admin/invite-user'
     | '/api/sheets/errors'
     | '/api/sheets/leadership'
@@ -508,6 +530,8 @@ export interface FileRouteTypes {
     | '/portal/'
     | '/admin/event-checkin/$eventId'
     | '/admin/event/$eventId'
+    | '/admin/formation/bulletin'
+    | '/admin/formation/yfp'
     | '/api/admin/invite-user'
     | '/api/sheets/errors'
     | '/api/sheets/leadership'
@@ -783,6 +807,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminEventEventIdRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/formation/bulletin': {
+      id: '/admin/formation/bulletin'
+      path: '/bulletin'
+      fullPath: '/admin/formation/bulletin'
+      preLoaderRoute: typeof AdminFormationBulletinRouteImport
+      parentRoute: typeof AdminFormationRoute
+    }
+    '/admin/formation/yfp': {
+      id: '/admin/formation/yfp'
+      path: '/yfp'
+      fullPath: '/admin/formation/yfp'
+      preLoaderRoute: typeof AdminFormationYfpRouteImport
+      parentRoute: typeof AdminFormationRoute
+    }
     '/api/admin/invite-user': {
       id: '/api/admin/invite-user'
       path: '/api/admin/invite-user'
@@ -828,13 +866,27 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AdminFormationRouteChildren {
+  AdminFormationBulletinRoute: typeof AdminFormationBulletinRoute
+  AdminFormationYfpRoute: typeof AdminFormationYfpRoute
+}
+
+const AdminFormationRouteChildren: AdminFormationRouteChildren = {
+  AdminFormationBulletinRoute: AdminFormationBulletinRoute,
+  AdminFormationYfpRoute: AdminFormationYfpRoute,
+}
+
+const AdminFormationRouteWithChildren = AdminFormationRoute._addFileChildren(
+  AdminFormationRouteChildren,
+)
+
 interface AdminRouteChildren {
   AdminAuditRoute: typeof AdminAuditRoute
   AdminCusaRoute: typeof AdminCusaRoute
   AdminDashboardRoute: typeof AdminDashboardRoute
   AdminEnrollmentRoute: typeof AdminEnrollmentRoute
   AdminEventsRoute: typeof AdminEventsRoute
-  AdminFormationRoute: typeof AdminFormationRoute
+  AdminFormationRoute: typeof AdminFormationRouteWithChildren
   AdminLeadersRoute: typeof AdminLeadersRoute
   AdminMissionRoute: typeof AdminMissionRoute
   AdminReportsRoute: typeof AdminReportsRoute
@@ -854,7 +906,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminDashboardRoute: AdminDashboardRoute,
   AdminEnrollmentRoute: AdminEnrollmentRoute,
   AdminEventsRoute: AdminEventsRoute,
-  AdminFormationRoute: AdminFormationRoute,
+  AdminFormationRoute: AdminFormationRouteWithChildren,
   AdminLeadersRoute: AdminLeadersRoute,
   AdminMissionRoute: AdminMissionRoute,
   AdminReportsRoute: AdminReportsRoute,

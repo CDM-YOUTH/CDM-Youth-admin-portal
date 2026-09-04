@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -8,6 +9,8 @@ import {
   Compass,
   GraduationCap,
   BookOpen,
+  Newspaper,
+  Book,
   HeartPulse,
   Shirt,
   BarChart3,
@@ -16,6 +19,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Crown,
+  ChevronDown,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useSidebar } from "./sidebar-context";
@@ -24,11 +28,12 @@ import { getMyProfile } from "@/lib/db/youth-records/profiles";
 import { useModuleAccess } from "@/lib/hooks/use-module-access";
 
 type NavItem = {
-  to: string;
+  to?: string;
   label: string;
   icon: LucideIcon;
   module: string;
   badge?: { text: string; tone: "danger" | "gold" | "info" };
+  children?: NavItem[];
 };
 
 type NavGroup = { label: string; items: NavItem[] };
@@ -77,7 +82,8 @@ const GROUPS: NavGroup[] = [
   {
     label: "Pastoral",
     items: [
-      { to: "/admin/formation", label: "Formation", icon: BookOpen, module: "formation" },
+      { to: "/admin/formation/bulletin", label: "Bulletin Library", icon: Newspaper, module: "formation" },
+      { to: "/admin/formation/yfp", label: "YFP Curriculum", icon: Book, module: "formation" },
       {
         to: "/admin/welfare",
         label: "Welfare",
@@ -140,6 +146,7 @@ function getInitials(name: string): string {
 }
 
 export function AdminSidebar() {
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { collapsed, toggle } = useSidebar();
 
@@ -167,6 +174,26 @@ export function AdminSidebar() {
     ...group,
     items: group.items.filter((item) => access[item.module]?.canView),
   })).filter((group) => group.items.length > 0);
+
+  const toggleExpand = (label: string) => {
+    const newExpanded = new Set(expandedItems);
+    if (newExpanded.has(label)) {
+      newExpanded.delete(label);
+    } else {
+      newExpanded.add(label);
+    }
+    setExpandedItems(newExpanded);
+  };
+
+  const isItemActive = (item: NavItem): boolean => {
+    if (item.to && (pathname === item.to || pathname.startsWith(item.to + "/"))) {
+      return true;
+    }
+    if (item.children) {
+      return item.children.some((child) => child.to && pathname.startsWith(child.to));
+    }
+    return false;
+  };
 
   return (
     <aside
@@ -202,12 +229,78 @@ export function AdminSidebar() {
             {!collapsed && <div className="label-eyebrow px-2 pb-1 pt-2.5">{group.label}</div>}
             {collapsed && <div className="my-2 h-px bg-border/60" />}
             {group.items.map((item) => {
-              const isActive = pathname === item.to || pathname.startsWith(item.to + "/");
+              const isActive = isItemActive(item);
+              const isExpanded = expandedItems.has(item.label);
+              const hasChildren = item.children && item.children.length > 0;
               const Icon = item.icon;
+
+              if (hasChildren) {
+                return (
+                  <div key={item.label}>
+                    <button
+                      type="button"
+                      onClick={() => !collapsed && toggleExpand(item.label)}
+                      className={`relative mb-[2px] flex w-full items-center rounded-lg text-[12px] font-bold transition-colors ${
+                        collapsed ? "h-9 justify-center" : "gap-2.5 px-2.5 py-[7px]"
+                      } ${
+                        isActive
+                          ? "bg-accent font-bold text-danger"
+                          : "text-gold-3 hover:bg-bg-3 hover:text-gold-3"
+                      }`}
+                      title={collapsed ? item.label : undefined}
+                    >
+                      {isActive && (
+                        <span className="absolute left-0 top-1/2 h-3.5 w-[3px] -translate-y-1/2 rounded-r bg-danger" />
+                      )}
+                      <Icon className="h-3.5 w-3.5 shrink-0" />
+                      {!collapsed && (
+                        <>
+                          <span>{item.label}</span>
+                          <ChevronDown
+                            className={`ml-auto h-3.5 w-3.5 transition-transform ${
+                              isExpanded ? "rotate-180" : ""
+                            }`}
+                          />
+                        </>
+                      )}
+                      {item.badge && <Badge {...item.badge} collapsed={collapsed} />}
+                    </button>
+
+                    {!collapsed && isExpanded && (
+                      <div className="mt-1 space-y-[2px] pl-2">
+                        {item.children.map((child) => {
+                          const isChildActive =
+                            child.to &&
+                            (pathname === child.to || pathname.startsWith(child.to + "/"));
+                          const ChildIcon = child.icon;
+                          return (
+                            <Link
+                              key={child.to}
+                              to={child.to!}
+                              className={`relative flex items-center rounded-lg text-[11px] font-bold transition-colors gap-2.5 px-2.5 py-[6px] ${
+                                isChildActive
+                                  ? "bg-accent text-danger"
+                                  : "text-gold-3 hover:bg-bg-3 hover:text-gold-3"
+                              }`}
+                            >
+                              {isChildActive && (
+                                <span className="absolute left-0 top-1/2 h-3 w-[2px] -translate-y-1/2 rounded-r bg-danger" />
+                              )}
+                              <ChildIcon className="h-3 w-3 shrink-0" />
+                              <span>{child.label}</span>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
               return (
                 <Link
                   key={item.to}
-                  to={item.to}
+                  to={item.to!}
                   title={collapsed ? item.label : undefined}
                   className={`relative mb-[2px] flex items-center rounded-lg text-[12px] font-bold transition-colors ${
                     collapsed ? "h-9 justify-center" : "gap-2.5 px-2.5 py-[7px]"
