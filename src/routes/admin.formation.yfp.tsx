@@ -13,6 +13,7 @@ import {
 import { Topbar, TopbarButton } from "@/components/admin/layout/topbar";
 import { Card, CardBody, CardHead } from "@/components/admin/composables/ui-bits";
 import { RecordFormDialog } from "@/components/admin/composables/forms/record-form-dialog";
+import { CurriculumFormDialog } from "@/components/admin/composables/forms/curriculum-form-dialog";
 import { PillarFormDialog } from "@/components/admin/composables/forms/pillar-form-dialog";
 import {
   AlertDialog,
@@ -62,7 +63,7 @@ function YFPPage() {
   const [selectedPillar, setSelectedPillar] = useState<YFPPillar | null>(null);
   const [showCreateCurriculum, setShowCreateCurriculum] = useState(false);
   const [showCreatePillar, setShowCreatePillar] = useState(false);
-  const [editingCurriculum, setEditingCurriculum] = useState<{ id: string; initial: Record<string, string> } | null>(null);
+  const [editingCurriculum, setEditingCurriculum] = useState<{ id: string; initial: Record<string, any> } | null>(null);
   const [editingPillar, setEditingPillar] = useState<{ id: string; initial: Record<string, string> } | null>(null);
   const [editingArticle, setEditingArticle] = useState<{ id: string; initial: Record<string, any> } | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string; type: "curriculum" | "pillar" | "article" } | null>(null);
@@ -192,7 +193,7 @@ function YFPPage() {
   };
 
   return (
-    <>
+    <div className="flex min-h-screen flex-col">
       {view === "curricula" ? (
         // Curricula View
         <>
@@ -253,6 +254,8 @@ function YFPPage() {
                                 initial: {
                                   title: c.title,
                                   description: c.description || "",
+                                  icon: "📚",
+                                  color: "#1e40af",
                                 },
                               });
                             }}
@@ -301,63 +304,65 @@ function YFPPage() {
                 <p className="text-sm text-text-3 mt-1">Add one to get started</p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
                 {pillars.map((pillar) => (
                   <div
                     key={pillar.id}
-                    className="group cursor-pointer rounded-lg border-2 p-4 transition-all hover:shadow-md hover:-translate-y-0.5 flex items-start gap-4"
+                    className="group cursor-pointer rounded-lg border-2 p-4 transition-all hover:shadow-lg hover:-translate-y-1 flex flex-col justify-between h-full"
                     style={{
                       backgroundColor: pillar.color ? `${pillar.color}15` : undefined,
                       borderColor: pillar.color || "currentColor",
                     }}
                   >
-                    <div onClick={() => handleSelectPillar(pillar)} className="flex-1 flex items-start gap-4">
-                      <div className="text-2xl">{pillar.icon || "🏛️"}</div>
-                      <div className="flex-1">
-                        <h4 className="font-bold text-text-1">{pillar.name}</h4>
-                        {pillar.description && <p className="mt-1 text-sm text-text-3">{pillar.description}</p>}
-                        <div
-                          className="mt-3 inline-block rounded-full px-3 py-1 text-xs font-bold"
-                          style={{
-                            backgroundColor: pillar.color ? `${pillar.color}20` : undefined,
-                            color: pillar.color || "currentColor",
-                          }}
-                        >
-                          {articles.filter((a) => a.pillar_id === pillar.id).length} articles
-                        </div>
+                    <div onClick={() => handleSelectPillar(pillar)} className="flex flex-col gap-3 flex-1">
+                      <div className="text-3xl">{pillar.icon || "🏛️"}</div>
+                      <div>
+                        <h4 className="font-bold text-text-1 line-clamp-2">{pillar.name}</h4>
+                        {pillar.description && <p className="mt-1 text-sm text-text-3 line-clamp-2">{pillar.description}</p>}
                       </div>
                     </div>
-                    <div className="opacity-0 transition-opacity group-hover:opacity-100">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button className="rounded-lg border border-border p-2 hover:bg-bg-2">
-                            <MoreVertical className="h-4 w-4 text-text-3" />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => {
-                              setEditingPillar({
-                                id: pillar.id,
-                                initial: {
-                                  name: pillar.name,
-                                  description: pillar.description || "",
-                                  icon: pillar.icon || "",
-                                },
-                              });
-                            }}
-                          >
-                            <Pencil className="h-4 w-4 mr-2" /> Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onClick={() => setDeleteTarget({ id: pillar.id, title: pillar.name, type: "pillar" })}
-                            className="text-danger focus:text-danger"
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" /> Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                    <div className="flex items-end justify-between gap-2 mt-4">
+                      <div
+                        className="rounded-full px-2 py-1 text-xs font-bold"
+                        style={{
+                          backgroundColor: pillar.color ? `${pillar.color}20` : undefined,
+                          color: pillar.color || "currentColor",
+                        }}
+                      >
+                        {articles.filter((a) => a.pillar_id === pillar.id).length} articles
+                      </div>
+                      <div className="opacity-0 transition-opacity group-hover:opacity-100">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button className="rounded-lg border border-border p-1.5 hover:bg-bg-2">
+                              <MoreVertical className="h-4 w-4 text-text-3" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => {
+                                setEditingPillar({
+                                  id: pillar.id,
+                                  initial: {
+                                    name: pillar.name,
+                                    description: pillar.description || "",
+                                    icon: pillar.icon || "",
+                                  },
+                                });
+                              }}
+                            >
+                              <Pencil className="h-4 w-4 mr-2" /> Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => setDeleteTarget({ id: pillar.id, title: pillar.name, type: "pillar" })}
+                              className="text-danger focus:text-danger"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" /> Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -463,22 +468,19 @@ function YFPPage() {
       )}
 
       {/* Create Curriculum Dialog */}
-      <RecordFormDialog
+      <CurriculumFormDialog
         open={showCreateCurriculum}
         onOpenChange={setShowCreateCurriculum}
         title="Create Curriculum"
         description="Create a new Youth Formation Program curriculum"
-        fields={[
-          { key: "title", label: "Curriculum Title", required: true, placeholder: "e.g. YFP 2026 Main Track" },
-          { key: "description", label: "Description", type: "textarea", placeholder: "Overview of this curriculum" },
-        ]}
         submitLabel="Create Curriculum"
         onSubmit={(values) => {
           createCurriculumMut.mutate({
             title: values.title,
-            description: values.description || null,
+            description: values.description,
           });
         }}
+        isLoading={createCurriculumMut.isPending}
       />
 
       {/* Create Pillar Dialog */}
@@ -504,17 +506,13 @@ function YFPPage() {
 
       {/* Edit Curriculum Dialog */}
       {editingCurriculum && (
-        <RecordFormDialog
+        <CurriculumFormDialog
           open={!!editingCurriculum}
           onOpenChange={(o) => {
             if (!o) setEditingCurriculum(null);
           }}
           title="Edit Curriculum"
           description="Update the curriculum details"
-          fields={[
-            { key: "title", label: "Curriculum Title", required: true, placeholder: "e.g. YFP 2026 Main Track" },
-            { key: "description", label: "Description", type: "textarea", placeholder: "Overview of this curriculum" },
-          ]}
           initial={editingCurriculum.initial}
           submitLabel="Save Changes"
           onSubmit={(values) => {
@@ -523,10 +521,11 @@ function YFPPage() {
               id: editingCurriculum.id,
               input: {
                 title: values.title,
-                description: values.description || null,
+                description: values.description,
               },
             });
           }}
+          isLoading={updateCurriculumMut.isPending}
         />
       )}
 
@@ -622,6 +621,6 @@ function YFPPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </div>
   );
 }
