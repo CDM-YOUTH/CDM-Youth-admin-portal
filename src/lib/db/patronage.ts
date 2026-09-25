@@ -6,6 +6,7 @@ export type Gender = "Male" | "Female";
 
 export type PatronageTeamRow = {
   id: string;
+  patron_number: string | null;
   name: string;
   phone: string | null;
   email: string | null;
