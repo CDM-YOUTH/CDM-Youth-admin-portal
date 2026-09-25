@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { zodValidator, fallback } from "@tanstack/zod-adapter";
 import { z } from "zod";
@@ -20,7 +20,7 @@ import {
 } from "@/lib/db/patronage";
 import { fetchOrg, type OrgTree } from "@/lib/db/org";
 import { useAdminScope } from "@/lib/hooks/use-admin-scope";
-import { Topbar, TopbarButton, TopbarTab } from "@/components/admin/layout/topbar";
+import { Topbar } from "@/components/admin/layout/topbar";
 import { Card, CardBody } from "@/components/admin/composables/ui-bits";
 import { TablePagination } from "@/components/admin/composables/tables/table-pagination";
 import {
@@ -65,10 +65,28 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 
+const filterValueSchema = fallback(
+  z
+    .object({
+      operator: z.enum(["equals", "contains", "startsWith", "notEquals"]),
+      value: z.string(),
+    })
+    .optional(),
+  undefined,
+);
+
 const patronageSearchSchema = z.object({
   q: fallback(z.string(), "").default(""),
   level: fallback(z.enum(["outstation", "parish", "deanery", "diocese"]), "").default(""),
   gender: fallback(z.enum(["Male", "Female"]), "").default(""),
+  deanery_id: fallback(z.string(), "").default(""),
+  parish_id: fallback(z.string(), "").default(""),
+  outstation_id: fallback(z.string(), "").default(""),
+  page: fallback(z.number().int().min(1), 1).default(1),
+  size: fallback(z.number().int().min(1).max(100), 10).default(10),
+  f_patron_number: filterValueSchema,
+  f_name: filterValueSchema,
+  f_gender: filterValueSchema,
 });
 type PatronageSearch = z.infer<typeof patronageSearchSchema>;
 
@@ -91,16 +109,8 @@ export const Route = createFileRoute("/admin/patronage")({
   component: PatronagePage,
 });
 
-const LEVELS: PatronageLevel[] = ["diocese", "deanery", "parish"];
-const LEVEL_LABELS: Record<PatronageLevel, string> = {
-  diocese: "Diocese",
-  deanery: "Deanery",
-  parish: "Parish",
-  outstation: "Outstation",
-};
 
 function PatronagePage() {
-  const [tab, setTab] = useState<PatronageLevel>("diocese");
   const [addOpen, setAddOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<PatronageTeamRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<PatronageTeamRow | null>(null);
@@ -108,44 +118,57 @@ function PatronagePage() {
 
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
-  const setFilter = (patch: Partial<PatronageSearch>) =>
-    navigate({ search: (prev: PatronageSearch) => ({ ...prev, ...patch }), replace: true });
+  const setFilter = (patch: Partial<PatronageSearch>) => {
+    navigate({ search: (prev: PatronageSearch) => ({ ...prev, ...patch, page: 1 }), replace: true });
+  };
 
   const scope = useAdminScope();
-  const deaneryId = scope.deaneryId;
-  const parishId = scope.parishId;
+  const deaneryId = scope.deaneryId || search.deanery_id;
+  const parishId = scope.parishId || search.parish_id;
+  const outstationId = scope.outstationId || search.outstation_id;
 
   const { data: org } = useQuery({ queryKey: ["org"], queryFn: fetchOrg });
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
 
   const { data: resp, isLoading } = useQuery({
     queryKey: [
       "patronage-team",
-      tab,
+      search.page - 1,
+      search.size,
       search.q,
+      search.level,
       search.gender,
       deaneryId,
       parishId,
-      page - 1,
-      pageSize,
+      outstationId,
     ],
     queryFn: () =>
       listPatronagePaged({
-        level: tab,
+        level: (search.level as PatronageLevel) || undefined,
         gender: (search.gender as Gender) || undefined,
-        page: page - 1,
-        size: pageSize,
+        page: search.page - 1,
+        size: search.size,
         q: search.q || undefined,
-        deaneryId: tab === "diocese" ? null : deaneryId,
-        parishId: tab === "parish" ? parishId : null,
+        deaneryId: deaneryId || null,
+        parishId: parishId || null,
+        outstationId: outstationId || null,
       }),
     placeholderData: keepPreviousData,
   });
 
   const data = resp?.data ?? [];
   const total = resp?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const totalPages = Math.max(1, Math.ceil(total / search.size));
+
+  // Client-side column filters applied on the current page only
+  const displayRows = useMemo(() => {
+    if (!search.f_patron_number && !search.f_name && !search.f_gender) return data;
+    return data.filter((row) => {
+      if (!applyColumnFilter(row.patron_number || "", search.f_patron_number)) return false;
+      if (!applyColumnFilter(row.name, search.f_name)) return false;
+      if (!applyColumnFilter(row.gender, search.f_gender)) return false;
+      return true;
+    });
+  }, [data, search.f_patron_number, search.f_name, search.f_gender]);
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["patronage-team"] });
 
@@ -180,149 +203,247 @@ function PatronagePage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  // Org dropdowns use UUIDs as values (from live Supabase org tree)
+  const deaneryOptions = (org?.deaneries ?? []).map((d) => ({ value: d.id, label: d.name }));
+  const parishOptions = (org?.parishes ?? [])
+    .filter((p) => !deaneryId || p.deanery_id === deaneryId)
+    .map((p) => ({ value: p.id, label: p.name }));
+  const outstationOptions = (org?.outstations ?? [])
+    .filter((o) => !parishId || o.parish_id === parishId)
+    .map((o) => ({ value: o.id, label: o.name }));
+
+  const fc = (
+    key: keyof PatronageSearch,
+    label: string,
+    mode: "text" | "select" = "text",
+    options?: { value: string; label: string }[],
+  ) => (
+    <ColumnFilter
+      label={label}
+      mode={mode}
+      options={options}
+      value={search[key] as ColumnFilterValue | undefined}
+      onChange={(v) => setFilter({ [key]: v } as Partial<PatronageSearch>)}
+    />
+  );
+
   return (
     <>
       <Topbar
         title="Patronage Team"
         subtitle={`${total} patrons and patronesses`}
-        tabs={
-          <>
-            {LEVELS.map((lvl) => (
-              <TopbarTab
-                key={lvl}
-                active={tab === lvl}
-                onClick={() => {
-                  setTab(lvl);
-                  setPage(1);
-                }}
-              >
-                {LEVEL_LABELS[lvl]}
-              </TopbarTab>
-            ))}
-          </>
-        }
         action={
           <button
             type="button"
             onClick={() => setAddOpen(true)}
             className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-[11px] font-bold text-primary-foreground shadow-sm transition-opacity hover:opacity-90"
           >
-            <Icon icon="mdi:plus" className="h-3.5 w-3.5" /> Add {LEVEL_LABELS[tab]}
+            <Icon icon="mdi:plus" className="h-3.5 w-3.5" /> Add Patron
           </button>
         }
       />
 
       <div className="flex-1 overflow-y-auto px-5 py-4">
         <Card>
-          <div className="border-b border-border bg-card px-3.5 py-2.5">
-            <div className="flex flex-wrap items-center gap-2">
-              <Input
-                placeholder="Search name, phone..."
-                value={search.q}
-                onChange={(e) => {
-                  setFilter({ q: e.target.value });
-                  setPage(1);
-                }}
-                className="h-8 flex-1 text-xs"
-              />
-              <Select value={search.gender} onValueChange={(v) => setFilter({ gender: v as Gender | "" })}>
-                <SelectTrigger className="h-8 w-32 text-xs">
-                  <SelectValue placeholder="All" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">All</SelectItem>
-                  <SelectItem value="Male">Patron</SelectItem>
-                  <SelectItem value="Female">Patroness</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+          <TableToolbar
+            searchValue={search.q}
+            onSearchChange={(value) => setFilter({ q: value })}
+            searchPlaceholder="Search name, patron number, phone..."
+          />
 
-          <CardBody>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/50">
-                    <th className="px-3 py-2 text-left font-semibold">Name</th>
-                    <th className="px-3 py-2 text-left font-semibold">Gender</th>
-                    <th className="px-3 py-2 text-left font-semibold">Level</th>
-                    <th className="px-3 py-2 text-left font-semibold">Deanery</th>
-                    <th className="px-3 py-2 text-left font-semibold">Parish</th>
-                    <th className="px-3 py-2 text-left font-semibold">Phone</th>
-                    <th className="px-3 py-2 text-left font-semibold">Email</th>
-                    <th className="px-3 py-2 text-left font-semibold">Since</th>
-                    <th className="px-3 py-2 text-center font-semibold">Actions</th>
+          <CardBody className="p-0">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
+                    <ColumnHeader label="Patron No." filter={fc("f_patron_number", "Patron No.")} />
+                  </th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
+                    <ColumnHeader label="Name" filter={fc("f_name", "Name")} />
+                  </th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
+                    <ColumnHeader
+                      label="Gender"
+                      filter={fc(
+                        "f_gender",
+                        "Gender",
+                        "select",
+                        [
+                          { value: "Male", label: "Patron" },
+                          { value: "Female", label: "Patroness" },
+                        ],
+                      )}
+                    />
+                  </th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
+                    <ColumnHeader
+                      label="Level"
+                      filter={
+                        <ColumnFilter
+                          label="Level"
+                          mode="select"
+                          options={LEVELS.map((l) => ({ value: l, label: LEVEL_LABELS[l] }))}
+                          value={
+                            search.level ? { operator: "equals", value: search.level } : undefined
+                          }
+                          onChange={(v) => setFilter({ level: v?.value ?? "" })}
+                        />
+                      }
+                    />
+                  </th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
+                    <ColumnHeader
+                      label="Deanery"
+                      filter={
+                        <ColumnFilter
+                          label="Deanery"
+                          mode="select"
+                          options={deaneryOptions}
+                          value={deaneryId ? { operator: "equals", value: deaneryId } : undefined}
+                          onChange={(v) =>
+                            setFilter({
+                              deanery_id: v?.value ?? "",
+                              parish_id: "",
+                              outstation_id: "",
+                            })
+                          }
+                          disabled={!!scope.deaneryId}
+                        />
+                      }
+                    />
+                  </th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
+                    <ColumnHeader
+                      label="Parish"
+                      filter={
+                        <ColumnFilter
+                          label="Parish"
+                          mode="select"
+                          options={parishOptions}
+                          value={parishId ? { operator: "equals", value: parishId } : undefined}
+                          onChange={(v) => setFilter({ parish_id: v?.value ?? "", outstation_id: "" })}
+                          disabled={!!scope.parishId}
+                        />
+                      }
+                    />
+                  </th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
+                    <ColumnHeader
+                      label="Outstation"
+                      filter={
+                        <ColumnFilter
+                          label="Outstation"
+                          mode="select"
+                          options={outstationOptions}
+                          value={
+                            outstationId ? { operator: "equals", value: outstationId } : undefined
+                          }
+                          onChange={(v) => setFilter({ outstation_id: v?.value ?? "" })}
+                          disabled={!!scope.outstationId}
+                        />
+                      }
+                    />
+                  </th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">Phone</th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">Email</th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">Since</th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={12} className="px-3.5 py-8 text-center text-muted-foreground">
+                      Loading...
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {isLoading ? (
-                    <tr>
-                      <td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">
-                        Loading...
+                ) : displayRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={12} className="px-3.5 py-8 text-center text-muted-foreground">
+                      No patrons found
+                    </td>
+                  </tr>
+                ) : (
+                  displayRows.map((patron) => (
+                    <tr key={patron.id} className="border-b border-border/30 last:border-0 hover:bg-bg-3">
+                      <td className="px-3.5 py-2.5 font-mono text-[10px] font-bold text-gold">
+                        {patron.patron_number || "—"}
+                      </td>
+                      <td className="px-3.5 py-2.5 text-[11px] font-semibold text-foreground">
+                        {patron.name}
+                      </td>
+                      <td className="px-3.5 py-2.5 text-[11px]">
+                        <span className={patron.gender === "Male" ? "text-blue-600" : "text-pink-600"}>
+                          {patron.gender === "Male" ? "Patron" : "Patroness"}
+                        </span>
+                      </td>
+                      <td className="px-3.5 py-2.5 text-[11px] font-semibold capitalize">
+                        {LEVEL_LABELS[patron.level]}
+                      </td>
+                      <td className="px-3.5 py-2.5 text-[11px] text-text-2">
+                        {patron.deanery?.name || "—"}
+                      </td>
+                      <td className="px-3.5 py-2.5 text-[11px] text-text-1">
+                        {patron.parish?.name || "—"}
+                      </td>
+                      <td className="px-3.5 py-2.5 text-[11px] text-text-2">
+                        {patron.outstation?.name || "—"}
+                      </td>
+                      <td className="px-3.5 py-2.5 text-[11px] text-text-1">
+                        {patron.phone || "—"}
+                      </td>
+                      <td className="px-3.5 py-2.5 text-[11px] text-text-2">
+                        {patron.email || "—"}
+                      </td>
+                      <td className="px-3.5 py-2.5 text-[11px] text-text-2">
+                        {new Date(patron.start_date).toLocaleDateString()}
+                      </td>
+                      <td className="px-3.5 py-2.5 text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button
+                              type="button"
+                              aria-label="Row actions"
+                              className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-bg-2 text-text-2 hover:border-gold-3 hover:text-gold"
+                            >
+                              <MoreVertical className="h-3.5 w-3.5" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-40">
+                            <DropdownMenuItem onClick={() => setEditTarget(patron)}>
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-danger focus:text-danger"
+                              onClick={() => setDeleteTarget(patron)}
+                            >
+                              Archive
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </td>
                     </tr>
-                  ) : data.length === 0 ? (
-                    <tr>
-                      <td colSpan={9} className="px-3 py-8 text-center text-muted-foreground">
-                        No {LEVEL_LABELS[tab].toLowerCase()} patrons found
-                      </td>
-                    </tr>
-                  ) : (
-                    data.map((patron) => (
-                      <tr key={patron.id} className="border-b hover:bg-muted/30">
-                        <td className="px-3 py-2 font-medium">{patron.name}</td>
-                        <td className="px-3 py-2 text-xs">
-                          <span className={patron.gender === "Male" ? "text-blue-600" : "text-pink-600"}>
-                            {patron.gender === "Male" ? "Patron" : "Patroness"}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2 text-xs font-semibold capitalize">{patron.level}</td>
-                        <td className="px-3 py-2 text-xs">{patron.deanery?.name || "—"}</td>
-                        <td className="px-3 py-2 text-xs">{patron.parish?.name || "—"}</td>
-                        <td className="px-3 py-2 text-xs">{patron.phone || "—"}</td>
-                        <td className="px-3 py-2 text-xs text-muted-foreground">{patron.email || "—"}</td>
-                        <td className="px-3 py-2 text-xs text-muted-foreground">
-                          {new Date(patron.start_date).toLocaleDateString()}
-                        </td>
-                        <td className="px-3 py-2 text-center">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <button className="inline-flex h-6 w-6 items-center justify-center rounded hover:bg-muted">
-                                <MoreVertical className="h-4 w-4" />
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => setEditTarget(patron)}>
-                                Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                className="text-danger"
-                                onClick={() => setDeleteTarget(patron)}
-                              >
-                                Archive
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                  ))
+                )}
+              </tbody>
+            </table>
+            <TablePagination
+              page={search.page}
+              pageSize={search.size}
+              total={total}
+              totalPages={totalPages}
+              onPageChange={(p) =>
+                navigate({ search: (prev: PatronageSearch) => ({ ...prev, page: p }), replace: true })
+              }
+              onPageSizeChange={(s) =>
+                navigate({
+                  search: (prev: PatronageSearch) => ({ ...prev, size: s, page: 1 }),
+                  replace: true,
+                })
+              }
+            />
           </CardBody>
         </Card>
-
-        <TablePagination
-          page={page}
-          pageSize={pageSize}
-          total={total}
-          onPageChange={setPage}
-          onPageSizeChange={(sz) => {
-            setPageSize(sz);
-            setPage(1);
-          }}
-        />
       </div>
 
       {/* Add/Edit Dialog */}
