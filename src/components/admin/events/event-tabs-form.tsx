@@ -282,7 +282,7 @@ export function EventTabsForm({
           return;
         }
         await saveEventDuties(draftEventId, state.duties);
-        toast.success("Duties saved");
+        toast.success(state.details.hasDuties ? "Duties saved" : "Activities saved");
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Save failed");

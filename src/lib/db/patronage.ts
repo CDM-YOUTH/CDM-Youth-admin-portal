@@ -1,7 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { likePattern } from "@/lib/utils";
 
-export type PatronageLevel = "outstation" | "parish" | "deanery" | "diocese";
 export type Gender = "Male" | "Female";
 
 export type PatronageTeamRow = {
@@ -11,10 +10,9 @@ export type PatronageTeamRow = {
   phone: string | null;
   email: string | null;
   gender: Gender;
-  level: PatronageLevel;
-  deanery_id: string | null;
-  parish_id: string | null;
-  outstation_id: string | null;
+  deanery_id: string;
+  parish_id: string;
+  outstation_id: string;
   start_date: string;
   created_at: string;
   deleted_at: string | null;
@@ -28,10 +26,9 @@ export type PatronageTeamInput = {
   phone?: string | null;
   email?: string | null;
   gender: Gender;
-  level: PatronageLevel;
-  deaneryId?: string | null;
-  parishId?: string | null;
-  outstationId?: string | null;
+  deaneryId: string;
+  parishId: string;
+  outstationId: string;
   startDate?: string;
 };
 
@@ -44,9 +41,6 @@ export type PagedResponse<T> = {
   size: number;
 };
 
-const SEL =
-  "*, deanery:deaneries(name), parish:parishes(name), outstation:outstations(name)";
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = () => (supabase as any).from("patronage_team");
 
@@ -54,7 +48,6 @@ export async function listPatronagePaged(opts: {
   page?: number;
   size?: number;
   q?: string;
-  level?: PatronageLevel;
   gender?: Gender;
   deaneryId?: string | null;
   parishId?: string | null;
@@ -65,16 +58,14 @@ export async function listPatronagePaged(opts: {
   const size = opts.size ?? 10;
   const offset = page * size;
 
-  let q = db().select(SEL);
+  let q = db().select(
+    "*, deanery:deaneries(name), parish:parishes(name), outstation:outstations(name)",
+    { count: "exact" }
+  );
 
   // Filter by soft-delete status
   if (!opts.includeDeleted) {
     q = q.is("deleted_at", null);
-  }
-
-  // Filter by level
-  if (opts.level) {
-    q = q.eq("level", opts.level);
   }
 
   // Filter by gender
@@ -97,12 +88,7 @@ export async function listPatronagePaged(opts: {
     q = q.or(`name.ilike.${pattern},phone.ilike.${pattern}`);
   }
 
-  // Get total count
-  const { count } = await q
-    .select("*", { count: "exact", head: true });
-
-  // Get paginated results
-  const { data, error } = await q
+  const { data, error, count } = await q
     .order("start_date", { ascending: false })
     .range(offset, offset + size - 1);
 
@@ -118,7 +104,7 @@ export async function listPatronagePaged(opts: {
 
 export async function getPatronage(id: string): Promise<PatronageTeamRow> {
   const { data, error } = await db()
-    .select(SEL)
+    .select("*, deanery:deaneries(name), parish:parishes(name), outstation:outstations(name)")
     .eq("id", id)
     .single();
   if (error) throw error;
@@ -132,13 +118,12 @@ export async function createPatronage(input: PatronageTeamInput): Promise<Patron
       phone: input.phone || null,
       email: input.email || null,
       gender: input.gender,
-      level: input.level,
-      deanery_id: input.deaneryId || null,
-      parish_id: input.parishId || null,
-      outstation_id: input.outstationId || null,
+      deanery_id: input.deaneryId,
+      parish_id: input.parishId,
+      outstation_id: input.outstationId,
       start_date: input.startDate || new Date().toISOString().split('T')[0],
     })
-    .select(SEL)
+    .select("*, deanery:deaneries(name), parish:parishes(name), outstation:outstations(name)")
     .single();
   if (error) throw error;
   return data as PatronageTeamRow;
@@ -153,7 +138,6 @@ export async function updatePatronage(
   if (input.phone !== undefined) updates.phone = input.phone;
   if (input.email !== undefined) updates.email = input.email;
   if (input.gender !== undefined) updates.gender = input.gender;
-  if (input.level !== undefined) updates.level = input.level;
   if (input.deaneryId !== undefined) updates.deanery_id = input.deaneryId;
   if (input.parishId !== undefined) updates.parish_id = input.parishId;
   if (input.outstationId !== undefined) updates.outstation_id = input.outstationId;
@@ -162,7 +146,7 @@ export async function updatePatronage(
   const { data, error } = await db()
     .update(updates)
     .eq("id", id)
-    .select(SEL)
+    .select("*, deanery:deaneries(name), parish:parishes(name), outstation:outstations(name)")
     .single();
   if (error) throw error;
   return data as PatronageTeamRow;

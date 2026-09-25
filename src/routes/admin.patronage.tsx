@@ -13,7 +13,6 @@ import {
   getPatronage,
   listPatronagePaged,
   updatePatronage,
-  type PatronageLevel,
   type Gender,
   type PatronageTeamRow,
   type PatronageTeamInput,
@@ -77,7 +76,6 @@ const filterValueSchema = fallback(
 
 const patronageSearchSchema = z.object({
   q: fallback(z.string(), "").default(""),
-  level: fallback(z.enum(["outstation", "parish", "deanery", "diocese"]), "").default(""),
   gender: fallback(z.enum(["Male", "Female"]), "").default(""),
   deanery_id: fallback(z.string(), "").default(""),
   parish_id: fallback(z.string(), "").default(""),
@@ -90,13 +88,6 @@ const patronageSearchSchema = z.object({
 });
 type PatronageSearch = z.infer<typeof patronageSearchSchema>;
 
-const LEVELS: PatronageLevel[] = ["diocese", "deanery", "parish", "outstation"];
-const LEVEL_LABELS: Record<PatronageLevel, string> = {
-  diocese: "Diocese",
-  deanery: "Deanery",
-  parish: "Parish",
-  outstation: "Outstation",
-};
 
 export const Route = createFileRoute("/admin/patronage")({
   validateSearch: zodValidator(patronageSearchSchema),
@@ -135,7 +126,6 @@ function PatronagePage() {
       search.page - 1,
       search.size,
       search.q,
-      search.level,
       search.gender,
       deaneryId,
       parishId,
@@ -143,7 +133,6 @@ function PatronagePage() {
     ],
     queryFn: () =>
       listPatronagePaged({
-        level: (search.level as PatronageLevel) || undefined,
         gender: (search.gender as Gender) || undefined,
         page: search.page - 1,
         size: search.size,
@@ -277,22 +266,6 @@ function PatronagePage() {
                   </th>
                   <th className="label-eyebrow px-3.5 py-2.5 text-left">
                     <ColumnHeader
-                      label="Level"
-                      filter={
-                        <ColumnFilter
-                          label="Level"
-                          mode="select"
-                          options={LEVELS.map((l) => ({ value: l, label: LEVEL_LABELS[l] }))}
-                          value={
-                            search.level ? { operator: "equals", value: search.level } : undefined
-                          }
-                          onChange={(v) => setFilter({ level: v?.value ?? "" })}
-                        />
-                      }
-                    />
-                  </th>
-                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
-                    <ColumnHeader
                       label="Deanery"
                       filter={
                         <ColumnFilter
@@ -346,20 +319,19 @@ function PatronagePage() {
                   </th>
                   <th className="label-eyebrow px-3.5 py-2.5 text-left">Phone</th>
                   <th className="label-eyebrow px-3.5 py-2.5 text-left">Email</th>
-                  <th className="label-eyebrow px-3.5 py-2.5 text-left">Since</th>
                   <th className="label-eyebrow px-3.5 py-2.5 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {isLoading ? (
                   <tr>
-                    <td colSpan={12} className="px-3.5 py-8 text-center text-muted-foreground">
+                    <td colSpan={10} className="px-3.5 py-8 text-center text-muted-foreground">
                       Loading...
                     </td>
                   </tr>
                 ) : displayRows.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className="px-3.5 py-8 text-center text-muted-foreground">
+                    <td colSpan={10} className="px-3.5 py-8 text-center text-muted-foreground">
                       No patrons found
                     </td>
                   </tr>
@@ -376,9 +348,6 @@ function PatronagePage() {
                         <span className={patron.gender === "Male" ? "text-blue-600" : "text-pink-600"}>
                           {patron.gender === "Male" ? "Patron" : "Patroness"}
                         </span>
-                      </td>
-                      <td className="px-3.5 py-2.5 text-[11px] font-semibold capitalize">
-                        {LEVEL_LABELS[patron.level]}
                       </td>
                       <td className="px-3.5 py-2.5 text-[11px] text-text-2">
                         {patron.deanery?.name || "—"}
@@ -519,7 +488,9 @@ function PatronageFormDialog({
       phone: "",
       email: "",
       gender: "Female",
-      level: "outstation",
+      deaneryId: "",
+      parishId: "",
+      outstationId: "",
     }
   );
 
@@ -531,26 +502,6 @@ function PatronageFormDialog({
     onSubmit(form);
   };
 
-  const getOrgUnits = () => {
-    if (!org) return [];
-    if (form.level === "diocese") return [];
-    if (form.level === "deanery") return org.deaneries || [];
-    if (form.level === "parish") {
-      const deanery = form.deaneryId
-        ? org.deaneries?.find((d) => d.id === form.deaneryId)
-        : null;
-      return deanery?.parishes || [];
-    }
-    if (form.level === "outstation") {
-      const parish = form.parishId
-        ? org.deaneries
-            ?.flatMap((d) => d.parishes || [])
-            .find((p) => p.id === form.parishId)
-        : null;
-      return parish?.outstations || [];
-    }
-    return [];
-  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -570,62 +521,32 @@ function PatronageFormDialog({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-semibold">Gender *</label>
-              <Select value={form.gender} onValueChange={(v) => setForm({ ...form, gender: v as Gender })}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Male">Patron</SelectItem>
-                  <SelectItem value="Female">Patroness</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-xs font-semibold">Org Level *</label>
-              <Select
-                value={form.level}
-                onValueChange={(v) =>
-                  setForm({
-                    ...form,
-                    level: v as PatronageLevel,
-                    deaneryId: null,
-                    parishId: null,
-                    outstationId: null,
-                  })
-                }
-              >
-                <SelectTrigger className="mt-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="diocese">Diocese</SelectItem>
-                  <SelectItem value="deanery">Deanery</SelectItem>
-                  <SelectItem value="parish">Parish</SelectItem>
-                  <SelectItem value="outstation">Outstation</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+          <div>
+            <label className="text-xs font-semibold">Gender *</label>
+            <Select value={form.gender} onValueChange={(v) => setForm({ ...form, gender: v as Gender })}>
+              <SelectTrigger className="mt-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Male">Patron</SelectItem>
+                <SelectItem value="Female">Patroness</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
-          {/* Deanery: always show, required for parish/outstation levels */}
+          {/* Deanery: required */}
           <div>
-            <label className="text-xs font-semibold">
-              Deanery {(form.level === "parish" || form.level === "outstation" || form.level === "deanery") && "*"}
-            </label>
+            <label className="text-xs font-semibold">Deanery *</label>
             <Select
               value={form.deaneryId || ""}
               onValueChange={(v) =>
                 setForm({
                   ...form,
-                  deaneryId: v || null,
-                  parishId: null,
-                  outstationId: null,
+                  deaneryId: v || "",
+                  parishId: "",
+                  outstationId: "",
                 })
               }
-              disabled={form.level === "diocese"}
             >
               <SelectTrigger className="mt-1">
                 <SelectValue placeholder="Select deanery" />
@@ -640,17 +561,13 @@ function PatronageFormDialog({
             </Select>
           </div>
 
-          {/* Parish: show for parish/outstation levels */}
+          {/* Parish: required */}
           <div>
-            <label className="text-xs font-semibold">
-              Parish {(form.level === "parish" || form.level === "outstation") && "*"}
-            </label>
+            <label className="text-xs font-semibold">Parish *</label>
             <Select
               value={form.parishId || ""}
-              onValueChange={(v) =>
-                setForm({ ...form, parishId: v || null, outstationId: null })
-              }
-              disabled={form.level === "diocese" || form.level === "deanery" || !form.deaneryId}
+              onValueChange={(v) => setForm({ ...form, parishId: v || "", outstationId: "" })}
+              disabled={!form.deaneryId}
             >
               <SelectTrigger className="mt-1">
                 <SelectValue placeholder={form.deaneryId ? "Select parish" : "Select deanery first"} />
@@ -667,15 +584,13 @@ function PatronageFormDialog({
             </Select>
           </div>
 
-          {/* Outstation: show only for outstation level */}
+          {/* Outstation: required */}
           <div>
-            <label className="text-xs font-semibold">
-              Outstation {form.level === "outstation" && "*"}
-            </label>
+            <label className="text-xs font-semibold">Outstation *</label>
             <Select
               value={form.outstationId || ""}
-              onValueChange={(v) => setForm({ ...form, outstationId: v || null })}
-              disabled={form.level !== "outstation" || !form.parishId}
+              onValueChange={(v) => setForm({ ...form, outstationId: v || "" })}
+              disabled={!form.parishId}
             >
               <SelectTrigger className="mt-1">
                 <SelectValue placeholder={form.parishId ? "Select outstation" : "Select parish first"} />
