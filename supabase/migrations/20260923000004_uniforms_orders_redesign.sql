@@ -31,7 +31,7 @@ CREATE TABLE public.uniform_orders (
   review_notes text,
 
   -- PAYMENT
-  payment_status enum_or_text NOT NULL DEFAULT 'pending', -- 'pending', 'paid', 'waived'
+  payment_status text NOT NULL DEFAULT 'pending' CHECK (payment_status IN ('pending', 'paid', 'waived')),
   paid_at timestamptz,
   paid_by uuid REFERENCES auth.users(id) ON DELETE SET NULL, -- who recorded the payment
   payment_method text, -- 'cash', 'mpesa', 'bank_transfer', etc
@@ -39,7 +39,7 @@ CREATE TABLE public.uniform_orders (
   -- DISPATCH
   dispatch_contact_name text,
   dispatch_contact_phone text,
-  dispatch_method enum_or_text NOT NULL DEFAULT 'pickup', -- 'pickup', 'delivery', 'mail'
+  dispatch_method text NOT NULL DEFAULT 'pickup' CHECK (dispatch_method IN ('pickup', 'delivery', 'mail')),
   dispatch_scheduled_at timestamptz,
   dispatched_at timestamptz,
   dispatch_by uuid REFERENCES auth.users(id) ON DELETE SET NULL, -- staff who dispatched
@@ -91,15 +91,6 @@ CREATE INDEX IF NOT EXISTS uniform_orders_youth_idx ON public.uniform_orders(you
 CREATE INDEX IF NOT EXISTS uniform_orders_cdm_id_idx ON public.uniform_orders(cdm_id);
 CREATE INDEX IF NOT EXISTS uniform_orders_ordered_at_idx ON public.uniform_orders(ordered_at DESC);
 CREATE INDEX IF NOT EXISTS uniform_orders_delivered_at_idx ON public.uniform_orders(delivered_at) WHERE delivered_at IS NOT NULL;
-CREATE INDEX IF NOT EXISTS uniform_orders_status_idx ON public.uniform_orders(
-  CASE
-    WHEN delivered_at IS NOT NULL THEN 'delivered'
-    WHEN dispatched_at IS NOT NULL THEN 'dispatched'
-    WHEN paid_at IS NOT NULL THEN 'paid'
-    WHEN reviewed_at IS NOT NULL THEN 'approved'
-    ELSE 'pending'
-  END
-);
 CREATE INDEX IF NOT EXISTS uniform_orders_deleted_at_idx ON public.uniform_orders(deleted_at) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS uniform_orders_created_by_idx ON public.uniform_orders(created_by);
 CREATE INDEX IF NOT EXISTS uniform_orders_updated_by_idx ON public.uniform_orders(updated_by);

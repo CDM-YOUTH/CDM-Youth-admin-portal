@@ -23,6 +23,7 @@ export const MODULE_BY_PATH: Record<string, string> = {
   "/admin/formation": "formation",
   "/admin/welfare": "welfare",
   "/admin/uniforms": "uniforms",
+  "/admin/patronage": "patronage",
   "/admin/reports": "reports",
   "/admin/users": "users",
   "/admin/settings": "settings",
