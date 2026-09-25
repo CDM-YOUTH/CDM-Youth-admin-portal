@@ -39,21 +39,23 @@ CREATE TABLE IF NOT EXISTS public.patronage_team (
     OR (level = 'deanery' AND deanery_id IS NOT NULL AND parish_id IS NULL AND outstation_id IS NULL)
     OR (level = 'parish'  AND parish_id IS NOT NULL AND outstation_id IS NULL)
     OR (level = 'outstation' AND outstation_id IS NOT NULL)
-  ),
-
-  -- One active patron/patroness per gender per role per org unit
-  CONSTRAINT patronage_no_duplicate_active UNIQUE (
-    gender,
-    level,
-    COALESCE(outstation_id::text, ''),
-    COALESCE(parish_id::text, ''),
-    COALESCE(deanery_id::text, '')
-  ) WHERE deleted_at IS NULL
+  )
 );
 
 -- =========================================================
 -- INDEXES
 -- =========================================================
+-- One active patron/patroness per gender per org unit
+CREATE UNIQUE INDEX IF NOT EXISTS patronage_team_no_duplicate_active
+  ON public.patronage_team (
+    gender,
+    level,
+    COALESCE(outstation_id::text, ''),
+    COALESCE(parish_id::text, ''),
+    COALESCE(deanery_id::text, '')
+  )
+  WHERE deleted_at IS NULL;
+
 CREATE INDEX IF NOT EXISTS patronage_team_level_idx ON public.patronage_team(level);
 CREATE INDEX IF NOT EXISTS patronage_team_outstation_idx ON public.patronage_team(outstation_id);
 CREATE INDEX IF NOT EXISTS patronage_team_parish_idx ON public.patronage_team(parish_id);

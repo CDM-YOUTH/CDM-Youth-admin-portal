@@ -5,7 +5,7 @@
 
 -- =========================================================
 -- UNIFORM_STOCK_LEVELS VIEW
--- =========================================================
+-- ==========a===============================================
 -- Shows available stock for each item calculated from:
 -- 1. SUM of all stock entries (inbound)
 -- 2. MINUS SUM of delivered youth orders (outbound)

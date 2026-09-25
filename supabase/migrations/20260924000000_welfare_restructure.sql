@@ -6,10 +6,12 @@
 -- =========================================================
 -- WELFARE_CASES (restructured)
 -- =========================================================
--- Backup old table
+-- Drop legacy backup if it exists, then backup old table
+DROP TABLE IF EXISTS public.welfare_cases_legacy CASCADE;
 ALTER TABLE IF EXISTS public.welfare_cases RENAME TO welfare_cases_legacy;
 
 -- Create new simplified table
+DROP TABLE IF EXISTS public.welfare_cases CASCADE;
 CREATE TABLE public.welfare_cases (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   case_ref text NOT NULL UNIQUE,
@@ -78,6 +80,7 @@ CREATE TRIGGER welfare_cases_touch BEFORE UPDATE ON public.welfare_cases
 -- WELFARE_CASE_HISTORY (append-only timeline)
 -- =========================================================
 -- Track all state transitions, assignments, comments, resolutions
+DROP TABLE IF EXISTS public.welfare_case_history CASCADE;
 CREATE TABLE public.welfare_case_history (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   case_id uuid NOT NULL REFERENCES public.welfare_cases(id) ON DELETE CASCADE,

@@ -23,6 +23,7 @@ SELECT id, name, swatch, unit_price, created_at, updated_at
 FROM public.uniform_skus
 ON CONFLICT (name) DO NOTHING;
 
+DROP TRIGGER IF EXISTS uniform_items_touch ON public.uniform_items;
 CREATE TRIGGER uniform_items_touch BEFORE UPDATE ON public.uniform_items
   FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
 
@@ -42,7 +43,7 @@ CREATE TABLE IF NOT EXISTS public.uniform_activities (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name text NOT NULL UNIQUE,
   description text,
-  activity_type enum_or_text NOT NULL DEFAULT 'in', -- 'in' (inbound) or 'out' (outbound)
+  activity_type text NOT NULL DEFAULT 'in' CHECK (activity_type IN ('in', 'out')),
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
@@ -99,3 +100,8 @@ CREATE POLICY uniform_stock_entries_delete ON public.uniform_stock_entries FOR D
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.uniform_stock_entries TO authenticated, anon;
 GRANT ALL ON public.uniform_stock_entries TO service_role;
+
+-- =========================================================
+-- CLEANUP: Drop old uniform_skus table
+-- =========================================================
+DROP TABLE IF EXISTS public.uniform_skus;
