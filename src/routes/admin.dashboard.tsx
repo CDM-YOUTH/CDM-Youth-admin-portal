@@ -38,6 +38,7 @@ import { getLiveAnalytics } from "@/lib/db/analytics";
 import {
   getAnalyticsSummary,
   getYouthBreakdown,
+  getYouthsBreakdown,
   getEnrollmentBreakdown,
   getEnrollmentDemographics,
   getEnrollmentTrend,
@@ -341,16 +342,16 @@ function GeneralTab({ chartDisplay }: { chartDisplay: ChartDisplay }) {
     queryFn: () => getYouthBreakdown(scopeParams, groupBy),
     staleTime: 30_000,
   });
-  const { data: enrollBreakdown = [] } = useQuery({
+  const { data: youths_breakdown = [] } = useQuery({
     queryKey: [
-      "enrollment-breakdown",
+      "youths-breakdown",
       CURRENT_YEAR,
       scopeParams.deaneryId,
       scopeParams.parishId,
       scopeParams.outstationId,
       groupBy,
     ],
-    queryFn: () => getEnrollmentBreakdown(CURRENT_YEAR, scopeParams, groupBy),
+    queryFn: () => getYouthsBreakdown(CURRENT_YEAR, scopeParams, groupBy),
     staleTime: 30_000,
   });
   const { data: ageRangeData = [] } = useQuery({
@@ -373,7 +374,9 @@ function GeneralTab({ chartDisplay }: { chartDisplay: ChartDisplay }) {
   const totalYouths = summary?.total_youths ?? 0;
   const totalEnrolled = summary?.enrolled ?? 0;
   const upcomingCount = summary?.upcoming_events ?? 0;
-  const maxYouths = Math.max(...enrollBreakdown.map((r) => r.total_youths), 1);
+  const maxYouthCount = Math.max(...youths_breakdown.map((r) => r.total_count), 1);
+
+  const topParishes = [...youths_breakdown].sort((a, b) => b.total_count - a.total_count).slice(0, 4);
 
   const catTotals = youthBreakdown.reduce(
     (acc, r) => ({
@@ -394,8 +397,6 @@ function GeneralTab({ chartDisplay }: { chartDisplay: ChartDisplay }) {
   const totalMale = youthBreakdown.reduce((s, r) => s + r.male, 0);
   const totalFemale = youthBreakdown.reduce((s, r) => s + r.female, 0);
   const genderTotal = totalMale + totalFemale || 1;
-
-  const topParishes = [...enrollBreakdown].sort((a, b) => b.enrolled - a.enrolled).slice(0, 4);
 
   return (
     <>
@@ -440,21 +441,21 @@ function GeneralTab({ chartDisplay }: { chartDisplay: ChartDisplay }) {
         <div className="flex flex-col gap-3">
           <Card>
             <CardHead
-              title="Enrollment Analytics"
-              subtitle="Changes with deanery, parish, and outstation filters"
+              title="Youth Analytics"
+              subtitle="Total youths by deanery, parish, or outstation"
             />
             <CardBody>
-              {enrollBreakdown.slice(0, 8).map((d) => (
+              {youths_breakdown.slice(0, 8).map((d) => (
                 <ProgressRow
-                  key={d.label}
-                  label={d.label}
-                  value={d.enrolled}
-                  max={maxYouths}
-                  color="var(--color-success)"
+                  key={d.id ?? d.name}
+                  label={d.name}
+                  value={d.total_count}
+                  max={maxYouthCount}
+                  color="var(--color-info)"
                   display={chartDisplay}
                 />
               ))}
-              {enrollBreakdown.length === 0 && (
+              {youths_breakdown.length === 0 && (
                 <p className="py-4 text-center text-[11px] text-text-2">
                   No data for selected filters.
                 </p>
@@ -497,11 +498,11 @@ function GeneralTab({ chartDisplay }: { chartDisplay: ChartDisplay }) {
                 <div className="label-eyebrow mb-2">Top Parishes</div>
                 {topParishes.map((p) => (
                   <div
-                    key={p.label}
+                    key={p.id ?? p.name}
                     className="flex items-center justify-between border-b border-border/50 py-1 text-[10px] last:border-0"
                   >
-                    <span className="text-text-1">{p.label}</span>
-                    <span className="font-bold text-danger">{p.enrolled}</span>
+                    <span className="text-text-1">{p.name}</span>
+                    <span className="font-bold text-danger">{p.total_count.toLocaleString()}</span>
                   </div>
                 ))}
               </CardBody>

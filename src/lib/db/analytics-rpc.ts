@@ -135,6 +135,13 @@ export type EventBreakdownRow = {
 
 export type AgeRangeRow = { label: string; count: number };
 
+export type YouthsBreakdownRow = {
+  id:          string | null;
+  name:        string;
+  total_count: number;
+  percentage:  number;
+};
+
 // ── Helper ──────────────────────────────────────────────────────────────────
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -435,4 +442,28 @@ export async function getAgeRangeBreakdown(scope: ScopeParams = {}): Promise<Age
   return AGE_BUCKETS
     .map(({ label }) => ({ label, count: buckets[label] ?? 0 }))
     .filter((r) => r.count > 0);
+}
+
+// ── 11. Youths breakdown (get_youths_breakdown) ──────────────────────────────
+// Returns id / name / total_count / percentage grouped by deanery | parish | outstation.
+
+export async function getYouthsBreakdown(
+  year: number,
+  scope: ScopeParams = {},
+  groupBy: GroupBy = "deanery",
+): Promise<YouthsBreakdownRow[]> {
+  const { data, error } = await rpc<unknown[]>("get_youths_breakdown", {
+    p_year:          year,
+    p_deanery_id:    scope.deaneryId    ?? null,
+    p_parish_id:     scope.parishId     ?? null,
+    p_outstation_id: scope.outstationId ?? null,
+    p_group_by:      groupBy,
+  });
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
+    id:          (r.id as string | null) ?? null,
+    name:        (r.name as string) ?? "—",
+    total_count: n(r.total_count),
+    percentage:  Number(r.percentage ?? 0),
+  }));
 }

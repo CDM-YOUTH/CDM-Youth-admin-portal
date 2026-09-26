@@ -82,6 +82,7 @@ const GROUPS: NavGroup[] = [
   {
     label: "Pastoral",
     items: [
+      { to: "/admin/patronage", label: "Patronage Team", icon: Crown, module: "patronage" },
       { to: "/admin/formation/bulletin", label: "Bulletin Library", icon: Newspaper, module: "formation" },
       { to: "/admin/formation/yfp", label: "YFP Curriculum", icon: Book, module: "formation" },
       {

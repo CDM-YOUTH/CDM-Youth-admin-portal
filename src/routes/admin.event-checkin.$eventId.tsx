@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { titleCase, formatPhone } from "@/lib/utils";
 import { useEffect, useMemo, useState, type ComponentType } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, QrCode, Search, X, BadgeCheck, Loader2, UserCog, MoreVertical, Trash2, FileText, Sheet, Pencil } from "lucide-react";
+import { ArrowLeft, QrCode, Search, X, BadgeCheck, Loader2, UserCog, MoreVertical, Trash2, FileText, Sheet, Pencil, ChevronDown } from "lucide-react";
 import { Icon } from "@iconify/react";
 import { toast } from "sonner";
 import { Topbar } from "@/components/admin/layout/topbar";
@@ -44,6 +44,7 @@ import { Input } from "@/components/ui/input";
 import { AddYouthDialog, type AddYouthResult } from "@/components/admin/youth/add-youth-dialog";
 import { useAdminScope } from "@/lib/hooks/use-admin-scope";
 import { useScopedOrgFields } from "@/lib/hooks/use-scoped-org";
+import { createPatronage, updatePatronage, getPatronage, type PatronageTeamInput } from "@/lib/db/patronage";
 
 export const Route = createFileRoute("/admin/event-checkin/$eventId")({
   head: () => ({
@@ -55,7 +56,7 @@ export const Route = createFileRoute("/admin/event-checkin/$eventId")({
   component: EventCheckinPage,
 });
 
-type AttendeeKind = "member" | "guest";
+type AttendeeKind = "member" | "patron" | "guest";
 type AttendeeEntry = {
   id: string;
   cdmId: string;
@@ -68,16 +69,29 @@ type AttendeeEntry = {
   time: string;
   kind: AttendeeKind;
   role: string;
+  notes: string;
 };
 
-const GUEST_ROLES = ["guest", "facilitator", "accompaniment", "patronage"] as const;
+// Guest roles — patronage is now its own first-class kind, not a guest sub-role
+const GUEST_ROLES = ["guest", "facilitator", "accompaniment"] as const;
 type GuestRole = typeof GUEST_ROLES[number];
+
+const KIND_TONE: Record<AttendeeKind, string> = {
+  member: "bg-success-soft text-success",
+  patron: "bg-violet-50 text-violet-600",
+  guest:  "bg-warn-soft text-gold",
+};
+
+const KIND_LABEL: Record<AttendeeKind, string> = {
+  member: "Youth",
+  patron: "Patron",
+  guest:  "Guest",
+};
 
 const ROLE_TONE: Record<GuestRole, string> = {
   guest:         "bg-warn-soft text-gold",
   facilitator:   "bg-info-soft text-info",
   accompaniment: "bg-success-soft text-success",
-  patronage:     "bg-violet-50 text-violet-600",
 };
 
 function btnCls(variant: "primary" | "ghost" = "primary", extra = "") {
@@ -174,19 +188,37 @@ function EventCheckinPage() {
   useEffect(() => {
     if (!event) return;
     setAttendees(
-      event.registrations.map((reg) => ({
-        id: reg.id,
-        cdmId: reg.youth?.cdm_id ?? "—",
-        name: reg.youth?.full_name ?? reg.guest_name ?? "—",
-        phone: reg.youth?.phone ?? reg.guest_phone ?? "",
-        category: reg.youth?.category ?? "",
-        deanery: reg.youth?.deanery?.name ?? reg.guest_deanery ?? "",
-        parish: reg.youth?.parish?.name ?? reg.guest_parish ?? "",
-        outstation: reg.youth?.outstation?.name ?? reg.guest_outstation ?? "",
-        time: new Date(reg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        kind: reg.youth ? "member" : "guest",
-        role: reg.guest_role ?? (reg.youth ? "" : "guest"),
-      })),
+      event.registrations.map((reg) => {
+        const notes = reg.notes ?? "";
+        const role = reg.guest_role ?? (reg.youth ? "" : "guest");
+        // Detect patron by role OR by notes containing patronage_id (handles legacy rows
+        // where guest_role was saved as null before the bug was fixed)
+        const isPatron = role === "patronage" || notes.includes("patronage_id:");
+        const kind: AttendeeKind = reg.youth
+          ? "member"
+          : isPatron
+            ? "patron"
+            : "guest";
+
+        // Extract patron_number from notes ("patronage_id:xxx|patron_no:yyy")
+        const patronNoMatch = notes.match(/patron_no:([^|]+)/);
+        const patronNo = patronNoMatch?.[1] ?? null;
+
+        return {
+          id: reg.id,
+          cdmId: reg.youth?.cdm_id ?? (patronNo ? patronNo : "—"),
+          name: reg.youth?.full_name ?? reg.guest_name ?? "—",
+          phone: reg.youth?.phone ?? reg.guest_phone ?? "",
+          category: reg.youth?.category ?? "",
+          deanery: reg.youth?.deanery?.name ?? reg.guest_deanery ?? "",
+          parish: reg.youth?.parish?.name ?? reg.guest_parish ?? "",
+          outstation: reg.youth?.outstation?.name ?? reg.guest_outstation ?? "",
+          time: new Date(reg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          kind,
+          role,
+          notes,
+        };
+      }),
     );
   }, [event]);
 
@@ -201,8 +233,10 @@ function EventCheckinPage() {
   const [walkInOpen, setWalkInOpen] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
   const [addYouthOpen, setAddYouthOpen] = useState(false);
+  const [addPatronageOpen, setAddPatronageOpen] = useState(false);
   const [removeTarget, setRemoveTarget] = useState<{ id: string; name: string } | null>(null);
   const [editTarget, setEditTarget] = useState<AttendeeEntry | null>(null);
+  const [editPatronageTarget, setEditPatronageTarget] = useState<AttendeeEntry | null>(null);
 
   /* per-column filters */
   const [fCdm, setFCdm] = useState<ColumnFilterValue | undefined>(undefined);
@@ -251,8 +285,8 @@ function EventCheckinPage() {
         return true;
       })
       .sort((a, b) => {
-        if (a.kind === b.kind) return 0;
-        return a.kind === "guest" ? 1 : -1;
+        const kindOrder: Record<AttendeeKind, number> = { member: 0, patron: 1, guest: 2 };
+        return kindOrder[a.kind] - kindOrder[b.kind];
       });
   }, [attendees, deaneryId, parishId, outstationId, selectedDeaneryName, selectedParishName, selectedOutstationName, q, fCdm, fName, fCategory, fPhone, fDeanery, fParish, fOutstation, fTime]);
 
@@ -270,8 +304,10 @@ function EventCheckinPage() {
   }
 
   const memberCount = attendees.filter((a) => a.kind === "member").length;
+  const patronCount = attendees.filter((a) => a.kind === "patron").length;
   const guestCount = attendees.filter((a) => a.kind === "guest").length;
   const filteredMemberCount = filtered.filter((a) => a.kind === "member").length;
+  const filteredPatronCount = filtered.filter((a) => a.kind === "patron").length;
   const filteredGuestCount = filtered.filter((a) => a.kind === "guest").length;
   const hasFilter = !!(deaneryId || parishId || outstationId || q || fCdm?.value || fName?.value || fCategory?.value || fPhone?.value || fDeanery?.value || fParish?.value || fOutstation?.value || fTime?.value);
 
@@ -279,9 +315,11 @@ function EventCheckinPage() {
     const { default: jsPDF } = await import("jspdf");
     const { default: autoTable } = await import("jspdf-autotable");
 
-    // Sort: members first (already sorted), then within each group sort by deanery → parish
+    // Sort: youth first, then patrons, then guests — within each group sort by deanery → parish
     const sorted = [...rows].sort((a, b) => {
-      if (a.kind !== b.kind) return a.kind === "member" ? -1 : 1;
+      const kindOrder: Record<AttendeeKind, number> = { member: 0, patron: 1, guest: 2 };
+      const ko = kindOrder[a.kind] - kindOrder[b.kind];
+      if (ko !== 0) return ko;
       const d = a.deanery.localeCompare(b.deanery);
       if (d !== 0) return d;
       return a.parish.localeCompare(b.parish);
@@ -298,13 +336,13 @@ function EventCheckinPage() {
     autoTable(doc, {
       startY: 26,
       theme: "grid",
-      head: [["#", "CDM No.", "Name", "Category", "Role", "Phone", "Deanery", "Parish", "Outstation", "Registered At"]],
+      head: [["#", "CDM No.", "Name", "Type", "Category", "Phone", "Deanery", "Parish", "Outstation", "Registered At"]],
       body: sorted.map((a, i) => [
         i + 1,
         a.cdmId === "—" ? "" : a.cdmId,
         a.name,
+        KIND_LABEL[a.kind],
         a.category || "",
-        a.kind === "guest" ? (a.role || "guest") : "member",
         formatPhone(a.phone) || "",
         a.deanery || "",
         a.parish || "",
@@ -338,7 +376,7 @@ function EventCheckinPage() {
 
       <div className="flex-1 overflow-y-auto px-5 py-4">
         {/* ── KPI cards ── */}
-        <div className="mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+        <div className="mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-5">
           <Kpi
             label="Registrations"
             value={String(filtered.length)}
@@ -346,10 +384,17 @@ function EventCheckinPage() {
             tone="info"
           />
           <Kpi
-            label="Members"
+            label="Youth"
             value={String(filteredMemberCount)}
-            trend={hasFilter ? `of ${memberCount} total` : "CDM youth"}
+            trend={hasFilter ? `of ${memberCount} total` : "CDM registered"}
             tone="up"
+          />
+          <Kpi
+            label="Patrons"
+            value={String(filteredPatronCount)}
+            trend={hasFilter ? `of ${patronCount} total` : "patronage team"}
+            tone="info"
+            accent="var(--color-violet)"
           />
           <Kpi
             label="Guests"
@@ -412,9 +457,23 @@ function EventCheckinPage() {
                 <button onClick={() => setWalkInOpen(true)} className={btnCls("primary")}>
                   <Icon icon="mdi:account-plus" className="h-3.5 w-3.5" /> Walk-in
                 </button>
-                <button onClick={() => setAddYouthOpen(true)} className={btnCls("primary")}>
-                  <UserCog className="h-3.5 w-3.5" /> New Youth
-                </button>
+                {/* Split "Add" dropdown — Youth or Patronage */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className={btnCls("primary")}>
+                      <UserCog className="h-3.5 w-3.5" /> Add
+                      <ChevronDown className="h-3 w-3 opacity-70" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-44">
+                    <DropdownMenuItem onClick={() => setAddYouthOpen(true)}>
+                      <UserCog className="mr-2 h-3.5 w-3.5" /> Youth
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setAddPatronageOpen(true)}>
+                      <Icon icon="mdi:account-tie" className="mr-2 h-3.5 w-3.5" /> Patronage
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
                 <button onClick={() => exportPdf(filtered)} className={btnCls("primary")} title="Export current view as PDF">
                   <FileText className="h-3.5 w-3.5" /> Export PDF
                 </button>
@@ -454,6 +513,7 @@ function EventCheckinPage() {
                       filter={<ColumnFilter label="Name" value={fName} onChange={setFName} />}
                     />
                   </th>
+                  <th className="label-eyebrow px-3.5 py-2.5 text-left">Type</th>
                   <th className="label-eyebrow px-3.5 py-2.5 text-left">
                     <ColumnHeader
                       label="Category"
@@ -509,7 +569,7 @@ function EventCheckinPage() {
               <tbody>
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="px-3.5 py-10 text-center text-[12px] text-text-3">
+                    <td colSpan={10} className="px-3.5 py-10 text-center text-[12px] text-text-3">
                       {attendees.length === 0
                         ? "No registrations yet — use Register, Walk-in, or Scan to add attendees."
                         : "No attendees match the current filters."}
@@ -521,15 +581,22 @@ function EventCheckinPage() {
                     <td className="px-3.5 py-2.5 font-mono text-[10px] font-bold text-gold">{a.cdmId}</td>
                     <td className="px-3.5 py-2.5 text-[11px] font-semibold text-foreground">
                       {titleCase(a.name)}
-                      {a.kind === "guest" && (
+                      {/* Guest sub-role badge (facilitator / accompaniment) */}
+                      {a.kind === "guest" && a.role && a.role !== "guest" && (
                         <span
                           className={`ml-1.5 rounded px-1 py-0.5 text-[8px] font-black uppercase tracking-wide ${
                             ROLE_TONE[a.role as GuestRole] ?? ROLE_TONE.guest
                           }`}
                         >
-                          {a.role || "guest"}
+                          {a.role}
                         </span>
                       )}
+                    </td>
+                    {/* Type column — Youth / Patron / Guest */}
+                    <td className="px-3.5 py-2.5">
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wide ${KIND_TONE[a.kind]}`}>
+                        {KIND_LABEL[a.kind]}
+                      </span>
                     </td>
                     <td className="px-3.5 py-2.5 text-[11px] text-text-2">
                       {a.category || "—"}
@@ -554,6 +621,11 @@ function EventCheckinPage() {
                           {a.kind === "guest" && (
                             <DropdownMenuItem onClick={() => setEditTarget(a)}>
                               <Pencil className="mr-2 h-3.5 w-3.5" /> Edit guest
+                            </DropdownMenuItem>
+                          )}
+                          {a.kind === "patron" && (
+                            <DropdownMenuItem onClick={() => setEditPatronageTarget(a)}>
+                              <Icon icon="mdi:account-tie" className="mr-2 h-3.5 w-3.5" /> Edit patronage
                             </DropdownMenuItem>
                           )}
                           <DropdownMenuSeparator />
@@ -604,6 +676,24 @@ function EventCheckinPage() {
               registerMut.mutate({ eventId, cdmId: youth.cdm_id });
             }}
           />
+          <AddPatronageDialog
+            open={addPatronageOpen}
+            onClose={() => setAddPatronageOpen(false)}
+            org={org}
+            onSuccess={(patron, resolved) => {
+              setAddPatronageOpen(false);
+              registerMut.mutate({
+                eventId,
+                guestName:       patron.name,
+                guestPhone:      patron.phone ?? undefined,
+                guestDeanery:    resolved.deaneryName,
+                guestParish:     resolved.parishName,
+                guestOutstation: resolved.outstationName,
+                guestRole:       "patronage",
+                notes:           `patronage_id:${patron.id}${patron.patron_number ? `|patron_no:${patron.patron_number}` : ""}`,
+              });
+            }}
+          />
         </>
       )}
       <WalkInDialog
@@ -648,6 +738,27 @@ function EventCheckinPage() {
         org={org}
         onClose={() => setEditTarget(null)}
         onSave={(id, input) => editMut.mutate({ id, input })}
+      />
+      <EditPatronageDialog
+        open={editPatronageTarget !== null}
+        target={editPatronageTarget}
+        org={org}
+        onClose={() => setEditPatronageTarget(null)}
+        onSaved={(updated) => {
+          setEditPatronageTarget(null);
+          if (editPatronageTarget) {
+            editMut.mutate({
+              id: editPatronageTarget.id,
+              input: {
+                guestName:       updated.name,
+                guestPhone:      updated.phone ?? null,
+                guestDeanery:    updated.deanery ?? null,
+                guestParish:     updated.parish ?? null,
+                guestOutstation: updated.outstation ?? null,
+              },
+            });
+          }
+        }}
       />
     </>
   );
@@ -1285,6 +1396,367 @@ function EditGuestDialog({
 
           <button onClick={submit} className={btnCls("primary", "w-full justify-center")}>
             Save changes
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ─── Add Patronage & Register dialog ─── */
+function AddPatronageDialog({
+  open,
+  onClose,
+  org,
+  onSuccess,
+}: {
+  open: boolean;
+  onClose: () => void;
+  org: OrgTree | undefined;
+  onSuccess: (patron: import("@/lib/db/patronage").PatronageTeamRow, resolved: { deaneryName?: string; parishName?: string; outstationName?: string }) => void;
+}) {
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [gender, setGender] = useState<"Male" | "Female">("Female");
+  const [saving, setSaving] = useState(false);
+
+  const scope = useAdminScope();
+  const {
+    deaneryId,
+    parishId,
+    outstationId,
+    setDeaneryId,
+    setParishId,
+    setOutstationId,
+    parishOptions,
+    outstationOptions,
+    deaneryLocked,
+    parishLocked,
+    outstationLocked,
+  } = useScopedOrgFields(org, scope, { resetKey: open });
+
+  const reset = () => {
+    setName(""); setPhone(""); setEmail(""); setGender("Female"); setSaving(false);
+  };
+
+  const submit = async () => {
+    if (!name.trim()) { toast.error("Full name is required"); return; }
+    if (!deaneryId) { toast.error("Deanery is required"); return; }
+    if (!parishId) { toast.error("Parish is required"); return; }
+    if (!outstationId) { toast.error("Outstation is required"); return; }
+    setSaving(true);
+    try {
+      // Resolve names now while the IDs are in local state — don't rely on
+      // the Supabase join on the insert response (it can come back null).
+      const deaneryName   = org?.deaneries.find((d) => d.id === deaneryId)?.name;
+      const parishName    = org?.parishes.find((p) => p.id === parishId)?.name;
+      const outstationName = org?.outstations.find((o) => o.id === outstationId)?.name;
+
+      const patron = await createPatronage({
+        name: name.trim(),
+        phone: phone.trim() || null,
+        email: email.trim() || null,
+        gender,
+        deaneryId,
+        parishId,
+        outstationId,
+      } as PatronageTeamInput);
+      onSuccess(patron, { deaneryName, parishName, outstationName });
+      reset();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Failed to save patronage record");
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) { reset(); onClose(); } }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Add Patronage & Register</DialogTitle>
+        </DialogHeader>
+        <p className="text-[11px] text-text-3">
+          Creates a patronage team record and registers the person for this event with role "patronage".
+        </p>
+        <div className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-[11px] font-bold text-text-3">Full name *</label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Mary Wanjiku" />
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] font-bold text-text-3">Gender</label>
+              <div className="flex gap-2">
+                {(["Female", "Male"] as const).map((g) => (
+                  <button
+                    key={g}
+                    type="button"
+                    onClick={() => setGender(g)}
+                    className={`flex-1 rounded-md border px-3 py-1.5 text-[11px] font-bold transition ${
+                      gender === g
+                        ? "border-danger bg-danger text-white"
+                        : "border-border bg-bg-2 text-text-2 hover:text-text-1"
+                    }`}
+                  >
+                    {g}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] font-bold text-text-3">Phone</label>
+              <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+254700000000" type="tel" />
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] font-bold text-text-3">Email</label>
+              <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="optional" type="email" />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-[11px] font-bold text-text-3">Location *</label>
+            {!deaneryLocked && (
+              <select value={deaneryId} onChange={(e) => setDeaneryId(e.target.value)} className={SEL_CLS}>
+                <option value="">Select Deanery</option>
+                {(org?.deaneries ?? []).map((d) => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </select>
+            )}
+            {!parishLocked && (
+              <select
+                value={parishId}
+                onChange={(e) => setParishId(e.target.value)}
+                disabled={!deaneryId || parishOptions.length === 0}
+                className={SEL_CLS}
+              >
+                <option value="">Select Parish</option>
+                {parishOptions.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            )}
+            {!outstationLocked && (
+              <select
+                value={outstationId}
+                onChange={(e) => setOutstationId(e.target.value)}
+                disabled={!parishId || outstationOptions.length === 0}
+                className={SEL_CLS}
+              >
+                <option value="">Select Outstation</option>
+                {outstationOptions.map((o) => (
+                  <option key={o.id} value={o.id}>{o.name}</option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          <button
+            onClick={submit}
+            disabled={saving}
+            className={btnCls("primary", "w-full justify-center")}
+          >
+            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Icon icon="mdi:account-tie" className="h-3.5 w-3.5" />}
+            {saving ? "Saving…" : "Save & Register"}
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ─── Edit Patronage dialog ─── */
+function EditPatronageDialog({
+  open,
+  target,
+  org,
+  onClose,
+  onSaved,
+}: {
+  open: boolean;
+  target: AttendeeEntry | null;
+  org: OrgTree | undefined;
+  onClose: () => void;
+  onSaved: (updated: { name: string; phone: string | null; deanery: string | null; parish: string | null; outstation: string | null }) => void;
+}) {
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [gender, setGender] = useState<"Male" | "Female">("Female");
+  const [saving, setSaving] = useState(false);
+
+  const scope = useAdminScope();
+
+  // Extract patronage_id from notes ("patronage_id:<uuid>")
+  const patronageId = useMemo(() => {
+    if (!target || target.kind !== "patron") return null;
+    const match = target.notes?.match(/^patronage_id:(.+)$/);
+    return match?.[1] ?? null;
+  }, [target]);
+
+  // Fetch full patronage record to get phone/email/gender/location
+  const { data: patronRecord } = useQuery({
+    queryKey: ["patronage-record", patronageId],
+    queryFn: () => getPatronage(patronageId!),
+    enabled: !!patronageId && open,
+    staleTime: 60_000,
+  });
+
+  const {
+    deaneryId,
+    parishId,
+    outstationId,
+    setDeaneryId,
+    setParishId,
+    setOutstationId,
+    parishOptions,
+    outstationOptions,
+    deaneryLocked,
+    parishLocked,
+    outstationLocked,
+  } = useScopedOrgFields(org, scope, {
+    // Prefer DB record IDs; fall back to resolving from attendee names
+    initialDeaneryId: patronRecord?.deanery_id
+      ?? org?.deaneries.find((d) => d.name === target?.deanery)?.id,
+    initialParishId: patronRecord?.parish_id
+      ?? org?.parishes.find((p) => p.name === target?.parish)?.id,
+    initialOutstationId: patronRecord?.outstation_id
+      ?? org?.outstations.find((o) => o.name === target?.outstation)?.id,
+    resetKey: patronRecord?.id ?? target?.id,
+  });
+
+  // Seed form from DB record when it loads
+  useEffect(() => {
+    if (!patronRecord) {
+      // Fallback: seed from AttendeeEntry while DB loads
+      if (target) {
+        setName(target.name);
+        setPhone(target.phone ?? "");
+      }
+      return;
+    }
+    setName(patronRecord.name);
+    setPhone(patronRecord.phone ?? "");
+    setEmail(patronRecord.email ?? "");
+    setGender(patronRecord.gender);
+    setSaving(false);
+  }, [patronRecord, target]);
+
+  const submit = async () => {
+    if (!name.trim()) { toast.error("Full name is required"); return; }
+    setSaving(true);
+    try {
+      if (patronageId) {
+        await updatePatronage(patronageId, {
+          name: name.trim(),
+          phone: phone.trim() || null,
+          email: email.trim() || null,
+          gender,
+          deaneryId: deaneryId || undefined,
+          parishId: parishId || undefined,
+          outstationId: outstationId || undefined,
+        });
+      }
+      onSaved({
+        name:       name.trim(),
+        phone:      phone.trim() || null,
+        deanery:    org?.deaneries.find((d) => d.id === deaneryId)?.name  ?? null,
+        parish:     org?.parishes.find((p)  => p.id === parishId)?.name   ?? null,
+        outstation: org?.outstations.find((o) => o.id === outstationId)?.name ?? null,
+      });
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Failed to update patronage record");
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Edit Patronage</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-[11px] font-bold text-text-3">Full name *</label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Mary Wanjiku" />
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] font-bold text-text-3">Gender</label>
+              <div className="flex gap-2">
+                {(["Female", "Male"] as const).map((g) => (
+                  <button
+                    key={g}
+                    type="button"
+                    onClick={() => setGender(g)}
+                    className={`flex-1 rounded-md border px-3 py-1.5 text-[11px] font-bold transition ${
+                      gender === g
+                        ? "border-danger bg-danger text-white"
+                        : "border-border bg-bg-2 text-text-2 hover:text-text-1"
+                    }`}
+                  >
+                    {g}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] font-bold text-text-3">Phone</label>
+              <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+254700000000" type="tel" />
+            </div>
+            <div>
+              <label className="mb-1 block text-[11px] font-bold text-text-3">Email</label>
+              <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="optional" type="email" />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-[11px] font-bold text-text-3">Location</label>
+            {!deaneryLocked && (
+              <select value={deaneryId} onChange={(e) => setDeaneryId(e.target.value)} className={SEL_CLS}>
+                <option value="">Select Deanery</option>
+                {(org?.deaneries ?? []).map((d) => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </select>
+            )}
+            {!parishLocked && (
+              <select
+                value={parishId}
+                onChange={(e) => setParishId(e.target.value)}
+                disabled={!deaneryId || parishOptions.length === 0}
+                className={SEL_CLS}
+              >
+                <option value="">Select Parish</option>
+                {parishOptions.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            )}
+            {!outstationLocked && (
+              <select
+                value={outstationId}
+                onChange={(e) => setOutstationId(e.target.value)}
+                disabled={!parishId || outstationOptions.length === 0}
+                className={SEL_CLS}
+              >
+                <option value="">Select Outstation</option>
+                {outstationOptions.map((o) => (
+                  <option key={o.id} value={o.id}>{o.name}</option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          <button
+            onClick={submit}
+            disabled={saving}
+            className={btnCls("primary", "w-full justify-center")}
+          >
+            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Pencil className="h-3.5 w-3.5" />}
+            {saving ? "Saving…" : "Save changes"}
           </button>
         </div>
       </DialogContent>
