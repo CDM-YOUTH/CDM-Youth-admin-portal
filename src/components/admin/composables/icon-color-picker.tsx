@@ -39,23 +39,18 @@ export function IconColorPicker({
 }) {
   const [showPicker, setShowPicker] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [activeCategory, setActiveCategory] = useState("Church & Faith");
 
-  const filteredEmojis = Object.entries(EMOJI_CATEGORIES).reduce(
-    (acc, [category, emojis]) => {
-      const filtered = emojis.filter((emoji) => {
-        const name = Object.entries(EMOJI_CATEGORIES)
-          .find(([_, items]) => items.includes(emoji))?.[0]
-          ?.toLowerCase() || "";
-        return name.includes(searchTerm.toLowerCase());
-      });
-      if (filtered.length > 0) {
-        acc[category] = filtered;
-      }
-      return acc;
-    },
-    {} as Record<string, string[]>
+  // Flatten all emojis with their category names for search
+  const allEmojis = Object.entries(EMOJI_CATEGORIES).flatMap(([category, emojis]) =>
+    emojis.map((emoji) => ({ emoji, category }))
   );
+
+  // Filter based on search term (searches category names)
+  const filteredEmojis = searchTerm
+    ? allEmojis.filter((item) =>
+        item.category.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    : allEmojis;
 
   return (
     <div className="space-y-4">
@@ -97,7 +92,7 @@ export function IconColorPicker({
           >
             {selectedIcon || "📖"}
           </button>
-          <span className="text-sm text-text-3">Click to choose icon</span>
+          <span className="text-sm text-text-3">Click to choose</span>
         </div>
 
         {showPicker && (
@@ -106,66 +101,34 @@ export function IconColorPicker({
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-text-3" />
               <input
                 type="text"
-                placeholder="Search categories..."
+                placeholder="Search by category..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                autoFocus
                 className="w-full rounded-lg border border-border bg-bg-2 py-2 pl-8 pr-3 text-sm text-text-1 placeholder-text-3 focus:border-primary focus:outline-none"
               />
             </div>
 
-            {searchTerm ? (
-              <div className="grid grid-cols-6 gap-2 max-h-48 overflow-y-auto">
-                {Object.values(filteredEmojis)
-                  .flat()
-                  .map((emoji) => (
-                    <button
-                      key={emoji}
-                      onClick={() => {
-                        onIconChange(emoji);
-                        setShowPicker(false);
-                        setSearchTerm("");
-                      }}
-                      className="flex h-8 items-center justify-center rounded text-lg hover:bg-bg-2"
-                      title={emoji}
-                    >
-                      {emoji}
-                    </button>
-                  ))}
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {Object.entries(EMOJI_CATEGORIES).map(([category, emojis]) => (
-                  <div key={category}>
-                    <button
-                      type="button"
-                      onClick={() => setActiveCategory(category)}
-                      className={`w-full rounded-lg px-3 py-2 text-left text-sm font-bold transition-colors ${
-                        activeCategory === category
-                          ? "bg-primary text-white"
-                          : "bg-bg-2 text-text-2 hover:bg-bg-3"
-                      }`}
-                    >
-                      {category}
-                    </button>
-                    {activeCategory === category && (
-                      <div className="mt-2 grid grid-cols-6 gap-2 p-2">
-                        {emojis.map((emoji) => (
-                          <button
-                            key={emoji}
-                            onClick={() => {
-                              onIconChange(emoji);
-                              setShowPicker(false);
-                            }}
-                            className="flex h-8 items-center justify-center rounded text-lg hover:bg-bg-3"
-                            title={emoji}
-                          >
-                            {emoji}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
+            <div className="grid grid-cols-8 gap-1 max-h-48 overflow-y-auto">
+              {filteredEmojis.map(({ emoji, category }) => (
+                <button
+                  key={`${emoji}-${category}`}
+                  onClick={() => {
+                    onIconChange(emoji);
+                    setShowPicker(false);
+                    setSearchTerm("");
+                  }}
+                  className="flex h-8 items-center justify-center rounded text-lg hover:bg-bg-2 transition-colors"
+                  title={category}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+
+            {filteredEmojis.length === 0 && (
+              <div className="py-4 text-center text-sm text-text-3">
+                No emojis found for "{searchTerm}"
               </div>
             )}
           </div>

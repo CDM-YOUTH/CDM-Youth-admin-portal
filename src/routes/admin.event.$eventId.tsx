@@ -79,7 +79,14 @@ const MASS_NAMES = new Set(["Readings", "Prayers of the Faithful", "Speeches"]);
 function eventToFormSeed(event: EventFull): EventFormState {
   const duties = dbCategoriesToDuties(event.duty_categories);
   const isMass = duties.some((c) => MASS_NAMES.has(c.name));
-  const hasDuties = event.duty_categories.length > 0;
+  // hasDuties = true only when categories exist AND at least one duty has assignees,
+  // OR it's a Mass event (which uses fixed category names but may have no assignees yet).
+  // Events saved in "Activities" mode write categories+duties but never write assignees,
+  // so we can distinguish the two modes without a DB schema change.
+  const hasAnyAssignees = event.duty_categories.some((cat) =>
+    cat.duties?.some((d) => (d.assignees?.length ?? 0) > 0),
+  );
+  const hasDuties = event.duty_categories.length > 0 && (hasAnyAssignees || isMass);
   return {
     details: {
       name: event.name,

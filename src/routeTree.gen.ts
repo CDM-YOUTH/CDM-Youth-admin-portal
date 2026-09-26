@@ -23,6 +23,7 @@ import { Route as AdminEventsRouteImport } from './routes/admin.events'
 import { Route as AdminFormationRouteImport } from './routes/admin.formation'
 import { Route as AdminLeadersRouteImport } from './routes/admin.leaders'
 import { Route as AdminMissionRouteImport } from './routes/admin.mission'
+import { Route as AdminPatronageRouteImport } from './routes/admin.patronage'
 import { Route as AdminReportsRouteImport } from './routes/admin.reports'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminUniformsRouteImport } from './routes/admin.uniforms'
@@ -121,6 +122,11 @@ const AdminLeadersRoute = AdminLeadersRouteImport.update({
 const AdminMissionRoute = AdminMissionRouteImport.update({
   id: '/mission',
   path: '/mission',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminPatronageRoute = AdminPatronageRouteImport.update({
+  id: '/patronage',
+  path: '/patronage',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminReportsRoute = AdminReportsRouteImport.update({
@@ -284,6 +290,7 @@ export interface FileRoutesByFullPath {
   '/admin/formation': typeof AdminFormationRouteWithChildren
   '/admin/leaders': typeof AdminLeadersRoute
   '/admin/mission': typeof AdminMissionRoute
+  '/admin/patronage': typeof AdminPatronageRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/uniforms': typeof AdminUniformsRoute
@@ -327,6 +334,7 @@ export interface FileRoutesByTo {
   '/admin/formation': typeof AdminFormationRouteWithChildren
   '/admin/leaders': typeof AdminLeadersRoute
   '/admin/mission': typeof AdminMissionRoute
+  '/admin/patronage': typeof AdminPatronageRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/uniforms': typeof AdminUniformsRoute
@@ -373,6 +381,7 @@ export interface FileRoutesById {
   '/admin/formation': typeof AdminFormationRouteWithChildren
   '/admin/leaders': typeof AdminLeadersRoute
   '/admin/mission': typeof AdminMissionRoute
+  '/admin/patronage': typeof AdminPatronageRoute
   '/admin/reports': typeof AdminReportsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/uniforms': typeof AdminUniformsRoute
@@ -420,6 +429,7 @@ export interface FileRouteTypes {
     | '/admin/formation'
     | '/admin/leaders'
     | '/admin/mission'
+    | '/admin/patronage'
     | '/admin/reports'
     | '/admin/settings'
     | '/admin/uniforms'
@@ -463,6 +473,7 @@ export interface FileRouteTypes {
     | '/admin/formation'
     | '/admin/leaders'
     | '/admin/mission'
+    | '/admin/patronage'
     | '/admin/reports'
     | '/admin/settings'
     | '/admin/uniforms'
@@ -508,6 +519,7 @@ export interface FileRouteTypes {
     | '/admin/formation'
     | '/admin/leaders'
     | '/admin/mission'
+    | '/admin/patronage'
     | '/admin/reports'
     | '/admin/settings'
     | '/admin/uniforms'
@@ -658,6 +670,13 @@ declare module '@tanstack/react-router' {
       path: '/mission'
       fullPath: '/admin/mission'
       preLoaderRoute: typeof AdminMissionRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/patronage': {
+      id: '/admin/patronage'
+      path: '/patronage'
+      fullPath: '/admin/patronage'
+      preLoaderRoute: typeof AdminPatronageRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/reports': {
@@ -889,6 +908,7 @@ interface AdminRouteChildren {
   AdminFormationRoute: typeof AdminFormationRouteWithChildren
   AdminLeadersRoute: typeof AdminLeadersRoute
   AdminMissionRoute: typeof AdminMissionRoute
+  AdminPatronageRoute: typeof AdminPatronageRoute
   AdminReportsRoute: typeof AdminReportsRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
   AdminUniformsRoute: typeof AdminUniformsRoute
@@ -909,6 +929,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminFormationRoute: AdminFormationRouteWithChildren,
   AdminLeadersRoute: AdminLeadersRoute,
   AdminMissionRoute: AdminMissionRoute,
+  AdminPatronageRoute: AdminPatronageRoute,
   AdminReportsRoute: AdminReportsRoute,
   AdminSettingsRoute: AdminSettingsRoute,
   AdminUniformsRoute: AdminUniformsRoute,

@@ -153,7 +153,7 @@ function BulletinPage() {
   };
 
   return (
-    <>
+    <div className="flex min-h-screen flex-col">
       {view === "categories" ? (
         // Categories View
         <>
@@ -471,7 +471,7 @@ function BulletinPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+    </div>
   );
 }
 
