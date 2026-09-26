@@ -85,6 +85,7 @@ const MODULES = [
   { key: "formation", label: "Formation" },
   { key: "welfare", label: "Welfare" },
   { key: "uniforms", label: "Uniforms" },
+  { key: "patronage", label: "Patronage" },
   { key: "reports", label: "Reports" },
   { key: "users", label: "User Management" },
   { key: "settings", label: "Settings" },
