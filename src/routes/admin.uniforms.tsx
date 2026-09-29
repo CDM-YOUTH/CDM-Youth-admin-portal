@@ -79,6 +79,7 @@ function UniformsPage() {
   const [reportRange,  setReportRange]  = useState<DateRange>(EMPTY_RANGE);
   const [reportItem,   setReportItem]   = useState<string>("all");
   const [statusQ,      setStatusQ]      = useState("");
+  const [statusCategory, setStatusCategory] = useState<string>("all");
   const [stockInQ,     setStockInQ]     = useState("");
   const [ordersFilter, setOrdersFilter] = useState<OrdersFilter>("all");
   const [ordersPage,   setOrdersPage]   = useState(1);
@@ -176,8 +177,12 @@ function UniformsPage() {
   );
 
   const filteredItemsForStatus = useMemo(
-    () => displayItems.filter((i) => !statusQ || i.name.toLowerCase().includes(statusQ.toLowerCase())),
-    [displayItems, statusQ],
+    () => displayItems.filter((i) => {
+      const matchesSearch = !statusQ || i.name.toLowerCase().includes(statusQ.toLowerCase());
+      const matchesCategory = statusCategory === "all" || (i.category ?? "youth") === statusCategory;
+      return matchesSearch && matchesCategory;
+    }),
+    [displayItems, statusQ, statusCategory],
   );
 
   const itemPagination   = usePagination(filteredItemsForStatus, uniformSettings.itemsPageSize);
@@ -345,9 +350,7 @@ function UniformsPage() {
   /* ── topbar action ── */
   const actionBtn =
     tab === "status" ? (
-      <button onClick={() => setAddItemOpen(true)} className="text-[11px] font-semibold text-text-2 hover:text-text-1 transition-colors">
-        + New Item
-      </button>
+      <TopbarButton onClick={() => setAddItemOpen(true)}>+ New Item</TopbarButton>
     ) : tab === "stock-in" ? (
       <TopbarButton onClick={() => setAddEntryOpen(true)}>+ Stock In</TopbarButton>
     ) : tab === "stock-out" ? (
@@ -402,6 +405,17 @@ function UniformsPage() {
                 placeholder="Search item name…"
                 className="min-w-[200px] rounded-md border border-black/20 bg-white px-3 py-1.5 text-[12px] text-black/70 placeholder:text-gray-400 outline-none hover:border-gold-3/50 focus:border-gold-3"
               />
+              <select
+                value={statusCategory}
+                onChange={(e) => setStatusCategory(e.target.value)}
+                className="rounded-md border border-border bg-bg-3 px-3 py-1.5 text-[11px] text-text-2 outline-none hover:border-gold-3/50 focus:border-gold-3"
+              >
+                <option value="all">All Categories</option>
+                <option value="youth">Youth</option>
+                <option value="sewing">Sewing</option>
+                <option value="organization">Organization</option>
+                <option value="other">Other</option>
+              </select>
               <DateRangeFilter value={statusRange} onChange={setStatusRange} />
             </div>
 
