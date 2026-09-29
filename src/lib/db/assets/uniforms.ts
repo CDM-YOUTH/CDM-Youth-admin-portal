@@ -1,229 +1,90 @@
 import { supabase } from "@/integrations/supabase/client";
 import { likePattern } from "@/lib/utils";
 
-export type UniformSku = {
+export type UniformItemCategory = "youth" | "sewing" | "organization" | "other";
+
+export type UniformItem = {
   id: string;
   name: string;
   swatch: string | null;
-  in_stock: number;
-  on_order: number;
   unit_price: number | null;
+  category?: UniformItemCategory;
   created_at: string;
+  updated_at: string;
 };
 
-export type OrderStatus = "pending" | "ordered" | "received" | "cancelled";
-
-export type UniformOrder = {
-  id: string;
-  sku_id: string | null;
-  item_name: string;
-  quantity: number;
-  supplier: string | null;
-  deanery_id: string | null;
-  deanery_name: string | null;
-  estimated_delivery: string | null;
-  status: OrderStatus;
-  notes: string | null;
-  created_at: string;
+export type UniformItemWithStock = UniformItem & {
+  stock_in: number;
+  stock_out_delivered: number;
+  pending_youth_orders: number;
+  available_stock: number;
 };
 
-export type UniformOrderInput = {
-  itemName: string;
-  quantity: number;
-  supplier?: string | null;
-  deaneryName?: string | null;
-  estimatedDelivery?: string | null;
-  notes?: string | null;
-};
-
-export type UniformOrderUpdateInput = {
-  itemName: string;
-  quantity: number;
-  supplier?: string | null;
-  deaneryName?: string | null;
-  estimatedDelivery?: string | null;
-  status: OrderStatus;
-  notes?: string | null;
-};
-
-export type UniformSkuInput = {
+export type UniformItemInput = {
   name: string;
-  inStock: number;
-  onOrder?: number;
-  unitPrice?: number | null;
   swatch?: string | null;
+  unitPrice?: number | null;
+  category?: UniformItemCategory;
 };
 
-export type UniformSkuUpdateInput = {
-  name: string;
-  inStock: number;
-  onOrder: number;
+export type UniformItemUpdateInput = {
+  name?: string;
+  swatch?: string | null;
   unitPrice?: number | null;
+  category?: UniformItemCategory;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
 
-export async function listUniformSkus(): Promise<UniformSku[]> {
-  const { data, error } = await db.from("uniform_skus").select("*").order("name");
+export async function listUniformItems(): Promise<UniformItem[]> {
+  const { data, error } = await db.from("uniform_items").select("*").order("name");
   if (error) throw error;
-  return (data ?? []) as UniformSku[];
+  return (data ?? []) as UniformItem[];
 }
 
-export async function listUniformSkusPaged(opts: {
-  page?: number;
-  size?: number;
-  q?: string;
-}): Promise<{ data: UniformSku[]; total: number; page: number; size: number }> {
-  const page = opts.page ?? 0;
-  const size = Math.min(opts.size ?? 50, 100);
-
-  let query = db
-    .from("uniform_skus")
-    .select("*", { count: "exact" })
-    .order("name")
-    .range(page * size, page * size + size - 1);
-
-  if (opts.q?.trim()) query = query.ilike("name", likePattern(opts.q));
-
-  const { data, error, count } = await query;
-  if (error) throw error;
-  return { data: (data ?? []) as UniformSku[], total: count ?? 0, page, size };
-}
-
-export async function listUniformOrders(limit = 100): Promise<UniformOrder[]> {
+export async function listUniformItemsWithStock(): Promise<UniformItemWithStock[]> {
   const { data, error } = await db
-    .from("uniform_orders")
+    .from("uniform_items_with_stock")
     .select("*")
-    .order("created_at", { ascending: false })
-    .limit(limit);
+    .order("name");
   if (error) throw error;
-  return (data ?? []) as UniformOrder[];
+  return (data ?? []) as UniformItemWithStock[];
 }
 
-export async function createUniformOrder(input: UniformOrderInput): Promise<UniformOrder> {
-  let skuId: string | null = null;
-  if (input.itemName) {
-    const { data: sku } = await db
-      .from("uniform_skus")
-      .select("id")
-      .eq("name", input.itemName)
-      .maybeSingle();
-    skuId = (sku as { id: string } | null)?.id ?? null;
-  }
-
-  let deaneryId: string | null = null;
-  if (input.deaneryName?.trim()) {
-    const { data: d } = await supabase
-      .from("deaneries")
-      .select("id")
-      .eq("name", input.deaneryName.trim())
-      .maybeSingle();
-    deaneryId = (d as { id: string } | null)?.id ?? null;
-  }
-
+export async function createUniformItem(input: UniformItemInput): Promise<UniformItem> {
   const { data, error } = await db
-    .from("uniform_orders")
+    .from("uniform_items")
     .insert({
-      sku_id: skuId,
-      item_name: input.itemName,
-      quantity: input.quantity,
-      supplier: input.supplier || null,
-      deanery_id: deaneryId,
-      deanery_name: input.deaneryName || null,
-      estimated_delivery: input.estimatedDelivery || null,
-      notes: input.notes || null,
-    })
-    .select()
-    .single();
-  if (error) throw error;
-  return data as UniformOrder;
-}
-
-export async function updateUniformOrder(id: string, input: UniformOrderUpdateInput): Promise<UniformOrder> {
-  let skuId: string | null = null;
-  if (input.itemName) {
-    const { data: sku } = await db
-      .from("uniform_skus")
-      .select("id")
-      .eq("name", input.itemName)
-      .maybeSingle();
-    skuId = (sku as { id: string } | null)?.id ?? null;
-  }
-
-  let deaneryId: string | null = null;
-  if (input.deaneryName?.trim()) {
-    const { data: d } = await supabase
-      .from("deaneries")
-      .select("id")
-      .eq("name", input.deaneryName.trim())
-      .maybeSingle();
-    deaneryId = (d as { id: string } | null)?.id ?? null;
-  }
-
-  const { data, error } = await db
-    .from("uniform_orders")
-    .update({
-      sku_id: skuId,
-      item_name: input.itemName,
-      quantity: input.quantity,
-      supplier: input.supplier || null,
-      deanery_id: deaneryId,
-      deanery_name: input.deaneryName || null,
-      estimated_delivery: input.estimatedDelivery || null,
-      status: input.status,
-      notes: input.notes || null,
-    })
-    .eq("id", id)
-    .select()
-    .single();
-  if (error) throw error;
-  return data as UniformOrder;
-}
-
-export async function deleteUniformOrder(id: string): Promise<void> {
-  const { error } = await db.from("uniform_orders").delete().eq("id", id);
-  if (error) throw error;
-}
-
-export async function updateUniformSku(id: string, input: UniformSkuUpdateInput): Promise<UniformSku> {
-  const { data, error } = await db
-    .from("uniform_skus")
-    .update({
       name: input.name,
-      in_stock: input.inStock,
-      on_order: input.onOrder,
+      swatch: input.swatch ?? null,
       unit_price: input.unitPrice ?? null,
+      category: input.category ?? "youth",
     })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as UniformItem;
+}
+
+export async function updateUniformItem(id: string, input: UniformItemUpdateInput): Promise<UniformItem> {
+  const payload: Record<string, unknown> = {};
+  if (input.name !== undefined) payload.name = input.name;
+  if (input.swatch !== undefined) payload.swatch = input.swatch;
+  if (input.unitPrice !== undefined) payload.unit_price = input.unitPrice;
+  if (input.category !== undefined) payload.category = input.category;
+
+  const { data, error } = await db
+    .from("uniform_items")
+    .update(payload)
     .eq("id", id)
     .select()
     .single();
   if (error) throw error;
-  return data as UniformSku;
+  return data as UniformItem;
 }
 
-export async function deleteUniformSku(id: string): Promise<void> {
-  const { error } = await db.from("uniform_skus").delete().eq("id", id);
-  if (error) throw error;
-}
-
-export async function createUniformSku(input: UniformSkuInput): Promise<UniformSku> {
-  const { data, error } = await db
-    .from("uniform_skus")
-    .insert({
-      name:       input.name,
-      in_stock:   input.inStock,
-      on_order:   input.onOrder  ?? 0,
-      unit_price: input.unitPrice ?? null,
-      swatch:     input.swatch   ?? null,
-    })
-    .select()
-    .single();
-  if (error) throw error;
-  return data as UniformSku;
-}
-
-export async function updateOrderStatus(id: string, status: OrderStatus): Promise<void> {
-  const { error } = await db.from("uniform_orders").update({ status }).eq("id", id);
+export async function deleteUniformItem(id: string): Promise<void> {
+  const { error } = await db.from("uniform_items").delete().eq("id", id);
   if (error) throw error;
 }

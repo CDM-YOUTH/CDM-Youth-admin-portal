@@ -4,248 +4,361 @@ import { likePattern } from "@/lib/utils";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
 
-export type PaymentStatus = "unpaid" | "partial" | "paid";
-export type OrderStage = "placed" | "confirmed" | "dispatched" | "delivered" | "cancelled";
+export type PaymentStatus = "pending" | "paid" | "waived";
+export type OrderStatus = "pending" | "approved" | "paid" | "dispatched" | "delivered" | "cancelled";
 
-export type UniformSale = {
+export type OrderType = "youth" | "patronage" | "walk_in";
+
+export type UniformOrder = {
   id: string;
-  sku_id: string | null;
+  order_number: string;
+  item_id: string | null;
   item_name: string;
-  youth_name: string;
-  youth_id: string | null;
-  size: string | null;
-  parish_name: string | null;
   quantity: number;
-  unit_price: number;
+  ordered_by: string | null;
+  youth_id: string | null;
+  cdm_id: string | null;
   ordered_at: string;
-  delivered_at: string | null;
-  paid_at: string | null;
-  paid_amount: number;
+  reviewed_at: string | null;
+  reviewed_by: string | null;
+  review_notes: string | null;
   payment_status: PaymentStatus;
-  notes: string | null;
-  order_ref: string;
-  stage: OrderStage;
-  delivery_location: string | null;
-  confirmed_at: string | null;
-  confirmed_by: string | null;
+  paid_at: string | null;
+  paid_by: string | null;
+  payment_method: string | null;
   dispatch_contact_name: string | null;
   dispatch_contact_phone: string | null;
   dispatch_method: string | null;
   dispatch_scheduled_at: string | null;
   dispatched_at: string | null;
+  dispatch_by: string | null;
+  dispatch_notes: string | null;
+  delivered_at: string | null;
   delivered_by: string | null;
+  delivery_notes: string | null;
+  created_by: string | null;
+  updated_by: string | null;
   created_at: string;
   updated_at: string;
+  deleted_at: string | null;
+  deleted_by: string | null;
+  // Walk-in order fields
+  ordered_by_name?: string | null;
+  ordered_by_phone?: string | null;
+  ordered_for_name?: string | null;
+  deanery_id?: string | null;
+  order_type?: OrderType;
+  // Computed status from view
+  status: OrderStatus;
+  // Joined fields for display
+  youth_name?: string;
+  parish_name?: string;
+  unit_price?: number;
 };
 
-export type UniformSaleInput = {
+export type UniformOrderInput = {
   itemName: string;
-  youthName: string;
-  parishName?: string | null;
-  size?: string | null;
-  deliveryLocation?: string | null;
   quantity: number;
-  unitPrice: number;
-  orderedAt?: string | null;
+  youthId?: string | null;
+  cdmId?: string | null;
   notes?: string | null;
+  // Walk-in order fields (when order_type is 'walk_in')
+  orderType?: OrderType;
+  orderedForName?: string | null;
+  orderedByName?: string | null;
+  orderedByPhone?: string | null;
+  deaneryId?: string | null;
 };
 
-export type UniformSaleUpdateInput = {
+export type UniformOrderUpdateInput = {
   itemName?: string;
-  youthName?: string;
-  parishName?: string | null;
-  size?: string | null;
-  deliveryLocation?: string | null;
   quantity?: number;
-  unitPrice?: number;
-  orderedAt?: string | null;
-  deliveredAt?: string | null;
-  notes?: string | null;
+  reviewNotes?: string | null;
+  paymentStatus?: PaymentStatus;
+  paymentMethod?: string | null;
+  dispatchContactName?: string | null;
+  dispatchContactPhone?: string | null;
+  dispatchMethod?: string | null;
+  dispatchScheduledAt?: string | null;
+  dispatchNotes?: string | null;
+  deliveredBy?: string | null;
+  deliveryNotes?: string | null;
 };
 
-export async function listUniformSales(limit = 300): Promise<UniformSale[]> {
+export async function listUniformOrders(limit = 300): Promise<UniformOrder[]> {
   const { data, error } = await db
-    .from("uniform_sales")
-    .select("*")
+    .from("uniform_orders_with_status")
+    .select(`
+      *,
+      item:uniform_items(name, unit_price),
+      youth:youths(id, first_name, last_name, parish_id),
+      parish:parishes(name)
+    `)
     .order("ordered_at", { ascending: false })
     .limit(limit);
   if (error) throw error;
-  return (data ?? []) as UniformSale[];
+  return (data ?? []).map((o: any) => ({
+    ...o,
+    item_name: o.item?.name ?? "Unknown",
+    unit_price: o.item?.unit_price ?? 0,
+    youth_name: o.youth ? `${o.youth.first_name} ${o.youth.last_name}` : null,
+    parish_name: o.parish?.name ?? null,
+  }));
 }
 
-export async function listUniformSalesPaged(opts: {
+export async function listUniformOrdersPaged(opts: {
   page?: number;
   size?: number;
   q?: string;
-  stage?: string | null;
+  status?: string | null;
   paymentStatus?: string | null;
   from?: string | null;
   to?: string | null;
-}): Promise<{ data: UniformSale[]; total: number; page: number; size: number }> {
+}): Promise<{ data: UniformOrder[]; total: number; page: number; size: number }> {
   const page = opts.page ?? 0;
   const size = Math.min(opts.size ?? 25, 100);
 
   let query = db
-    .from("uniform_sales")
-    .select("*", { count: "exact" })
+    .from("uniform_orders_with_status")
+    .select(`
+      *,
+      item:uniform_items(name, unit_price),
+      youth:youths(id, first_name, last_name, parish_id),
+      parish:parishes(name)
+    `, { count: "exact" })
     .order("ordered_at", { ascending: false })
     .range(page * size, page * size + size - 1);
 
-  if (opts.stage) {
-    if (opts.stage === "pending") {
-      query = query.not("stage", "in", "(delivered,cancelled)");
-    } else {
-      query = query.eq("stage", opts.stage);
-    }
+  if (opts.status) {
+    query = query.eq("status", opts.status);
   }
-  if (opts.paymentStatus === "not_paid") {
-    query = query.neq("payment_status", "paid");
-  } else if (opts.paymentStatus) {
+  if (opts.paymentStatus) {
     query = query.eq("payment_status", opts.paymentStatus);
   }
   if (opts.from) query = query.gte("ordered_at", opts.from);
   if (opts.to)   query = query.lte("ordered_at", `${opts.to}T23:59:59Z`);
   if (opts.q?.trim()) {
     const t = likePattern(opts.q);
-    query = query.or(`youth_name.ilike.${t},item_name.ilike.${t},parish_name.ilike.${t}`);
+    query = query.or(`cdm_id.ilike.${t},item.name.ilike.${t},parish.name.ilike.${t}`);
   }
 
   const { data, error, count } = await query;
   if (error) throw error;
-  return { data: (data ?? []) as UniformSale[], total: count ?? 0, page, size };
+  const mappedData = (data ?? []).map((o: any) => ({
+    ...o,
+    item_name: o.item?.name ?? "Unknown",
+    unit_price: o.item?.unit_price ?? 0,
+    youth_name: o.youth ? `${o.youth.first_name} ${o.youth.last_name}` : null,
+    parish_name: o.parish?.name ?? null,
+  }));
+  return { data: mappedData as UniformOrder[], total: count ?? 0, page, size };
 }
 
-export async function createUniformSale(input: UniformSaleInput): Promise<UniformSale> {
-  let skuId: string | null = null;
+export async function createUniformOrder(input: UniformOrderInput): Promise<UniformOrder> {
+  let itemId: string | null = null;
   if (input.itemName) {
-    const { data: sku } = await db
-      .from("uniform_skus")
+    const { data: item } = await db
+      .from("uniform_items")
       .select("id")
       .eq("name", input.itemName)
       .maybeSingle();
-    skuId = (sku as { id: string } | null)?.id ?? null;
+    itemId = (item as { id: string } | null)?.id ?? null;
   }
 
+  // Determine order type
+  const orderType: OrderType = input.orderType ?? (input.youthId || input.cdmId ? 'youth' : 'walk_in');
+
   const { data, error } = await db
-    .from("uniform_sales")
+    .from("uniform_orders")
     .insert({
-      sku_id:            skuId,
-      item_name:         input.itemName,
-      youth_name:        input.youthName,
-      parish_name:       input.parishName ?? null,
-      size:              input.size ?? null,
-      delivery_location: input.deliveryLocation ?? null,
-      quantity:          input.quantity,
-      unit_price:        input.unitPrice,
-      ordered_at:        input.orderedAt ?? new Date().toISOString(),
-      notes:             input.notes ?? null,
+      item_id: itemId,
+      quantity: input.quantity,
+      youth_id: input.youthId ?? null,
+      cdm_id: input.cdmId ?? null,
+      review_notes: input.notes ?? null,
+      order_type: orderType,
+      ordered_for_name: input.orderedForName ?? null,
+      ordered_by_name: input.orderedByName ?? null,
+      ordered_by_phone: input.orderedByPhone ?? null,
+      deanery_id: input.deaneryId ?? null,
     })
-    .select()
+    .select(`
+      *,
+      item:uniform_items(name, unit_price),
+      youth:youths(id, first_name, last_name, parish_id),
+      parish:parishes(name)
+    `)
     .single();
   if (error) throw error;
-  return data as UniformSale;
+  const order = data as any;
+  return {
+    ...order,
+    item_name: order.item?.name ?? input.itemName,
+    unit_price: order.item?.unit_price ?? 0,
+    youth_name: order.youth ? `${order.youth.first_name} ${order.youth.last_name}` : null,
+    parish_name: order.parish?.name ?? null,
+    status: 'pending',
+  };
 }
 
-export async function updateUniformSale(id: string, input: UniformSaleUpdateInput): Promise<UniformSale> {
+export async function updateUniformOrder(id: string, input: UniformOrderUpdateInput): Promise<UniformOrder> {
   const payload: Record<string, unknown> = {};
-  if (input.itemName    !== undefined) payload.item_name    = input.itemName;
-  if (input.youthName   !== undefined) payload.youth_name   = input.youthName;
-  if (input.parishName  !== undefined) payload.parish_name  = input.parishName;
-  if (input.size        !== undefined) payload.size         = input.size;
-  if (input.deliveryLocation !== undefined) payload.delivery_location = input.deliveryLocation;
-  if (input.quantity    !== undefined) payload.quantity     = input.quantity;
-  if (input.unitPrice   !== undefined) payload.unit_price   = input.unitPrice;
-  if (input.orderedAt   !== undefined) payload.ordered_at   = input.orderedAt   || null;
-  if (input.deliveredAt !== undefined) payload.delivered_at = input.deliveredAt || null;
-  if (input.notes       !== undefined) payload.notes        = input.notes;
+  if (input.reviewNotes !== undefined) payload.review_notes = input.reviewNotes;
+  if (input.paymentStatus !== undefined) payload.payment_status = input.paymentStatus;
+  if (input.paymentMethod !== undefined) payload.payment_method = input.paymentMethod;
+  if (input.dispatchContactName !== undefined) payload.dispatch_contact_name = input.dispatchContactName;
+  if (input.dispatchContactPhone !== undefined) payload.dispatch_contact_phone = input.dispatchContactPhone;
+  if (input.dispatchMethod !== undefined) payload.dispatch_method = input.dispatchMethod;
+  if (input.dispatchScheduledAt !== undefined) payload.dispatch_scheduled_at = input.dispatchScheduledAt;
+  if (input.dispatchNotes !== undefined) payload.dispatch_notes = input.dispatchNotes;
+  if (input.deliveredBy !== undefined) payload.delivered_by = input.deliveredBy;
+  if (input.deliveryNotes !== undefined) payload.delivery_notes = input.deliveryNotes;
 
   const { data, error } = await db
-    .from("uniform_sales")
+    .from("uniform_orders")
     .update(payload)
     .eq("id", id)
-    .select()
+    .select(`
+      *,
+      item:uniform_items(name, unit_price),
+      youth:youths(id, first_name, last_name, parish_id),
+      parish:parishes(name)
+    `)
     .single();
   if (error) throw error;
-  return data as UniformSale;
+  const order = data as any;
+  return {
+    ...order,
+    item_name: order.item?.name ?? "Unknown",
+    unit_price: order.item?.unit_price ?? 0,
+    youth_name: order.youth ? `${order.youth.first_name} ${order.youth.last_name}` : null,
+    parish_name: order.parish?.name ?? null,
+  };
 }
 
 /** Stage 1: staff acknowledges/accepts a placed order. */
-export async function confirmOrder(id: string): Promise<void> {
+export async function approveOrder(id: string): Promise<void> {
   const { data: auth } = await supabase.auth.getUser();
   const { error } = await db
-    .from("uniform_sales")
-    .update({ stage: "confirmed", confirmed_at: new Date().toISOString(), confirmed_by: auth.user?.id ?? null })
+    .from("uniform_orders")
+    .update({ reviewed_at: new Date().toISOString(), reviewed_by: auth.user?.id ?? null })
     .eq("id", id);
   if (error) throw error;
 }
 
-/** Stage 2: dispatch details — who's delivering, how, and when. */
+/** Stage 2: record payment. */
+export async function recordPayment(id: string, paymentMethod?: string): Promise<void> {
+  const { data: auth } = await supabase.auth.getUser();
+  const { error } = await db
+    .from("uniform_orders")
+    .update({
+      payment_status: "paid",
+      paid_at: new Date().toISOString(),
+      paid_by: auth.user?.id ?? null,
+      payment_method: paymentMethod ?? null,
+    })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+/** Stage 3: dispatch details — who's delivering, how, and when. */
 export async function confirmDispatch(
   id: string,
-  input: { contactName: string; contactPhone?: string | null; method: string; scheduledAt?: string | null },
+  input: { contactName: string; contactPhone?: string | null; method: string; scheduledAt?: string | null; notes?: string | null },
 ): Promise<void> {
+  const { data: auth } = await supabase.auth.getUser();
   const { error } = await db
-    .from("uniform_sales")
+    .from("uniform_orders")
     .update({
-      stage: "dispatched",
       dispatch_contact_name: input.contactName,
       dispatch_contact_phone: input.contactPhone ?? null,
       dispatch_method: input.method,
       dispatch_scheduled_at: input.scheduledAt ?? null,
+      dispatch_notes: input.notes ?? null,
       dispatched_at: new Date().toISOString(),
+      dispatch_by: auth.user?.id ?? null,
     })
     .eq("id", id);
   if (error) throw error;
 }
 
-/** Stage 3: confirm the item actually reached the youth. */
-export async function confirmDelivery(id: string, deliveredBy?: string | null): Promise<void> {
+/** Stage 4: confirm the item actually reached the youth. */
+export async function confirmDelivery(id: string, deliveredBy?: string | null, notes?: string | null): Promise<void> {
   const { error } = await db
-    .from("uniform_sales")
+    .from("uniform_orders")
     .update({
-      stage: "delivered",
       delivered_at: new Date().toISOString(),
       delivered_by: deliveredBy ?? null,
+      delivery_notes: notes ?? null,
     })
     .eq("id", id);
   if (error) throw error;
 }
 
 export async function cancelOrder(id: string): Promise<void> {
-  const { error } = await db.from("uniform_sales").update({ stage: "cancelled" }).eq("id", id);
-  if (error) throw error;
-}
-
-/** @deprecated use confirmDelivery — kept for any existing callers */
-export async function markDelivered(id: string): Promise<void> {
-  return confirmDelivery(id);
-}
-
-export async function recordPayment(id: string, totalPaidSoFar: number): Promise<void> {
-  const { data: sale, error: fetchErr } = await db
-    .from("uniform_sales")
-    .select("quantity, unit_price")
-    .eq("id", id)
-    .single();
-  if (fetchErr) throw fetchErr;
-
-  const total = Number(sale.quantity) * Number(sale.unit_price);
-  const clamped = Math.min(totalPaidSoFar, total);
-  const status: PaymentStatus =
-    clamped >= total ? "paid" : clamped > 0 ? "partial" : "unpaid";
-
+  const { data: auth } = await supabase.auth.getUser();
   const { error } = await db
-    .from("uniform_sales")
-    .update({
-      paid_amount:    clamped,
-      paid_at:        status === "paid" ? new Date().toISOString() : null,
-      payment_status: status,
-    })
+    .from("uniform_orders")
+    .update({ deleted_at: new Date().toISOString(), deleted_by: auth.user?.id ?? null })
     .eq("id", id);
   if (error) throw error;
 }
 
-export async function deleteUniformSale(id: string): Promise<void> {
-  const { error } = await db.from("uniform_sales").delete().eq("id", id);
+export async function deleteUniformOrder(id: string): Promise<void> {
+  const { error } = await db.from("uniform_orders").delete().eq("id", id);
   if (error) throw error;
+}
+
+/* ── Search & Lookup Functions ── */
+
+export type OrderRecipient = {
+  id: string;
+  type: "youth" | "patronage";
+  name: string;
+  cdmId?: string;
+  parishName?: string;
+};
+
+export async function searchOrderRecipients(q: string, limit = 25): Promise<OrderRecipient[]> {
+  if (!q || q.length < 2) return [];
+
+  const pattern = likePattern(q);
+  const { data: youths, error: youthError } = await db
+    .from("youths")
+    .select("id, cdm_id, first_name, last_name, parish_id, parish:parishes(name)")
+    .ilike("first_name", pattern)
+    .limit(limit / 2);
+
+  const { data: patronage, error: patronageError } = await db
+    .from("patronage_team")
+    .select("id, first_name, last_name, parish_id, parish:parishes(name)")
+    .ilike("first_name", pattern)
+    .limit(limit / 2);
+
+  const results: OrderRecipient[] = [];
+
+  if (!youthError && youths) {
+    youths.forEach((y: any) => {
+      results.push({
+        id: y.id,
+        type: "youth",
+        name: `${y.first_name} ${y.last_name}`,
+        cdmId: y.cdm_id,
+        parishName: y.parish?.name,
+      });
+    });
+  }
+
+  if (!patronageError && patronage) {
+    patronage.forEach((p: any) => {
+      results.push({
+        id: p.id,
+        type: "patronage",
+        name: `${p.first_name} ${p.last_name}`,
+        parishName: p.parish?.name,
+      });
+    });
+  }
+
+  return results.slice(0, limit);
 }
