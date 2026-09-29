@@ -1,14 +1,13 @@
 import { supabase } from "@/integrations/supabase/client";
 import { likePattern } from "@/lib/utils";
 
-export type UniformItemCategory = "youth" | "sewing" | "organization" | "other";
-
 export type UniformItem = {
   id: string;
   name: string;
   swatch: string | null;
   unit_price: number | null;
-  category?: UniformItemCategory;
+  category_id?: string | null;
+  category_name?: string;
   created_at: string;
   updated_at: string;
 };
@@ -24,14 +23,14 @@ export type UniformItemInput = {
   name: string;
   swatch?: string | null;
   unitPrice?: number | null;
-  category?: UniformItemCategory;
+  categoryId?: string | null;
 };
 
 export type UniformItemUpdateInput = {
   name?: string;
   swatch?: string | null;
   unitPrice?: number | null;
-  category?: UniformItemCategory;
+  categoryId?: string | null;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -46,10 +45,13 @@ export async function listUniformItems(): Promise<UniformItem[]> {
 export async function listUniformItemsWithStock(): Promise<UniformItemWithStock[]> {
   const { data, error } = await db
     .from("uniform_items_with_stock")
-    .select("*")
+    .select("*, category:uniform_categories(name)")
     .order("name");
   if (error) throw error;
-  return (data ?? []) as UniformItemWithStock[];
+  return ((data ?? []) as any[]).map((item) => ({
+    ...item,
+    category_name: item.category?.name,
+  })) as UniformItemWithStock[];
 }
 
 export async function createUniformItem(input: UniformItemInput): Promise<UniformItem> {
@@ -59,12 +61,16 @@ export async function createUniformItem(input: UniformItemInput): Promise<Unifor
       name: input.name,
       swatch: input.swatch ?? null,
       unit_price: input.unitPrice ?? null,
-      category: input.category ?? "youth",
+      category_id: input.categoryId ?? null,
     })
-    .select()
+    .select(`*, category:uniform_categories(name)`)
     .single();
   if (error) throw error;
-  return data as UniformItem;
+  const item = data as any;
+  return {
+    ...item,
+    category_name: item.category?.name,
+  };
 }
 
 export async function updateUniformItem(id: string, input: UniformItemUpdateInput): Promise<UniformItem> {
@@ -72,16 +78,20 @@ export async function updateUniformItem(id: string, input: UniformItemUpdateInpu
   if (input.name !== undefined) payload.name = input.name;
   if (input.swatch !== undefined) payload.swatch = input.swatch;
   if (input.unitPrice !== undefined) payload.unit_price = input.unitPrice;
-  if (input.category !== undefined) payload.category = input.category;
+  if (input.categoryId !== undefined) payload.category_id = input.categoryId;
 
   const { data, error } = await db
     .from("uniform_items")
     .update(payload)
     .eq("id", id)
-    .select()
+    .select(`*, category:uniform_categories(name)`)
     .single();
   if (error) throw error;
-  return data as UniformItem;
+  const item = data as any;
+  return {
+    ...item,
+    category_name: item.category?.name,
+  };
 }
 
 export async function deleteUniformItem(id: string): Promise<void> {

@@ -60,6 +60,7 @@ import {
   type UniformSettings,
 } from "@/lib/db/organization-settings";
 import { fetchOrg, type DeaneryRow, type ParishRow } from "@/lib/db/org";
+import { listUniformCategories, type UniformCategory } from "@/lib/db/assets/uniform-categories";
 
 export const Route = createFileRoute("/admin/uniforms")({
   head: () => ({
@@ -78,12 +79,15 @@ function UniformsPage() {
   const [stockOutRange, setStockOutRange] = useState<DateRange>(EMPTY_RANGE);
   const [reportRange,  setReportRange]  = useState<DateRange>(EMPTY_RANGE);
   const [reportItem,   setReportItem]   = useState<string>("all");
-  const [statusQ,      setStatusQ]      = useState("");
-  const [statusCategory, setStatusCategory] = useState<string>("all");
-  const [stockInQ,     setStockInQ]     = useState("");
-  const [ordersFilter, setOrdersFilter] = useState<OrdersFilter>("all");
-  const [ordersPage,   setOrdersPage]   = useState(1);
-  const [ordersQ,      setOrdersQ]      = useState("");
+  const [statusQ,         setStatusQ]         = useState("");
+  const [statusCategory,  setStatusCategory]  = useState<string>("all");
+  const [statusItem,      setStatusItem]      = useState<string>("all");
+  const [stockInQ,        setStockInQ]        = useState("");
+  const [stockInCategory, setStockInCategory] = useState<string>("all");
+  const [stockOutCategory, setStockOutCategory] = useState<string>("all");
+  const [ordersFilter,    setOrdersFilter]    = useState<OrdersFilter>("all");
+  const [ordersPage,      setOrdersPage]      = useState(1);
+  const [ordersQ,         setOrdersQ]         = useState("");
 
   /* ── Item dialogs ── */
   const [addItemOpen, setAddItemOpen] = useState(false);
@@ -120,6 +124,7 @@ function UniformsPage() {
   };
 
   /* ── queries ── */
+  const { data: categoriesRaw } = useQuery({ queryKey: ["uniform-categories"], queryFn: listUniformCategories });
   const { data: itemsRaw    } = useQuery({ queryKey: ["uniform-items"],    queryFn: listUniformItemsWithStock });
   const { data: entriesRaw } = useQuery({ queryKey: ["uniform-entries"],  queryFn: listStockEntries });
   const { data: activitiesRaw } = useQuery({ queryKey: ["uniform-activities"], queryFn: listUniformActivities });
@@ -142,15 +147,17 @@ function UniformsPage() {
     placeholderData: keepPreviousData,
   });
 
-  const items     = (itemsRaw     ?? []) as UniformItemWithStock[];
-  const entries   = (entriesRaw   ?? []) as StockEntry[];
+  const categories = (categoriesRaw ?? []) as UniformCategory[];
+  const items      = (itemsRaw      ?? []) as UniformItemWithStock[];
+  const entries    = (entriesRaw    ?? []) as StockEntry[];
   const activities = (activitiesRaw ?? []) as UniformActivity[];
-  const orders    = (ordersRaw    ?? []) as UniformOrder[];
+  const orders     = (ordersRaw     ?? []) as UniformOrder[];
 
   const displayItems     = items;
   const displayEntries   = entries;
   const displayOrders    = orders;
   const itemNames        = displayItems.map((s) => s.name);
+  const categoryNames    = categories.map((c) => ({ id: c.id, name: c.name }));
   const activityNames    = activities.map((a) => a.name);
 
   // Server-paginated rows for the orders tab table
@@ -166,9 +173,11 @@ function UniformsPage() {
         e.item_name.toLowerCase().includes(stockInQ.toLowerCase()) ||
         e.activity_name.toLowerCase().includes(stockInQ.toLowerCase()) ||
         (e.description?.toLowerCase().includes(stockInQ.toLowerCase()) ?? false);
-      return inDate && matchesSearch;
+      const matchesCategory = stockInCategory === "all" ||
+        (displayItems.find(item => item.name === e.item_name)?.category_id === stockInCategory);
+      return inDate && matchesSearch && matchesCategory;
     }),
-    [displayEntries, stockInRange, stockInQ],
+    [displayEntries, stockInRange, stockInQ, stockInCategory, displayItems],
   );
 
   const filteredOrdersForStatus = useMemo(
@@ -179,10 +188,11 @@ function UniformsPage() {
   const filteredItemsForStatus = useMemo(
     () => displayItems.filter((i) => {
       const matchesSearch = !statusQ || i.name.toLowerCase().includes(statusQ.toLowerCase());
-      const matchesCategory = statusCategory === "all" || (i.category ?? "youth") === statusCategory;
-      return matchesSearch && matchesCategory;
+      const matchesCategory = statusCategory === "all" || i.category_id === statusCategory;
+      const matchesItem = statusItem === "all" || i.id === statusItem;
+      return matchesSearch && matchesCategory && matchesItem;
     }),
-    [displayItems, statusQ, statusCategory],
+    [displayItems, statusQ, statusCategory, statusItem],
   );
 
   const itemPagination   = usePagination(filteredItemsForStatus, uniformSettings.itemsPageSize);
@@ -399,23 +409,37 @@ function UniformsPage() {
 
             {/* Filter bar */}
             <div className="mb-4 flex flex-wrap items-center gap-2">
-              <input
-                value={statusQ}
-                onChange={(e) => setStatusQ(e.target.value)}
-                placeholder="Search item name…"
-                className="min-w-[200px] rounded-md border border-black/20 bg-white px-3 py-1.5 text-[12px] text-black/70 placeholder:text-gray-400 outline-none hover:border-gold-3/50 focus:border-gold-3"
-              />
               <select
                 value={statusCategory}
-                onChange={(e) => setStatusCategory(e.target.value)}
+                onChange={(e) => { setStatusCategory(e.target.value); setStatusItem("all"); }}
                 className="rounded-md border border-border bg-bg-3 px-3 py-1.5 text-[11px] text-text-2 outline-none hover:border-gold-3/50 focus:border-gold-3"
               >
                 <option value="all">All Categories</option>
-                <option value="youth">Youth</option>
-                <option value="sewing">Sewing</option>
-                <option value="organization">Organization</option>
-                <option value="other">Other</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
               </select>
+
+              <select
+                value={statusItem}
+                onChange={(e) => setStatusItem(e.target.value)}
+                className="rounded-md border border-border bg-bg-3 px-3 py-1.5 text-[11px] text-text-2 outline-none hover:border-gold-3/50 focus:border-gold-3"
+              >
+                <option value="all">All Items</option>
+                {displayItems
+                  .filter(i => statusCategory === "all" || i.category_id === statusCategory)
+                  .map((item) => (
+                    <option key={item.id} value={item.id}>{item.name}</option>
+                  ))
+                }
+              </select>
+
+              <input
+                value={statusQ}
+                onChange={(e) => setStatusQ(e.target.value)}
+                placeholder="Search…"
+                className="min-w-[150px] rounded-md border border-black/20 bg-white px-3 py-1.5 text-[12px] text-black/70 placeholder:text-gray-400 outline-none hover:border-gold-3/50 focus:border-gold-3"
+              />
               <DateRangeFilter value={statusRange} onChange={setStatusRange} />
             </div>
 
@@ -428,6 +452,7 @@ function UniformsPage() {
                 <TableHeader>
                   <TableRow className="border-b border-border bg-bg-3 hover:bg-bg-3">
                     <TH>Item</TH>
+                    <TH>Category</TH>
                     <TH className="text-right">Stock In</TH>
                     <TH className="text-right">Stock Out</TH>
                     <TH className="text-right">Available</TH>
@@ -446,6 +471,7 @@ function UniformsPage() {
                           <span className="font-semibold text-foreground">{u.name}</span>
                         </div>
                       </TD>
+                      <TD className="text-text-2">{u.category_name || "—"}</TD>
                       <TD className="text-right text-text-2">{u.stock_in.toLocaleString()}</TD>
                       <TD className="text-right text-text-2">{u.stock_out_delivered.toLocaleString()}</TD>
                       <TD className="text-right font-bold text-foreground">{u.available_stock.toLocaleString()}</TD>
@@ -508,6 +534,17 @@ function UniformsPage() {
 
             {/* Filter bar */}
             <div className="mb-3 flex flex-wrap items-center gap-2">
+              <select
+                value={stockInCategory}
+                onChange={(e) => setStockInCategory(e.target.value)}
+                className="rounded-md border border-border bg-bg-3 px-3 py-1.5 text-[11px] text-text-2 outline-none hover:border-gold-3/50 focus:border-gold-3"
+              >
+                <option value="all">All Categories</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+
               <input
                 value={stockInQ}
                 onChange={(e) => setStockInQ(e.target.value)}
@@ -530,6 +567,7 @@ function UniformsPage() {
                   <TableRow className="border-b border-border bg-bg-3 hover:bg-bg-3">
                     <TH>Date</TH>
                     <TH>Item</TH>
+                    <TH>Category</TH>
                     <TH>Activity</TH>
                     <TH className="text-right">Qty</TH>
                     <TH>Notes</TH>
@@ -539,7 +577,7 @@ function UniformsPage() {
                 <TableBody>
                   {filteredEntries.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="py-6 text-center text-[11px] text-text-3">
+                      <TableCell colSpan={7} className="py-6 text-center text-[11px] text-text-3">
                         No stock entries for this period.
                       </TableCell>
                     </TableRow>
@@ -547,6 +585,7 @@ function UniformsPage() {
                     <TableRow key={e.id} className="border-b border-border hover:bg-bg-2">
                       <TD className="whitespace-nowrap text-text-2">{fmtDate(e.created_at)}</TD>
                       <TD className="font-semibold text-foreground">{e.item_name}</TD>
+                      <TD className="text-text-2">{displayItems.find(i => i.name === e.item_name)?.category_name || "—"}</TD>
                       <TD className="text-text-2">{e.activity_name}</TD>
                       <TD className="text-right font-bold text-foreground">{e.quantity.toLocaleString()}</TD>
                       <TD className="max-w-[200px] truncate text-text-3">{e.description ?? "—"}</TD>
@@ -952,20 +991,21 @@ function UniformsPage() {
 
       {/* Add Item */}
       <RecordFormDialog open={addItemOpen} onOpenChange={setAddItemOpen} title="Add Uniform Item"
-        fields={itemAddFields} submitLabel="Add Item"
-        onSubmit={(v) => createItemMut.mutate({ name: v.name, swatch: v.swatch || null, unitPrice: v.unitPrice ? parseFloat(v.unitPrice) : null, category: (v.category as any) || "youth" })}
+        fields={buildItemAddFields(categories)} submitLabel="Add Item"
+        onSubmit={(v) => createItemMut.mutate({ name: v.name, swatch: v.swatch || null, unitPrice: v.unitPrice ? parseFloat(v.unitPrice) : null, categoryId: v.category || null })}
       />
 
       {/* Edit Item */}
       <RecordFormDialog open={!!editItem} onOpenChange={(o) => { if (!o) setEditItem(null); }} title="Edit Item"
-        fields={itemEditFields} initial={editItem?.initial} submitLabel="Update"
-        onSubmit={(v) => { if (!editItem) return; updateItemMut.mutate({ id: editItem.id, input: { name: v.name, swatch: v.swatch || null, unitPrice: v.unitPrice ? parseFloat(v.unitPrice) : null, category: (v.category as any) || undefined } }); }}
+        fields={buildItemEditFields(categories)} initial={editItem?.initial} submitLabel="Update"
+        onSubmit={(v) => { if (!editItem) return; updateItemMut.mutate({ id: editItem.id, input: { name: v.name, swatch: v.swatch || null, unitPrice: v.unitPrice ? parseFloat(v.unitPrice) : null, categoryId: v.category || undefined } }); }}
       />
 
       {/* View Item */}
       <ViewRecordDialog open={!!viewItem} onOpenChange={(o) => { if (!o) setViewItem(null); }} title={viewItem?.name ?? ""}
         fields={viewItem ? [
           { label: "Item Name",  value: viewItem.name },
+          { label: "Category",   value: viewItem.category_name || "—" },
           { label: "Stock In",   value: String(viewItem.stock_in) },
           { label: "Stock Out",  value: String(viewItem.stock_out_delivered) },
           { label: "Available", value: String(viewItem.available_stock) },
@@ -1588,19 +1628,23 @@ const isLiveItems   = true;
 const isLiveEntries = true;
 const isLiveOrders  = true;
 
-const itemAddFields: FieldDef[] = [
-  { key: "name",      label: "Item Name",                required: true, placeholder: "e.g. T-Shirt — Green" },
-  { key: "category",  label: "Category",                 type: "select", options: ["youth", "sewing", "organization", "other"] },
-  { key: "swatch",    label: "Color Swatch (CSS)",       placeholder: "e.g. #00ff00 or var(--color-success)" },
-  { key: "unitPrice", label: "Unit Price (KES)",         type: "number", placeholder: "e.g. 450" },
-];
+function buildItemAddFields(categories: UniformCategory[]): FieldDef[] {
+  return [
+    { key: "name",      label: "Item Name",                required: true, placeholder: "e.g. T-Shirt — Green" },
+    { key: "category",  label: "Category",                 type: "select", options: categories.map(c => c.id), optionLabels: categories.map(c => c.name) },
+    { key: "swatch",    label: "Color Swatch (CSS)",       placeholder: "e.g. #00ff00 or var(--color-success)" },
+    { key: "unitPrice", label: "Unit Price (KES)",         type: "number", placeholder: "e.g. 450" },
+  ];
+}
 
-const itemEditFields: FieldDef[] = [
-  { key: "name",      label: "Item Name",                required: true },
-  { key: "category",  label: "Category",                 type: "select", options: ["youth", "sewing", "organization", "other"] },
-  { key: "swatch",    label: "Color Swatch (CSS)" },
-  { key: "unitPrice", label: "Unit Price (KES)",         type: "number" },
-];
+function buildItemEditFields(categories: UniformCategory[]): FieldDef[] {
+  return [
+    { key: "name",      label: "Item Name",                required: true },
+    { key: "category",  label: "Category",                 type: "select", options: categories.map(c => c.id), optionLabels: categories.map(c => c.name) },
+    { key: "swatch",    label: "Color Swatch (CSS)" },
+    { key: "unitPrice", label: "Unit Price (KES)",         type: "number" },
+  ];
+}
 
 function buildEntryFields(itemNames: string[], activityNames: string[]): FieldDef[] {
   const items = itemNames.length > 0 ? itemNames : MOCK_ITEMS.map((s) => s.name);
@@ -1649,7 +1693,7 @@ function groupByDay(orders: UniformOrder[]) {
 }
 
 const itemToInitial = (s: UniformItemWithStock): Record<string, string> => ({
-  name: s.name, category: s.category ?? "youth", swatch: s.swatch ?? "", unitPrice: s.unit_price != null ? String(s.unit_price) : "",
+  name: s.name, category: s.category_id ?? "", swatch: s.swatch ?? "", unitPrice: s.unit_price != null ? String(s.unit_price) : "",
 });
 
 const STATUS_TONE: Record<OrderStatus, "neutral" | "info" | "gold" | "success" | "danger"> = {
