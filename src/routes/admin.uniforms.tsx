@@ -52,7 +52,8 @@ import {
 import {
   createUniformOrder, deleteUniformOrder, listUniformOrders, listUniformOrdersPaged,
   approveOrder, confirmDispatch, confirmDelivery, recordPayment, cancelOrder, updateUniformOrder,
-  type PaymentStatus, type OrderStatus, type UniformOrder, type UniformOrderInput, type UniformOrderUpdateInput,
+  searchOrderRecipients,
+  type PaymentStatus, type OrderStatus, type UniformOrder, type UniformOrderInput, type UniformOrderUpdateInput, type OrderRecipient,
 } from "@/lib/db/assets/uniform-sales";
 import {
   fetchUniformSettings,
@@ -93,12 +94,13 @@ function UniformsPage() {
   const [deleteEntry,   setDeleteEntry]   = useState<{ id: string; name: string } | null>(null);
 
   /* ── Order dialogs ── */
-  const [orderOpen,   setOrderOpen]   = useState(false);
-  const [viewOrder,   setViewOrder]   = useState<UniformOrder | null>(null);
-  const [deleteOrder, setDeleteOrder] = useState<{ id: string; name: string } | null>(null);
-  const [payOrder,    setPayOrder]    = useState<UniformOrder | null>(null);
-  const [dispatchOrder, setDispatchOrder] = useState<UniformOrder | null>(null);
-  const [deliveryOrder, setDeliveryOrder] = useState<UniformOrder | null>(null);
+  const [orderOpen,      setOrderOpen]      = useState(false);
+  const [orderMode,      setOrderMode]      = useState<"registered" | "walk_in">("registered");
+  const [viewOrder,      setViewOrder]      = useState<UniformOrder | null>(null);
+  const [deleteOrder,    setDeleteOrder]    = useState<{ id: string; name: string } | null>(null);
+  const [payOrder,       setPayOrder]       = useState<UniformOrder | null>(null);
+  const [dispatchOrder,  setDispatchOrder]  = useState<UniformOrder | null>(null);
+  const [deliveryOrder,  setDeliveryOrder]  = useState<UniformOrder | null>(null);
 
   const qc = useQueryClient();
 
@@ -935,13 +937,13 @@ function UniformsPage() {
       {/* Add Item */}
       <RecordFormDialog open={addItemOpen} onOpenChange={setAddItemOpen} title="Add Uniform Item"
         fields={itemAddFields} submitLabel="Add Item"
-        onSubmit={(v) => createItemMut.mutate({ name: v.name, swatch: v.swatch || null, unitPrice: v.unitPrice ? parseFloat(v.unitPrice) : null })}
+        onSubmit={(v) => createItemMut.mutate({ name: v.name, swatch: v.swatch || null, unitPrice: v.unitPrice ? parseFloat(v.unitPrice) : null, category: (v.category as any) || "youth" })}
       />
 
       {/* Edit Item */}
       <RecordFormDialog open={!!editItem} onOpenChange={(o) => { if (!o) setEditItem(null); }} title="Edit Item"
         fields={itemEditFields} initial={editItem?.initial} submitLabel="Update"
-        onSubmit={(v) => { if (!editItem) return; updateItemMut.mutate({ id: editItem.id, input: { name: v.name, swatch: v.swatch || null, unitPrice: v.unitPrice ? parseFloat(v.unitPrice) : null } }); }}
+        onSubmit={(v) => { if (!editItem) return; updateItemMut.mutate({ id: editItem.id, input: { name: v.name, swatch: v.swatch || null, unitPrice: v.unitPrice ? parseFloat(v.unitPrice) : null, category: (v.category as any) || undefined } }); }}
       />
 
       {/* View Item */}
@@ -986,10 +988,12 @@ function UniformsPage() {
       </AlertDialog>
 
       {/* New Order */}
-      <RecordFormDialog open={orderOpen} onOpenChange={setOrderOpen} title="New Order"
-        description="Create a new uniform order"
-        fields={buildOrderFields(itemNames)} submitLabel="Create Order"
-        onSubmit={(v) => createOrderMut.mutate({ itemName: v.item, youthId: null, cdmId: v.cdmId || null, quantity: parseInt(v.quantity || "1", 10), notes: v.notes || null })}
+      <NewOrderDialog
+        open={orderOpen}
+        onOpenChange={setOrderOpen}
+        itemNames={itemNames}
+        deaneries={displayItems.length > 0 ? [] : []} // Fetch deaneries if needed
+        onSubmit={(input) => createOrderMut.mutate(input)}
       />
 
       {/* View Order */}
@@ -1042,6 +1046,261 @@ function UniformsPage() {
         onConfirm={(id, deliveredBy, notes) => confirmDeliveryMut.mutate({ id, deliveredBy, notes })}
       />
     </>
+  );
+}
+
+/* ── new order dialog (registered or walk-in) ── */
+
+function NewOrderDialog({
+  open,
+  onOpenChange,
+  itemNames,
+  onSubmit,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  itemNames: string[];
+  onSubmit: (input: UniformOrderInput) => void;
+}) {
+  const [mode, setMode] = useState<"registered" | "walk_in">("registered");
+  const [item, setItem] = useState("");
+  const [quantity, setQuantity] = useState("1");
+  const [notes, setNotes] = useState("");
+
+  // Registered mode
+  const [searchQ, setSearchQ] = useState("");
+  const [searchResults, setSearchResults] = useState<OrderRecipient[]>([]);
+  const [selectedRecipient, setSelectedRecipient] = useState<OrderRecipient | null>(null);
+  const { data: recipients, isLoading: searchLoading } = useQuery({
+    queryKey: ["order-recipients", searchQ],
+    queryFn: () => searchOrderRecipients(searchQ),
+    enabled: mode === "registered" && searchQ.length > 1,
+  });
+
+  // Walk-in mode
+  const [orderedForName, setOrderedForName] = useState("");
+  const [orderedByName, setOrderedByName] = useState("");
+  const [orderedByPhone, setOrderedByPhone] = useState("");
+
+  useEffect(() => {
+    if (recipients) setSearchResults(recipients);
+  }, [recipients]);
+
+  useEffect(() => {
+    if (!open) {
+      setMode("registered");
+      setItem("");
+      setQuantity("1");
+      setNotes("");
+      setSearchQ("");
+      setSelectedRecipient(null);
+      setOrderedForName("");
+      setOrderedByName("");
+      setOrderedByPhone("");
+    }
+  }, [open]);
+
+  const handleSubmit = () => {
+    if (!item.trim() || !quantity) {
+      toast.error("Item and quantity are required");
+      return;
+    }
+
+    if (mode === "registered") {
+      if (!selectedRecipient) {
+        toast.error("Please select a youth or patronage member");
+        return;
+      }
+      onSubmit({
+        itemName: item,
+        quantity: parseInt(quantity, 10),
+        youthId: selectedRecipient.type === "youth" ? selectedRecipient.id : null,
+        cdmId: selectedRecipient.cdmId || null,
+        notes: notes || null,
+      });
+    } else {
+      if (!orderedForName.trim()) {
+        toast.error("Name of who ordered for is required");
+        return;
+      }
+      onSubmit({
+        itemName: item,
+        quantity: parseInt(quantity, 10),
+        orderType: "walk_in",
+        orderedForName: orderedForName.trim(),
+        orderedByName: orderedByName.trim() || null,
+        orderedByPhone: orderedByPhone.trim() || null,
+        notes: notes || null,
+      });
+    }
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg border-border bg-white text-foreground">
+        <DialogHeader>
+          <DialogTitle className="text-xl font-black text-gold">New Order</DialogTitle>
+        </DialogHeader>
+
+        {/* Mode Selector */}
+        <div className="flex gap-2 border-b border-border pb-3">
+          <button
+            onClick={() => setMode("registered")}
+            className={`px-4 py-2 text-sm font-bold transition-colors ${
+              mode === "registered"
+                ? "border-b-2 border-gold text-gold"
+                : "text-text-3 hover:text-text-2"
+            }`}
+          >
+            Registered
+          </button>
+          <button
+            onClick={() => setMode("walk_in")}
+            className={`px-4 py-2 text-sm font-bold transition-colors ${
+              mode === "walk_in"
+                ? "border-b-2 border-gold text-gold"
+                : "text-text-3 hover:text-text-2"
+            }`}
+          >
+            Walk-in
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          {/* Item Selection (both modes) */}
+          <label className="block space-y-1 text-[10px] font-bold uppercase tracking-wide text-text-3">
+            <span>Item *</span>
+            <select
+              value={item}
+              onChange={(e) => setItem(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 text-[11px] text-foreground"
+            >
+              <option value="">Select item</option>
+              {itemNames.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block space-y-1 text-[10px] font-bold uppercase tracking-wide text-text-3">
+            <span>Quantity *</span>
+            <Input
+              type="number"
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              placeholder="1"
+              min="1"
+            />
+          </label>
+
+          {mode === "registered" ? (
+            <>
+              <label className="block space-y-1 text-[10px] font-bold uppercase tracking-wide text-text-3">
+                <span>Search Youth / Patronage</span>
+                <Input
+                  value={searchQ}
+                  onChange={(e) => setSearchQ(e.target.value)}
+                  placeholder="Name or CDM ID"
+                />
+              </label>
+
+              {selectedRecipient && (
+                <div className="rounded-lg border border-border bg-bg-2 p-2 text-[11px]">
+                  <div className="font-bold text-foreground">{selectedRecipient.name}</div>
+                  {selectedRecipient.cdmId && (
+                    <div className="text-text-3">{selectedRecipient.cdmId}</div>
+                  )}
+                  {selectedRecipient.parishName && (
+                    <div className="text-text-3">{selectedRecipient.parishName}</div>
+                  )}
+                  <button
+                    onClick={() => setSelectedRecipient(null)}
+                    className="mt-1 text-[9px] text-gold hover:underline"
+                  >
+                    Change
+                  </button>
+                </div>
+              )}
+
+              {!selectedRecipient && searchResults.length > 0 && (
+                <div className="max-h-40 overflow-y-auto rounded-lg border border-border bg-bg-2">
+                  {searchResults.map((r) => (
+                    <button
+                      key={r.id}
+                      onClick={() => { setSelectedRecipient(r); setSearchQ(""); }}
+                      className="w-full px-3 py-2 text-left text-[11px] hover:bg-bg-3"
+                    >
+                      <div className="font-bold text-foreground">{r.name}</div>
+                      <div className="text-text-3">
+                        {r.cdmId && `${r.cdmId} • `}
+                        {r.type} • {r.parishName || "—"}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <label className="block space-y-1 text-[10px] font-bold uppercase tracking-wide text-text-3">
+                <span>Order For (Name) *</span>
+                <Input
+                  value={orderedForName}
+                  onChange={(e) => setOrderedForName(e.target.value)}
+                  placeholder="e.g. John Kamau or Parish youth group"
+                />
+              </label>
+
+              <label className="block space-y-1 text-[10px] font-bold uppercase tracking-wide text-text-3">
+                <span>Ordered By (Name)</span>
+                <Input
+                  value={orderedByName}
+                  onChange={(e) => setOrderedByName(e.target.value)}
+                  placeholder="e.g. Mary Wanjiru (parish rep)"
+                />
+              </label>
+
+              <label className="block space-y-1 text-[10px] font-bold uppercase tracking-wide text-text-3">
+                <span>Contact Phone</span>
+                <Input
+                  value={orderedByPhone}
+                  onChange={(e) => setOrderedByPhone(e.target.value)}
+                  placeholder="+254700000000"
+                />
+              </label>
+            </>
+          )}
+
+          <label className="block space-y-1 text-[10px] font-bold uppercase tracking-wide text-text-3">
+            <span>Notes</span>
+            <Input
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Additional notes..."
+              className="min-h-[60px]"
+            />
+          </label>
+        </div>
+
+        <DialogFooter>
+          <button
+            onClick={() => onOpenChange(false)}
+            className="rounded-lg border border-border bg-bg-3 px-4 py-2 text-[11px] font-bold text-text-2"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            className="rounded-lg bg-primary px-4 py-2 text-[11px] font-bold text-primary-foreground hover:opacity-90"
+          >
+            Create Order
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -1205,12 +1464,14 @@ const isLiveOrders  = true;
 
 const itemAddFields: FieldDef[] = [
   { key: "name",      label: "Item Name",                required: true, placeholder: "e.g. T-Shirt — Green" },
+  { key: "category",  label: "Category",                 type: "select", options: ["youth", "sewing", "organization", "other"] },
   { key: "swatch",    label: "Color Swatch (CSS)",       placeholder: "e.g. #00ff00 or var(--color-success)" },
   { key: "unitPrice", label: "Unit Price (KES)",         type: "number", placeholder: "e.g. 450" },
 ];
 
 const itemEditFields: FieldDef[] = [
   { key: "name",      label: "Item Name",                required: true },
+  { key: "category",  label: "Category",                 type: "select", options: ["youth", "sewing", "organization", "other"] },
   { key: "swatch",    label: "Color Swatch (CSS)" },
   { key: "unitPrice", label: "Unit Price (KES)",         type: "number" },
 ];
@@ -1262,7 +1523,7 @@ function groupByDay(orders: UniformOrder[]) {
 }
 
 const itemToInitial = (s: UniformItemWithStock): Record<string, string> => ({
-  name: s.name, swatch: s.swatch ?? "", unitPrice: s.unit_price != null ? String(s.unit_price) : "",
+  name: s.name, category: s.category ?? "youth", swatch: s.swatch ?? "", unitPrice: s.unit_price != null ? String(s.unit_price) : "",
 });
 
 const STATUS_TONE: Record<OrderStatus, "neutral" | "info" | "gold" | "success" | "danger"> = {
