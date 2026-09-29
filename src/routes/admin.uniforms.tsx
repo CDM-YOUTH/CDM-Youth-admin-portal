@@ -59,6 +59,7 @@ import {
   fetchUniformSettings,
   type UniformSettings,
 } from "@/lib/db/organization-settings";
+import { fetchOrg, type DeaneryRow, type ParishRow } from "@/lib/db/org";
 
 export const Route = createFileRoute("/admin/uniforms")({
   head: () => ({
@@ -121,6 +122,7 @@ function UniformsPage() {
   const { data: itemsRaw    } = useQuery({ queryKey: ["uniform-items"],    queryFn: listUniformItemsWithStock });
   const { data: entriesRaw } = useQuery({ queryKey: ["uniform-entries"],  queryFn: listStockEntries });
   const { data: activitiesRaw } = useQuery({ queryKey: ["uniform-activities"], queryFn: listUniformActivities });
+  const { data: orgRaw } = useQuery({ queryKey: ["org"], queryFn: fetchOrg });
   // Full list for KPIs and reports tab
   const { data: ordersRaw   } = useQuery({ queryKey: ["uniform-orders"],   queryFn: listUniformOrders });
   // Paginated + filtered for the orders table
@@ -992,7 +994,7 @@ function UniformsPage() {
         open={orderOpen}
         onOpenChange={setOrderOpen}
         itemNames={itemNames}
-        deaneries={displayItems.length > 0 ? [] : []} // Fetch deaneries if needed
+        org={orgRaw}
         onSubmit={(input) => createOrderMut.mutate(input)}
       />
 
@@ -1055,11 +1057,13 @@ function NewOrderDialog({
   open,
   onOpenChange,
   itemNames,
+  org,
   onSubmit,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   itemNames: string[];
+  org?: any;
   onSubmit: (input: UniformOrderInput) => void;
 }) {
   const [mode, setMode] = useState<"registered" | "walk_in">("registered");
@@ -1067,13 +1071,22 @@ function NewOrderDialog({
   const [quantity, setQuantity] = useState("1");
   const [notes, setNotes] = useState("");
 
+  // Location selectors (both modes)
+  const [selectedDeanery, setSelectedDeanery] = useState<DeaneryRow | null>(null);
+  const [selectedParish, setSelectedParish] = useState<ParishRow | null>(null);
+
   // Registered mode
   const [searchQ, setSearchQ] = useState("");
   const [searchResults, setSearchResults] = useState<OrderRecipient[]>([]);
   const [selectedRecipient, setSelectedRecipient] = useState<OrderRecipient | null>(null);
-  const { data: recipients, isLoading: searchLoading } = useQuery({
-    queryKey: ["order-recipients", searchQ],
-    queryFn: () => searchOrderRecipients(searchQ),
+  const { data: recipients } = useQuery({
+    queryKey: ["order-recipients", searchQ, selectedDeanery?.id, selectedParish?.id],
+    queryFn: () =>
+      searchOrderRecipients({
+        q: searchQ,
+        deaneryId: selectedDeanery?.id,
+        parishId: selectedParish?.id,
+      }),
     enabled: mode === "registered" && searchQ.length > 1,
   });
 
@@ -1081,6 +1094,11 @@ function NewOrderDialog({
   const [orderedForName, setOrderedForName] = useState("");
   const [orderedByName, setOrderedByName] = useState("");
   const [orderedByPhone, setOrderedByPhone] = useState("");
+
+  const deaneries = org?.deaneries ?? [];
+  const parishesByDeanery = selectedDeanery
+    ? (org?.parishes?.filter((p: ParishRow) => p.deanery_id === selectedDeanery.id) ?? [])
+    : [];
 
   useEffect(() => {
     if (recipients) setSearchResults(recipients);
@@ -1092,6 +1110,8 @@ function NewOrderDialog({
       setItem("");
       setQuantity("1");
       setNotes("");
+      setSelectedDeanery(null);
+      setSelectedParish(null);
       setSearchQ("");
       setSelectedRecipient(null);
       setOrderedForName("");
@@ -1123,6 +1143,10 @@ function NewOrderDialog({
         toast.error("Name of who ordered for is required");
         return;
       }
+      if (!selectedDeanery) {
+        toast.error("Please select a deanery");
+        return;
+      }
       onSubmit({
         itemName: item,
         quantity: parseInt(quantity, 10),
@@ -1130,6 +1154,7 @@ function NewOrderDialog({
         orderedForName: orderedForName.trim(),
         orderedByName: orderedByName.trim() || null,
         orderedByPhone: orderedByPhone.trim() || null,
+        deaneryId: selectedDeanery.id,
         notes: notes || null,
       });
     }
@@ -1199,11 +1224,55 @@ function NewOrderDialog({
           {mode === "registered" ? (
             <>
               <label className="block space-y-1 text-[10px] font-bold uppercase tracking-wide text-text-3">
-                <span>Search Youth / Patronage</span>
+                <span>Filter by Deanery</span>
+                <select
+                  value={selectedDeanery?.id ?? ""}
+                  onChange={(e) => {
+                    const deaneryId = e.target.value;
+                    const deanery = deaneries.find((d: DeaneryRow) => d.id === deaneryId) || null;
+                    setSelectedDeanery(deanery);
+                    setSelectedParish(null);
+                  }}
+                  className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 text-[11px] text-foreground"
+                >
+                  <option value="">All deaneries</option>
+                  {deaneries.map((d: DeaneryRow) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              {selectedDeanery && (
+                <label className="block space-y-1 text-[10px] font-bold uppercase tracking-wide text-text-3">
+                  <span>Filter by Parish</span>
+                  <select
+                    value={selectedParish?.id ?? ""}
+                    onChange={(e) => {
+                      const parishId = e.target.value;
+                      const parish = parishesByDeanery.find((p: ParishRow) => p.id === parishId) || null;
+                      setSelectedParish(parish);
+                    }}
+                    className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 text-[11px] text-foreground"
+                  >
+                    <option value="">All parishes in {selectedDeanery.name}</option>
+                    {parishesByDeanery.map((p: ParishRow) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+
+              <label className="block space-y-1 text-[10px] font-bold uppercase tracking-wide text-text-3">
+                <span>Search by Name</span>
                 <Input
                   value={searchQ}
                   onChange={(e) => setSearchQ(e.target.value)}
-                  placeholder="Name or CDM ID"
+                  placeholder={selectedDeanery ? "Name or CDM ID in " + selectedDeanery.name : "Select deanery first"}
+                  disabled={!selectedDeanery}
                 />
               </label>
 
@@ -1245,6 +1314,49 @@ function NewOrderDialog({
             </>
           ) : (
             <>
+              <label className="block space-y-1 text-[10px] font-bold uppercase tracking-wide text-text-3">
+                <span>Deanery</span>
+                <select
+                  value={selectedDeanery?.id ?? ""}
+                  onChange={(e) => {
+                    const deaneryId = e.target.value;
+                    const deanery = deaneries.find((d: DeaneryRow) => d.id === deaneryId) || null;
+                    setSelectedDeanery(deanery);
+                    setSelectedParish(null);
+                  }}
+                  className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 text-[11px] text-foreground"
+                >
+                  <option value="">Select deanery</option>
+                  {deaneries.map((d: DeaneryRow) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              {selectedDeanery && (
+                <label className="block space-y-1 text-[10px] font-bold uppercase tracking-wide text-text-3">
+                  <span>Parish (optional)</span>
+                  <select
+                    value={selectedParish?.id ?? ""}
+                    onChange={(e) => {
+                      const parishId = e.target.value;
+                      const parish = parishesByDeanery.find((p: ParishRow) => p.id === parishId) || null;
+                      setSelectedParish(parish);
+                    }}
+                    className="mt-1 w-full rounded-lg border border-border bg-white px-3 py-2 text-[11px] text-foreground"
+                  >
+                    <option value="">Any parish in {selectedDeanery.name}</option>
+                    {parishesByDeanery.map((p: ParishRow) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+
               <label className="block space-y-1 text-[10px] font-bold uppercase tracking-wide text-text-3">
                 <span>Order For (Name) *</span>
                 <Input

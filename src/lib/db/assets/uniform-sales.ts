@@ -317,23 +317,58 @@ export type OrderRecipient = {
   name: string;
   cdmId?: string;
   parishName?: string;
+  parishId?: string;
+  deaneryName?: string;
 };
 
-export async function searchOrderRecipients(q: string, limit = 25): Promise<OrderRecipient[]> {
+export async function searchOrderRecipients(opts: {
+  q?: string;
+  deaneryId?: string;
+  parishId?: string;
+  limit?: number;
+}): Promise<OrderRecipient[]> {
+  const { q = "", deaneryId, parishId, limit = 25 } = opts;
+
   if (!q || q.length < 2) return [];
 
   const pattern = likePattern(q);
-  const { data: youths, error: youthError } = await db
+  let youthQuery = db
     .from("youths")
-    .select("id, cdm_id, first_name, last_name, parish_id, parish:parishes(name)")
-    .ilike("first_name", pattern)
-    .limit(limit / 2);
+    .select(`
+      id, cdm_id, first_name, last_name, parish_id,
+      parish:parishes(id, name, deanery_id, deanery:deaneries(name))
+    `)
+    .ilike("first_name", pattern);
 
-  const { data: patronage, error: patronageError } = await db
+  if (deaneryId) {
+    youthQuery = youthQuery.eq("parish.deanery_id", deaneryId);
+  }
+  if (parishId) {
+    youthQuery = youthQuery.eq("parish_id", parishId);
+  }
+
+  youthQuery = youthQuery.limit(limit / 2);
+
+  const { data: youths, error: youthError } = await youthQuery;
+
+  let patronageQuery = db
     .from("patronage_team")
-    .select("id, first_name, last_name, parish_id, parish:parishes(name)")
-    .ilike("first_name", pattern)
-    .limit(limit / 2);
+    .select(`
+      id, first_name, last_name, parish_id,
+      parish:parishes(id, name, deanery_id, deanery:deaneries(name))
+    `)
+    .ilike("first_name", pattern);
+
+  if (deaneryId) {
+    patronageQuery = patronageQuery.eq("parish.deanery_id", deaneryId);
+  }
+  if (parishId) {
+    patronageQuery = patronageQuery.eq("parish_id", parishId);
+  }
+
+  patronageQuery = patronageQuery.limit(limit / 2);
+
+  const { data: patronage, error: patronageError } = await patronageQuery;
 
   const results: OrderRecipient[] = [];
 
@@ -344,7 +379,9 @@ export async function searchOrderRecipients(q: string, limit = 25): Promise<Orde
         type: "youth",
         name: `${y.first_name} ${y.last_name}`,
         cdmId: y.cdm_id,
+        parishId: y.parish_id,
         parishName: y.parish?.name,
+        deaneryName: y.parish?.deanery?.name,
       });
     });
   }
@@ -355,7 +392,9 @@ export async function searchOrderRecipients(q: string, limit = 25): Promise<Orde
         id: p.id,
         type: "patronage",
         name: `${p.first_name} ${p.last_name}`,
+        parishId: p.parish_id,
         parishName: p.parish?.name,
+        deaneryName: p.parish?.deanery?.name,
       });
     });
   }
