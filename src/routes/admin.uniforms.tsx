@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { MoreVertical, Eye, Pencil, Trash2, BadgeCheck, Truck, PackageCheck, Banknote } from "lucide-react";
+import { MoreVertical, Eye, Pencil, Trash2, BadgeCheck, Truck, PackageCheck, Banknote, Download, BarChart3, TrendingUp, PieChart } from "lucide-react";
 import { Topbar, TopbarButton, TopbarTab } from "@/components/admin/layout/topbar";
 import { Card, Kpi, Pill } from "@/components/admin/composables/ui-bits";
 import { RecordFormDialog, type FieldDef } from "@/components/admin/composables/forms/record-form-dialog";
@@ -12,6 +12,21 @@ import { usePagination, TablePagination } from "@/components/admin/composables/t
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Line,
+  LineChart,
+  Pie,
+  PieChart as RechartsPieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+  Cell,
+} from "recharts";
+import { Donut } from "@/components/admin/composables/donut";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -27,18 +42,22 @@ import {
 import { Input } from "@/components/ui/input";
 import { ORGANIZATION } from "@/lib/mock-data";
 import {
-  createUniformSku, deleteUniformSku, listUniformSkus, updateUniformSku,
-  type UniformSku, type UniformSkuInput, type UniformSkuUpdateInput,
+  createUniformItem, deleteUniformItem, listUniformItemsWithStock, updateUniformItem,
+  type UniformItem, type UniformItemWithStock, type UniformItemInput, type UniformItemUpdateInput,
 } from "@/lib/db/assets/uniforms";
 import {
-  createStockEntry, deleteStockEntry, listStockEntries,
-  type StockEntry, type StockEntryInput,
+  createStockEntry, deleteStockEntry, listStockEntries, listUniformActivities,
+  type StockEntry, type StockEntryInput, type UniformActivity,
 } from "@/lib/db/assets/uniform-stock-entries";
 import {
-  createUniformSale, deleteUniformSale, listUniformSales, listUniformSalesPaged,
-  confirmOrder, confirmDispatch, confirmDelivery, recordPayment, updateUniformSale,
-  type PaymentStatus, type OrderStage, type UniformSale, type UniformSaleInput, type UniformSaleUpdateInput,
+  createUniformOrder, deleteUniformOrder, listUniformOrders, listUniformOrdersPaged,
+  approveOrder, confirmDispatch, confirmDelivery, recordPayment, cancelOrder, updateUniformOrder,
+  type PaymentStatus, type OrderStatus, type UniformOrder, type UniformOrderInput, type UniformOrderUpdateInput,
 } from "@/lib/db/assets/uniform-sales";
+import {
+  fetchUniformSettings,
+  type UniformSettings,
+} from "@/lib/db/organization-settings";
 
 export const Route = createFileRoute("/admin/uniforms")({
   head: () => ({
@@ -51,149 +70,215 @@ export const Route = createFileRoute("/admin/uniforms")({
 });
 
 function UniformsPage() {
-  const [tab,          setTab]          = useState<TabId>("stock");
-  const [stockRange,   setStockRange]   = useState<DateRange>(EMPTY_RANGE);
-  const [salesRange,   setSalesRange]   = useState<DateRange>(EMPTY_RANGE);
+  const [tab,          setTab]          = useState<TabId>("status");
+  const [statusRange,  setStatusRange]  = useState<DateRange>(EMPTY_RANGE);
+  const [stockInRange,  setStockInRange]  = useState<DateRange>(EMPTY_RANGE);
+  const [stockOutRange, setStockOutRange] = useState<DateRange>(EMPTY_RANGE);
   const [reportRange,  setReportRange]  = useState<DateRange>(EMPTY_RANGE);
-  const [salesFilter,  setSalesFilter]  = useState<SalesFilter>("all");
-  const [salesPage,    setSalesPage]    = useState(1);
-  const [salesQ,       setSalesQ]       = useState("");
+  const [reportItem,   setReportItem]   = useState<string>("all");
+  const [statusQ,      setStatusQ]      = useState("");
+  const [stockInQ,     setStockInQ]     = useState("");
+  const [ordersFilter, setOrdersFilter] = useState<OrdersFilter>("all");
+  const [ordersPage,   setOrdersPage]   = useState(1);
+  const [ordersQ,      setOrdersQ]      = useState("");
 
-  /* ── SKU dialogs ── */
-  const [addSkuOpen, setAddSkuOpen] = useState(false);
-  const [editSku,    setEditSku]    = useState<{ id: string; initial: Record<string, string> } | null>(null);
-  const [viewSku,    setViewSku]    = useState<UniformSku | null>(null);
-  const [deleteSku,  setDeleteSku]  = useState<{ id: string; name: string } | null>(null);
+  /* ── Item dialogs ── */
+  const [addItemOpen, setAddItemOpen] = useState(false);
+  const [editItem,    setEditItem]    = useState<{ id: string; initial: Record<string, string> } | null>(null);
+  const [viewItem,    setViewItem]    = useState<UniformItemWithStock | null>(null);
+  const [deleteItem,  setDeleteItem]  = useState<{ id: string; name: string } | null>(null);
 
-  /* ── stock entry dialogs ── */
+  /* ── Stock entry dialogs ── */
   const [addEntryOpen,  setAddEntryOpen]  = useState(false);
   const [deleteEntry,   setDeleteEntry]   = useState<{ id: string; name: string } | null>(null);
 
-  /* ── sale dialogs ── */
-  const [saleOpen,   setSaleOpen]   = useState(false);
-  const [editSale,   setEditSale]   = useState<{ id: string; initial: Record<string, string> } | null>(null);
-  const [viewSale,   setViewSale]   = useState<UniformSale | null>(null);
-  const [deleteSale, setDeleteSale] = useState<{ id: string; name: string } | null>(null);
-  const [paySale,    setPaySale]    = useState<UniformSale | null>(null);
-  const [dispatchSale, setDispatchSale] = useState<UniformSale | null>(null);
+  /* ── Order dialogs ── */
+  const [orderOpen,   setOrderOpen]   = useState(false);
+  const [viewOrder,   setViewOrder]   = useState<UniformOrder | null>(null);
+  const [deleteOrder, setDeleteOrder] = useState<{ id: string; name: string } | null>(null);
+  const [payOrder,    setPayOrder]    = useState<UniformOrder | null>(null);
+  const [dispatchOrder, setDispatchOrder] = useState<UniformOrder | null>(null);
+  const [deliveryOrder, setDeliveryOrder] = useState<UniformOrder | null>(null);
 
   const qc = useQueryClient();
 
+  /* ── organization settings ── */
+  const { data: settings } = useQuery({
+    queryKey: ["uniform-settings"],
+    queryFn: fetchUniformSettings,
+  });
+  const uniformSettings: UniformSettings = settings || {
+    lowStockThreshold: 50,
+    mediumStockThreshold: 200,
+    itemsPageSize: 10,
+    entriesPageSize: 10,
+    ordersPageSize: 10,
+  };
+
   /* ── queries ── */
-  const { data: skusRaw    } = useQuery({ queryKey: ["uniform-skus"],    queryFn: listUniformSkus });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: entriesRaw } = useQuery({ queryKey: ["uniform-entries"],  queryFn: listStockEntries as any });
+  const { data: itemsRaw    } = useQuery({ queryKey: ["uniform-items"],    queryFn: listUniformItemsWithStock });
+  const { data: entriesRaw } = useQuery({ queryKey: ["uniform-entries"],  queryFn: listStockEntries });
+  const { data: activitiesRaw } = useQuery({ queryKey: ["uniform-activities"], queryFn: listUniformActivities });
   // Full list for KPIs and reports tab
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: salesRaw   } = useQuery({ queryKey: ["uniform-sales"],   queryFn: listUniformSales as any });
-  // Paginated + filtered for the sales table
-  const SALES_PAGE_SIZE = 10;
-  const { data: salesPagedResp } = useQuery({
-    queryKey: ["uniform-sales-paged", salesPage, SALES_PAGE_SIZE, salesQ, salesFilter, salesRange.from?.toISOString(), salesRange.to?.toISOString()],
+  const { data: ordersRaw   } = useQuery({ queryKey: ["uniform-orders"],   queryFn: listUniformOrders });
+  // Paginated + filtered for the orders table
+  const { data: ordersPagedResp } = useQuery({
+    queryKey: ["uniform-orders-paged", ordersPage, uniformSettings.ordersPageSize, ordersQ, ordersFilter, stockOutRange.from?.toISOString(), stockOutRange.to?.toISOString()],
     queryFn: () =>
-      listUniformSalesPaged({
-        page: salesPage - 1,
-        size: SALES_PAGE_SIZE,
-        q: salesQ,
-        stage: salesFilter === "pending" ? "pending" : null,
-        paymentStatus:
-          salesFilter === "paid"   ? "paid"     :
-          salesFilter === "unpaid" ? "not_paid" : null,
-        from: salesRange.from?.toISOString().slice(0, 10) ?? null,
-        to:   salesRange.to?.toISOString().slice(0, 10)   ?? null,
+      listUniformOrdersPaged({
+        page: ordersPage - 1,
+        size: uniformSettings.ordersPageSize,
+        q: ordersQ,
+        status: ordersFilter === "pending" ? "pending" : ordersFilter === "all" ? null : ordersFilter,
+        paymentStatus: null,
+        from: stockOutRange.from?.toISOString().slice(0, 10) ?? null,
+        to:   stockOutRange.to?.toISOString().slice(0, 10)   ?? null,
       }),
     placeholderData: keepPreviousData,
   });
 
-  const skus    = (skusRaw    ?? []) as UniformSku[];
-  const entries = (entriesRaw ?? []) as StockEntry[];
-  const sales   = (salesRaw   ?? []) as UniformSale[];
+  const items     = (itemsRaw     ?? []) as UniformItemWithStock[];
+  const entries   = (entriesRaw   ?? []) as StockEntry[];
+  const activities = (activitiesRaw ?? []) as UniformActivity[];
+  const orders    = (ordersRaw    ?? []) as UniformOrder[];
 
-  const isLiveSkus    = skus.length    > 0;
-  const isLiveEntries = entries.length > 0;
-  const isLiveSales   = (salesPagedResp?.total ?? 0) > 0 || sales.length > 0;
+  const displayItems     = items;
+  const displayEntries   = entries;
+  const displayOrders    = orders;
+  const itemNames        = displayItems.map((s) => s.name);
+  const activityNames    = activities.map((a) => a.name);
 
-  const displaySkus    = isLiveSkus    ? skus    : MOCK_STOCK;
-  const displayEntries = isLiveEntries ? entries : MOCK_ENTRIES;
-  // displaySales is for KPIs and reports; sales table uses salesPagedResp
-  const displaySales   = sales.length > 0 ? sales : MOCK_SALES;
-  const skuNames       = displaySkus.map((s) => s.name);
-
-  // Server-paginated rows for the sales tab table
-  const pagedSaleRows    = (salesPagedResp?.data ?? (sales.length > 0 ? [] : MOCK_SALES)) as UniformSale[];
-  const pagedSalesTotal  = salesPagedResp?.total ?? (sales.length > 0 ? 0 : MOCK_SALES.length);
-  const pagedSalesTotalPages = Math.max(1, Math.ceil(pagedSalesTotal / SALES_PAGE_SIZE));
+  // Server-paginated rows for the orders tab table
+  const pagedOrderRows    = (ordersPagedResp?.data ?? []) as UniformOrder[];
+  const pagedOrdersTotal  = ordersPagedResp?.total ?? 0;
+  const pagedOrdersTotalPages = Math.max(1, Math.ceil(pagedOrdersTotal / uniformSettings.ordersPageSize));
 
   /* ── derived ── */
   const filteredEntries = useMemo(
-    () => displayEntries.filter((e) => inDateRange(e.entered_at, stockRange)),
-    [displayEntries, stockRange],
+    () => displayEntries.filter((e) => {
+      const inDate = inDateRange(e.created_at, stockInRange);
+      const matchesSearch = !stockInQ ||
+        e.item_name.toLowerCase().includes(stockInQ.toLowerCase()) ||
+        e.activity_name.toLowerCase().includes(stockInQ.toLowerCase()) ||
+        (e.description?.toLowerCase().includes(stockInQ.toLowerCase()) ?? false);
+      return inDate && matchesSearch;
+    }),
+    [displayEntries, stockInRange, stockInQ],
   );
 
-  const skuPagination   = usePagination(displaySkus, 10);
-  const entryPagination = usePagination(filteredEntries, 10);
+  const filteredOrdersForStatus = useMemo(
+    () => displayOrders.filter((o) => inDateRange(o.ordered_at, statusRange)),
+    [displayOrders, statusRange],
+  );
 
-  const stockKpis = useMemo(() => ({
-    totalStock: displaySkus.reduce((a, u) => a + u.in_stock, 0),
-    lowCount:   displaySkus.filter((u) => u.in_stock < 50).length,
-    onOrder:    displaySkus.reduce((a, u) => a + u.on_order, 0),
-    sewerYTD:   displayEntries.reduce((a, e) => a + e.quantity, 0),
-  }), [displaySkus, displayEntries]);
+  const filteredItemsForStatus = useMemo(
+    () => displayItems.filter((i) => !statusQ || i.name.toLowerCase().includes(statusQ.toLowerCase())),
+    [displayItems, statusQ],
+  );
 
-  const salesKpis = useMemo(() => {
-    const revenue     = displaySales.reduce((a, x) => a + x.quantity * Number(x.unit_price), 0);
-    const collected   = displaySales.reduce((a, x) => a + Number(x.paid_amount), 0);
+  const itemPagination   = usePagination(filteredItemsForStatus, uniformSettings.itemsPageSize);
+  const entryPagination = usePagination(filteredEntries, uniformSettings.entriesPageSize);
+
+  const statusKpis = useMemo(() => ({
+    totalStock: displayItems.reduce((a, u) => a + u.available_stock, 0),
+    stockIn:    statusRange.from || statusRange.to ? filteredEntries.reduce((a, e) => a + e.quantity, 0) : displayItems.reduce((a, u) => a + u.stock_in, 0),
+    stockOut:   statusRange.from || statusRange.to ? filteredOrdersForStatus.filter((o) => o.status === "delivered").reduce((a, o) => a + o.quantity, 0) : displayItems.reduce((a, u) => a + u.stock_out_delivered, 0),
+    pending:    statusRange.from || statusRange.to ? filteredOrdersForStatus.filter((o) => o.status === "pending" || o.status === "approved").reduce((a, o) => a + o.quantity, 0) : displayItems.reduce((a, u) => a + u.pending_youth_orders, 0),
+    lowCount:   displayItems.filter((u) => u.available_stock < uniformSettings.lowStockThreshold).length,
+  }), [displayItems, filteredEntries, filteredOrdersForStatus, statusRange, uniformSettings.lowStockThreshold]);
+
+  const stockInKpis = useMemo(() => ({
+    totalEntries: filteredEntries.length,
+    totalQty:     filteredEntries.reduce((a, e) => a + e.quantity, 0),
+  }), [filteredEntries]);
+
+  const stockInByItem = useMemo(() => {
+    const m = new Map<string, { qty: number; entries: number; lastEntry: string }>();
+    for (const e of displayEntries) {
+      const existing = m.get(e.item_name) ?? { qty: 0, entries: 0, lastEntry: "" };
+      m.set(e.item_name, {
+        qty: existing.qty + e.quantity,
+        entries: existing.entries + 1,
+        lastEntry: existing.lastEntry ? (e.created_at > existing.lastEntry ? e.created_at : existing.lastEntry) : e.created_at,
+      });
+    }
+    return Array.from(m.entries()).map(([name, v]) => ({ name, ...v }));
+  }, [displayEntries]);
+
+  const stockOutKpis = useMemo(() => {
+    const hasFilters = stockOutRange.from || stockOutRange.to || ordersQ || ordersFilter !== "all";
+    const ordersToUse = hasFilters ? pagedOrderRows : displayOrders;
+    const revenue     = ordersToUse.reduce((a, x) => a + x.quantity * (x.unit_price ?? 0), 0);
+    const collected   = ordersToUse.filter((x) => x.payment_status === "paid").length;
     return {
-      total:       displaySales.length,
-      pending:     displaySales.filter((x) => !x.delivered_at).length,
-      delivered:   displaySales.filter((x) => !!x.delivered_at).length,
-      outstanding: revenue - collected,
+      total:       ordersToUse.length,
+      pending:     ordersToUse.filter((x) => x.status === "pending").length,
+      approved:    ordersToUse.filter((x) => x.status === "approved").length,
+      paid:        ordersToUse.filter((x) => x.payment_status === "paid").length,
+      dispatched:  ordersToUse.filter((x) => x.status === "dispatched").length,
+      delivered:   ordersToUse.filter((x) => x.status === "delivered").length,
     };
-  }, [displaySales]);
+  }, [pagedOrderRows, displayOrders, stockOutRange, ordersQ, ordersFilter]);
 
-  const reportSales = useMemo(
-    () => displaySales.filter((s) => inDateRange(s.ordered_at, reportRange)),
-    [displaySales, reportRange],
+  const reportOrders = useMemo(
+    () => displayOrders.filter((s) => inDateRange(s.ordered_at, reportRange)),
+    [displayOrders, reportRange],
   );
   const reportKpis  = useMemo(() => {
-    const units     = reportSales.reduce((a, x) => a + x.quantity, 0);
-    const revenue   = reportSales.reduce((a, x) => a + x.quantity * Number(x.unit_price), 0);
-    const collected = reportSales.reduce((a, x) => a + Number(x.paid_amount), 0);
-    return { units, revenue, collected, outstanding: revenue - collected };
-  }, [reportSales]);
+    const units     = reportOrders.reduce((a, x) => a + x.quantity, 0);
+    const revenue   = reportOrders.reduce((a, x) => a + x.quantity * (x.unit_price ?? 0), 0);
+    const collected = reportOrders.filter((x) => x.payment_status === "paid").length;
+    return { units, revenue, collected, pending: reportOrders.filter((x) => x.status !== "delivered").length };
+  }, [reportOrders]);
 
-  const byItem = useMemo(() => groupByItem(reportSales), [reportSales]);
-  const byDay  = useMemo(() => groupByDay(reportSales),  [reportSales]);
+  const byItem = useMemo(() => groupByItem(reportOrders), [reportOrders]);
+  const byDay  = useMemo(() => groupByDay(reportOrders),  [reportOrders]);
+  const byStatus = useMemo(() => {
+    const totals: Record<OrderStatus, number> = { pending: 0, approved: 0, paid: 0, dispatched: 0, delivered: 0, cancelled: 0 };
+    for (const s of reportOrders) totals[s.status] += 1;
+    return totals;
+  }, [reportOrders]);
 
-  const reportEntries = useMemo(
-    () => displayEntries.filter((e) => inDateRange(e.entered_at, reportRange)),
-    [displayEntries, reportRange],
+  // Statistics for Reports tab (filtered by date and item)
+  const statsOrders = useMemo(
+    () => displayOrders.filter((s) => {
+      const inDate = inDateRange(s.ordered_at, reportRange);
+      const matchesItem = reportItem === "all" || s.item_name === reportItem;
+      return inDate && matchesItem;
+    }),
+    [displayOrders, reportRange, reportItem],
   );
-  const byActivity = useMemo(() => {
-    const totals: Record<"sewing" | "logo" | "branding", number> = { sewing: 0, logo: 0, branding: 0 };
-    for (const e of reportEntries) totals[e.activity] += e.quantity;
-    return totals;
-  }, [reportEntries]);
-  const byStage = useMemo(() => {
-    const totals: Record<OrderStage, number> = { placed: 0, confirmed: 0, dispatched: 0, delivered: 0, cancelled: 0 };
-    for (const s of reportSales) totals[s.stage] += 1;
-    return totals;
-  }, [reportSales]);
+
+  const statsKpis = useMemo(() => {
+    const totalRevenue = statsOrders.reduce((a, x) => a + x.quantity * (x.unit_price ?? 0), 0);
+    const paidRevenue = statsOrders.filter((x) => x.payment_status === "paid").reduce((a, x) => a + x.quantity * (x.unit_price ?? 0), 0);
+    const pendingRevenue = totalRevenue - paidRevenue;
+    const totalUnits = statsOrders.reduce((a, x) => a + x.quantity, 0);
+    const paidOrders = statsOrders.filter((x) => x.payment_status === "paid").length;
+    return {
+      totalRevenue,
+      paidRevenue,
+      pendingRevenue,
+      totalUnits,
+      paidOrders,
+      totalOrders: statsOrders.length,
+    };
+  }, [statsOrders]);
 
   /* ── mutations ── */
-  const createSkuMut = useMutation({
-    mutationFn: (i: UniformSkuInput) => createUniformSku(i),
-    onSuccess: () => { toast.success("Item added."); qc.invalidateQueries({ queryKey: ["uniform-skus"] }); },
+  const createItemMut = useMutation({
+    mutationFn: (i: UniformItemInput) => createUniformItem(i),
+    onSuccess: () => { toast.success("Item added."); qc.invalidateQueries({ queryKey: ["uniform-items"] }); },
     onError: (e: Error) => toast.error(e.message),
   });
-  const updateSkuMut = useMutation({
-    mutationFn: ({ id, input }: { id: string; input: UniformSkuUpdateInput }) => updateUniformSku(id, input),
-    onSuccess: () => { toast.success("Stock updated."); qc.invalidateQueries({ queryKey: ["uniform-skus"] }); setEditSku(null); },
+  const updateItemMut = useMutation({
+    mutationFn: ({ id, input }: { id: string; input: UniformItemUpdateInput }) => updateUniformItem(id, input),
+    onSuccess: () => { toast.success("Item updated."); qc.invalidateQueries({ queryKey: ["uniform-items"] }); setEditItem(null); },
     onError: (e: Error) => toast.error(e.message),
   });
-  const deleteSkuMut = useMutation({
-    mutationFn: (id: string) => deleteUniformSku(id),
-    onSuccess: () => { toast.success("Item deleted."); qc.invalidateQueries({ queryKey: ["uniform-skus"] }); setDeleteSku(null); },
+  const deleteItemMut = useMutation({
+    mutationFn: (id: string) => deleteUniformItem(id),
+    onSuccess: () => { toast.success("Item deleted."); qc.invalidateQueries({ queryKey: ["uniform-items"] }); setDeleteItem(null); },
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -202,7 +287,7 @@ function UniformsPage() {
     onSuccess: () => {
       toast.success("Stock entry recorded.");
       qc.invalidateQueries({ queryKey: ["uniform-entries"] });
-      qc.invalidateQueries({ queryKey: ["uniform-skus"] });
+      qc.invalidateQueries({ queryKey: ["uniform-items"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -212,58 +297,57 @@ function UniformsPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const createSaleMut = useMutation({
-    mutationFn: (i: UniformSaleInput) => createUniformSale(i),
-    onSuccess: () => { toast.success("Sale recorded."); qc.invalidateQueries({ queryKey: ["uniform-sales"] }); },
+  const createOrderMut = useMutation({
+    mutationFn: (i: UniformOrderInput) => createUniformOrder(i),
+    onSuccess: () => { toast.success("Order recorded."); qc.invalidateQueries({ queryKey: ["uniform-orders"] }); },
     onError: (e: Error) => toast.error(e.message),
   });
-  const updateSaleMut = useMutation({
-    mutationFn: ({ id, input }: { id: string; input: UniformSaleUpdateInput }) => updateUniformSale(id, input),
-    onSuccess: () => { toast.success("Sale updated."); qc.invalidateQueries({ queryKey: ["uniform-sales"] }); setEditSale(null); },
-    onError: (e: Error) => toast.error(e.message),
-  });
-  const confirmOrderMut = useMutation({
-    mutationFn: (id: string) => confirmOrder(id),
-    onSuccess: () => { toast.success("Order confirmed."); qc.invalidateQueries({ queryKey: ["uniform-sales"] }); },
+  const approveOrderMut = useMutation({
+    mutationFn: (id: string) => approveOrder(id),
+    onSuccess: () => { toast.success("Order approved."); qc.invalidateQueries({ queryKey: ["uniform-orders"] }); },
     onError: (e: Error) => toast.error(e.message),
   });
   const confirmDispatchMut = useMutation({
-    mutationFn: ({ id, ...input }: { id: string; contactName: string; contactPhone?: string | null; method: string; scheduledAt?: string | null }) =>
+    mutationFn: ({ id, ...input }: { id: string; contactName: string; contactPhone?: string | null; method: string; scheduledAt?: string | null; notes?: string | null }) =>
       confirmDispatch(id, input),
-    onSuccess: () => { toast.success("Dispatch confirmed."); qc.invalidateQueries({ queryKey: ["uniform-sales"] }); setDispatchSale(null); },
+    onSuccess: () => { toast.success("Dispatch confirmed."); qc.invalidateQueries({ queryKey: ["uniform-orders"] }); setDispatchOrder(null); },
     onError: (e: Error) => toast.error(e.message),
   });
   const confirmDeliveryMut = useMutation({
-    mutationFn: (id: string) => confirmDelivery(id),
-    onSuccess: () => { toast.success("Delivery confirmed."); qc.invalidateQueries({ queryKey: ["uniform-sales"] }); },
+    mutationFn: ({ id, deliveredBy, notes }: { id: string; deliveredBy?: string; notes?: string }) => confirmDelivery(id, deliveredBy, notes),
+    onSuccess: () => { toast.success("Delivery confirmed."); qc.invalidateQueries({ queryKey: ["uniform-orders"] }); setDeliveryOrder(null); },
     onError: (e: Error) => toast.error(e.message),
   });
   const payMut = useMutation({
-    mutationFn: ({ id, total }: { id: string; total: number }) => recordPayment(id, total),
-    onSuccess: () => { toast.success("Payment recorded."); qc.invalidateQueries({ queryKey: ["uniform-sales"] }); },
+    mutationFn: ({ id, paymentMethod }: { id: string; paymentMethod?: string }) => recordPayment(id, paymentMethod),
+    onSuccess: () => { toast.success("Payment recorded."); qc.invalidateQueries({ queryKey: ["uniform-orders"] }); },
     onError: (e: Error) => toast.error(e.message),
   });
-  const deleteSaleMut = useMutation({
-    mutationFn: (id: string) => deleteUniformSale(id),
-    onSuccess: () => { toast.success("Sale deleted."); qc.invalidateQueries({ queryKey: ["uniform-sales"] }); setDeleteSale(null); },
+  const cancelOrderMut = useMutation({
+    mutationFn: (id: string) => cancelOrder(id),
+    onSuccess: () => { toast.success("Order cancelled."); qc.invalidateQueries({ queryKey: ["uniform-orders"] }); },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const deleteOrderMut = useMutation({
+    mutationFn: (id: string) => deleteUniformOrder(id),
+    onSuccess: () => { toast.success("Order deleted."); qc.invalidateQueries({ queryKey: ["uniform-orders"] }); setDeleteOrder(null); },
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const changeSalesFilter = (f: SalesFilter) => { setSalesFilter(f); setSalesPage(1); };
-  const changeSalesRange  = (r: DateRange)   => { setSalesRange(r);  setSalesPage(1); };
-  const changeSalesQ      = (q: string)      => { setSalesQ(q);      setSalesPage(1); };
+  const changeOrdersFilter = (f: OrdersFilter) => { setOrdersFilter(f); setOrdersPage(1); };
+  const changeOrdersRange  = (r: DateRange)   => { setStockOutRange(r);  setOrdersPage(1); };
+  const changeOrdersQ      = (q: string)      => { setOrdersQ(q);      setOrdersPage(1); };
 
   /* ── topbar action ── */
   const actionBtn =
-    tab === "stock" ? (
-      <div className="flex items-center gap-2">
-        <button onClick={() => setAddSkuOpen(true)} className="text-[11px] font-semibold text-text-2 hover:text-text-1 transition-colors">
-          + New Item
-        </button>
-        <TopbarButton onClick={() => setAddEntryOpen(true)}>+ Add Stock</TopbarButton>
-      </div>
-    ) : tab === "sales" ? (
-      <TopbarButton onClick={() => setSaleOpen(true)}>+ Record Sale</TopbarButton>
+    tab === "status" ? (
+      <button onClick={() => setAddItemOpen(true)} className="text-[11px] font-semibold text-text-2 hover:text-text-1 transition-colors">
+        + New Item
+      </button>
+    ) : tab === "stock-in" ? (
+      <TopbarButton onClick={() => setAddEntryOpen(true)}>+ Stock In</TopbarButton>
+    ) : tab === "stock-out" ? (
+      <TopbarButton onClick={() => setOrderOpen(true)}>+ New Order</TopbarButton>
     ) : null;
 
   /* ── TH helper ── */
@@ -284,9 +368,10 @@ function UniformsPage() {
         title="Uniforms"
         tabs={
           <>
-            <TopbarTab active={tab === "stock"}   onClick={() => setTab("stock")}>Stock</TopbarTab>
-            <TopbarTab active={tab === "sales"}   onClick={() => setTab("sales")}>Sales & Orders</TopbarTab>
-            <TopbarTab active={tab === "reports"} onClick={() => setTab("reports")}>Reports</TopbarTab>
+            <TopbarTab active={tab === "status"}    onClick={() => setTab("status")}>Stock Status</TopbarTab>
+            <TopbarTab active={tab === "stock-in"}  onClick={() => setTab("stock-in")}>Stock In</TopbarTab>
+            <TopbarTab active={tab === "stock-out"} onClick={() => setTab("stock-out")}>Stock Out</TopbarTab>
+            <TopbarTab active={tab === "reports"}   onClick={() => setTab("reports")}>Reports</TopbarTab>
           </>
         }
         action={actionBtn}
@@ -294,35 +379,48 @@ function UniformsPage() {
 
       <div className="flex-1 overflow-y-auto px-5 py-4">
 
-        {/* ══════════════════ STOCK TAB ══════════════════ */}
-        {tab === "stock" && (
+        {/* ══════════════════ STOCK STATUS TAB ══════════════════ */}
+        {tab === "status" && (
           <>
             {/* KPIs */}
             <div className="mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-              <Kpi label="In Store (Total)"  value={stockKpis.totalStock.toLocaleString()} trend={`${displaySkus.length} items`} tone="up" />
-              <Kpi label="On Order"          value={stockKpis.onOrder.toLocaleString()}    trend="from supplier"                  tone="info" />
-              <Kpi label="Sewn / Added (All)"value={stockKpis.sewerYTD.toLocaleString()}   trend={`${displayEntries.length} batches`} tone="up" />
-              <Kpi label="Low Stock"         value={String(stockKpis.lowCount)}            trend="items below 50 units"           tone={stockKpis.lowCount > 0 ? "warn" : "up"} />
+              <Kpi label="Available Stock"  value={statusKpis.totalStock.toLocaleString()} trend={`${displayItems.length} items`} tone="up" />
+              <Kpi label="Total Stock In"    value={statusKpis.stockIn.toLocaleString()}    trend="all time"                  tone="info" />
+              <Kpi label="Total Stock Out"   value={statusKpis.stockOut.toLocaleString()}   trend="delivered" tone="warn" />
+              <Kpi label="Low Stock"         value={String(statusKpis.lowCount)}            trend={`items below ${uniformSettings.lowStockThreshold} units`}           tone={statusKpis.lowCount > 0 ? "warn" : "up"} />
+            </div>
+
+            {/* Filter bar */}
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              <input
+                value={statusQ}
+                onChange={(e) => setStatusQ(e.target.value)}
+                placeholder="Search item name…"
+                className="min-w-[200px] rounded-md border border-black/20 bg-white px-3 py-1.5 text-[12px] text-black/70 placeholder:text-gray-400 outline-none hover:border-gold-3/50 focus:border-gold-3"
+              />
+              <DateRangeFilter value={statusRange} onChange={setStatusRange} />
             </div>
 
             {/* Current inventory table */}
             <div className="mb-4 overflow-hidden rounded-xl border border-border bg-card">
               <div className="border-b border-border px-3.5 py-2.5">
-                <div className="text-[11px] font-bold text-gold">Current Inventory</div>
+                <div className="text-[11px] font-bold text-gold">Current Stock Levels</div>
               </div>
               <Table>
                 <TableHeader>
                   <TableRow className="border-b border-border bg-bg-3 hover:bg-bg-3">
                     <TH>Item</TH>
-                    <TH className="text-right">In Store</TH>
-                    <TH className="text-right">On Order</TH>
+                    <TH className="text-right">Stock In</TH>
+                    <TH className="text-right">Stock Out</TH>
+                    <TH className="text-right">Available</TH>
+                    <TH className="text-right">Pending</TH>
                     <TH className="text-right">Unit Price</TH>
                     <TH>Status</TH>
-                    {isLiveSkus && <TH className="w-10" />}
+                    {isLiveItems && <TH className="w-10" />}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {skuPagination.pageRows.map((u) => (
+                  {itemPagination.pageRows.map((u) => (
                     <TableRow key={u.name} className="border-b border-border hover:bg-bg-2">
                       <TD>
                         <div className="flex items-center gap-2">
@@ -330,15 +428,17 @@ function UniformsPage() {
                           <span className="font-semibold text-foreground">{u.name}</span>
                         </div>
                       </TD>
-                      <TD className="text-right font-semibold text-foreground">{u.in_stock.toLocaleString()}</TD>
-                      <TD className="text-right text-text-2">{u.on_order.toLocaleString()}</TD>
+                      <TD className="text-right text-text-2">{u.stock_in.toLocaleString()}</TD>
+                      <TD className="text-right text-text-2">{u.stock_out_delivered.toLocaleString()}</TD>
+                      <TD className="text-right font-bold text-foreground">{u.available_stock.toLocaleString()}</TD>
+                      <TD className="text-right text-text-3">{u.pending_youth_orders.toLocaleString()}</TD>
                       <TD className="text-right text-text-2">{u.unit_price != null ? fmtKES(u.unit_price) : "—"}</TD>
                       <TD>
-                        <Pill tone={u.in_stock < 50 ? "danger" : u.in_stock < 200 ? "gold" : "success"}>
-                          {u.in_stock < 50 ? "critical" : u.in_stock < 200 ? "low" : "ok"}
+                        <Pill tone={u.available_stock < uniformSettings.lowStockThreshold ? "danger" : u.available_stock < uniformSettings.mediumStockThreshold ? "gold" : "success"}>
+                          {u.available_stock < uniformSettings.lowStockThreshold ? "critical" : u.available_stock < uniformSettings.mediumStockThreshold ? "low" : "ok"}
                         </Pill>
                       </TD>
-                      {isLiveSkus && (
+                      {isLiveItems && (
                         <TD>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -347,14 +447,14 @@ function UniformsPage() {
                               </button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="min-w-[140px]">
-                              <DropdownMenuItem onClick={() => setViewSku(u as UniformSku)}>
+                              <DropdownMenuItem onClick={() => setViewItem(u)}>
                                 <Eye className="mr-2 h-3.5 w-3.5" /> View
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => setEditSku({ id: (u as UniformSku).id, initial: skuToInitial(u as UniformSku) })}>
-                                <Pencil className="mr-2 h-3.5 w-3.5" /> Adjust Stock
+                              <DropdownMenuItem onClick={() => setEditItem({ id: u.id, initial: itemToInitial(u) })}>
+                                <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-danger focus:text-danger" onClick={() => setDeleteSku({ id: (u as UniformSku).id, name: u.name })}>
+                              <DropdownMenuItem className="text-danger focus:text-danger" onClick={() => setDeleteItem({ id: u.id, name: u.name })}>
                                 <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
                               </DropdownMenuItem>
                             </DropdownMenuContent>
@@ -366,30 +466,54 @@ function UniformsPage() {
                 </TableBody>
               </Table>
               <TablePagination
-                page={skuPagination.page}
-                pageSize={skuPagination.pageSize}
-                total={skuPagination.total}
-                totalPages={skuPagination.totalPages}
-                onPageChange={skuPagination.setPage}
-                onPageSizeChange={skuPagination.setPageSize}
+                page={itemPagination.page}
+                pageSize={itemPagination.pageSize}
+                total={itemPagination.total}
+                totalPages={itemPagination.totalPages}
+                onPageChange={itemPagination.setPage}
+                onPageSizeChange={itemPagination.setPageSize}
               />
             </div>
+          </>
+        )}
 
-            {/* Stock log table */}
+        {/* ══════════════════ STOCK IN TAB ══════════════════ */}
+        {tab === "stock-in" && (
+          <>
+            {/* KPIs */}
+            <div className="mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+              <Kpi label="Total Entries" value={String(stockInKpis.totalEntries)} trend="in period" tone="info" />
+              <Kpi label="Total Quantity" value={stockInKpis.totalQty.toLocaleString()} trend="units added" tone="up" />
+              <Kpi label="Unique Items" value={String(new Set(filteredEntries.map((e) => e.item_name)).size)} trend="items affected" tone="info" />
+              <Kpi label="Activities" value={String(new Set(filteredEntries.map((e) => e.activity_name)).size)} trend="activity types" tone="info" />
+            </div>
+
+            {/* Filter bar */}
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <input
+                value={stockInQ}
+                onChange={(e) => setStockInQ(e.target.value)}
+                placeholder="Search item, activity, notes…"
+                className="min-w-[200px] rounded-md border border-black/20 bg-white px-3 py-1.5 text-[12px] text-black/70 placeholder:text-gray-400 outline-none hover:border-gold-3/50 focus:border-gold-3"
+              />
+              <DateRangeFilter value={stockInRange} onChange={setStockInRange} />
+              <span className="ml-auto text-[9px] font-bold text-text-4">
+                {filteredEntries.length} record{filteredEntries.length !== 1 ? "s" : ""}
+              </span>
+            </div>
+
+            {/* Stock entries table */}
             <div className="overflow-hidden rounded-xl border border-border bg-card">
-              <div className="flex items-center justify-between border-b border-border px-3.5 py-2.5">
-                <div className="text-[11px] font-bold text-gold">Stock Log — Sewing / Production</div>
-                <div className="flex items-center gap-2">
-                  <DateRangeFilter value={stockRange} onChange={setStockRange} />
-                  <span className="text-[9px] font-bold text-text-4">{filteredEntries.length} record{filteredEntries.length !== 1 ? "s" : ""}</span>
-                </div>
+              <div className="border-b border-border px-3.5 py-2.5">
+                <div className="text-[11px] font-bold text-gold">Stock In Log</div>
               </div>
               <Table>
                 <TableHeader>
                   <TableRow className="border-b border-border bg-bg-3 hover:bg-bg-3">
                     <TH>Date</TH>
                     <TH>Item</TH>
-                    <TH className="text-right">Qty Sewn</TH>
+                    <TH>Activity</TH>
+                    <TH className="text-right">Qty</TH>
                     <TH>Notes</TH>
                     {isLiveEntries && <TH className="w-10" />}
                   </TableRow>
@@ -397,16 +521,17 @@ function UniformsPage() {
                 <TableBody>
                   {filteredEntries.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="py-6 text-center text-[11px] text-text-3">
+                      <TableCell colSpan={6} className="py-6 text-center text-[11px] text-text-3">
                         No stock entries for this period.
                       </TableCell>
                     </TableRow>
                   ) : entryPagination.pageRows.map((e) => (
                     <TableRow key={e.id} className="border-b border-border hover:bg-bg-2">
-                      <TD className="whitespace-nowrap text-text-2">{fmtDate(e.entered_at)}</TD>
+                      <TD className="whitespace-nowrap text-text-2">{fmtDate(e.created_at)}</TD>
                       <TD className="font-semibold text-foreground">{e.item_name}</TD>
+                      <TD className="text-text-2">{e.activity_name}</TD>
                       <TD className="text-right font-bold text-foreground">{e.quantity.toLocaleString()}</TD>
-                      <TD className="max-w-[200px] truncate text-text-3">{e.notes ?? "—"}</TD>
+                      <TD className="max-w-[200px] truncate text-text-3">{e.description ?? "—"}</TD>
                       {isLiveEntries && (
                         <TD>
                           <button
@@ -435,90 +560,89 @@ function UniformsPage() {
           </>
         )}
 
-        {/* ══════════════════ SALES & ORDERS TAB ══════════════════ */}
-        {tab === "sales" && (
+        {/* ══════════════════ STOCK OUT TAB ══════════════════ */}
+        {tab === "stock-out" && (
           <>
             {/* KPIs */}
-            <div className="mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-              <Kpi label="Total Orders"      value={String(salesKpis.total)}              trend="all time"                tone="info" />
-              <Kpi label="Awaiting Delivery" value={String(salesKpis.pending)}            trend="not yet handed over"     tone="warn" />
-              <Kpi label="Delivered"         value={String(salesKpis.delivered)}          trend="handed to youth"         tone="up"   />
-              <Kpi label="Outstanding"       value={fmtKES(salesKpis.outstanding)}        trend="not yet collected"       tone={salesKpis.outstanding > 0 ? "warn" : "up"} />
+            <div className="mb-4 grid grid-cols-3 gap-2.5 sm:grid-cols-6">
+              <Kpi label="Total Orders"      value={String(stockOutKpis.total)}      trend="all time" tone="info" />
+              <Kpi label="Pending"          value={String(stockOutKpis.pending)}    trend="awaiting approval" tone="warn" />
+              <Kpi label="Approved"         value={String(stockOutKpis.approved)}   trend="ready for payment" tone="info" />
+              <Kpi label="Paid"             value={String(stockOutKpis.paid)}       trend="payment received" tone="up" />
+              <Kpi label="Dispatched"       value={String(stockOutKpis.dispatched)} trend="in transit" tone="gold" />
+              <Kpi label="Delivered"        value={String(stockOutKpis.delivered)}  trend="completed" tone="success" />
             </div>
 
             {/* Filter bar */}
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <input
-                value={salesQ}
-                onChange={(e) => changeSalesQ(e.target.value)}
-                placeholder="Search youth, item, parish…"
+                value={ordersQ}
+                onChange={(e) => changeOrdersQ(e.target.value)}
+                placeholder="Search CDM ID, youth, item, parish…"
                 className="min-w-[200px] rounded-md border border-black/20 bg-white px-3 py-1.5 text-[12px] text-black/70 placeholder:text-gray-400 outline-none hover:border-gold-3/50 focus:border-gold-3"
               />
-              <DateRangeFilter value={salesRange} onChange={changeSalesRange} />
+              <DateRangeFilter value={stockOutRange} onChange={changeOrdersRange} />
               <div className="mx-1 h-4 w-px bg-border" />
-              {(["all", "pending", "paid", "unpaid"] as const).map((f) => (
+              {(["all", "pending", "approved", "paid", "dispatched", "delivered"] as const).map((f) => (
                 <button
                   key={f}
-                  onClick={() => changeSalesFilter(f)}
+                  onClick={() => changeOrdersFilter(f)}
                   className={`rounded-full px-3 py-1 text-[10px] font-bold transition-colors ${
-                    salesFilter === f ? "bg-danger text-white" : "bg-bg-3 text-text-2 hover:bg-bg-4"
+                    ordersFilter === f ? "bg-danger text-white" : "bg-bg-3 text-text-2 hover:bg-bg-4"
                   }`}
                 >
-                  {f === "all" ? "All" : f === "pending" ? "Awaiting Delivery" : f === "paid" ? "Paid" : "Unpaid"}
+                  {f.charAt(0).toUpperCase() + f.slice(1)}
                 </button>
               ))}
               <span className="ml-auto text-[9px] font-bold text-text-4">
-                {pagedSalesTotal} record{pagedSalesTotal !== 1 ? "s" : ""}
+                {pagedOrdersTotal} record{pagedOrdersTotal !== 1 ? "s" : ""}
               </span>
             </div>
 
-            {/* Sales table */}
+            {/* Orders table */}
             <div className="overflow-hidden rounded-xl border border-border bg-card">
               <Table>
                 <TableHeader>
                   <TableRow className="border-b border-border bg-bg-3 hover:bg-bg-3">
-                    <TH>Order Ref</TH>
+                    <TH>Order #</TH>
                     <TH>Date</TH>
                     <TH>Youth</TH>
-                    <TH>Item / Size</TH>
+                    <TH>Item</TH>
                     <TH className="text-right">Qty</TH>
                     <TH className="text-right">Total</TH>
-                    <TH>Stage</TH>
+                    <TH>Status</TH>
                     <TH>Payment</TH>
                     <TH className="w-14" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {pagedSaleRows.length === 0 ? (
+                  {pagedOrderRows.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={9} className="py-6 text-center text-[11px] text-text-3">
-                        No sales for this filter.
+                        No orders for this filter.
                       </TableCell>
                     </TableRow>
-                  ) : pagedSaleRows.map((s) => {
-                    const total       = s.quantity * Number(s.unit_price);
-                    const outstanding = total - Number(s.paid_amount);
+                  ) : pagedOrderRows.map((s) => {
+                    const total = s.quantity * (s.unit_price ?? 0);
                     return (
                       <TableRow key={s.id} className="border-b border-border hover:bg-bg-2">
-                        <TD className="whitespace-nowrap font-mono text-[10px] text-text-3">{s.order_ref}</TD>
+                        <TD className="whitespace-nowrap font-mono text-[10px] text-text-3">{s.order_number}</TD>
                         <TD className="whitespace-nowrap text-text-2">{fmtDate(s.ordered_at)}</TD>
                         <TD className="font-semibold text-foreground">
-                          {s.youth_name}
+                          {s.youth_name ?? s.cdm_id ?? "—"}
                           <div className="font-normal text-text-3">{s.parish_name ?? "—"}</div>
                         </TD>
-                        <TD className="text-text-2">{s.item_name}{s.size ? ` · ${s.size}` : ""}</TD>
+                        <TD className="text-text-2">{s.item_name}</TD>
                         <TD className="text-right text-foreground">{s.quantity}</TD>
                         <TD className="text-right font-semibold text-foreground">{fmtKES(total)}</TD>
                         <TD>
-                          <Pill tone={STAGE_TONE[s.stage]}>{STAGE_LABEL[s.stage]}</Pill>
+                          <Pill tone={STATUS_TONE[s.status]}>{STATUS_LABEL[s.status]}</Pill>
                         </TD>
                         <TD>
                           {s.payment_status === "paid" ? (
-                            <span className="text-[10px] font-bold text-success">✓ {fmtKES(Number(s.paid_amount))}</span>
-                          ) : s.payment_status === "partial" ? (
-                            <span className="text-[10px] font-semibold text-gold">{fmtKES(Number(s.paid_amount))} / {fmtKES(total)}</span>
+                            <span className="text-[10px] font-bold text-success">✓ Paid</span>
                           ) : (
-                            <Pill tone="danger">unpaid</Pill>
+                            <Pill tone="danger">{s.payment_status}</Pill>
                           )}
                         </TD>
                         <TD>
@@ -529,39 +653,39 @@ function UniformsPage() {
                               </button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="min-w-[170px]">
-                              <DropdownMenuItem onClick={() => setViewSale(s)}>
+                              <DropdownMenuItem onClick={() => setViewOrder(s)}>
                                 <Eye className="mr-2 h-3.5 w-3.5" /> View
                               </DropdownMenuItem>
-                              {isLiveSales && (
-                                <DropdownMenuItem onClick={() => setEditSale({ id: s.id, initial: saleToInitial(s) })}>
-                                  <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
+                              {isLiveOrders && s.status === "pending" && (
+                                <DropdownMenuItem onClick={() => approveOrderMut.mutate(s.id)}>
+                                  <BadgeCheck className="mr-2 h-3.5 w-3.5" /> Approve
                                 </DropdownMenuItem>
                               )}
-                              {isLiveSales && (s.stage !== "delivered" && s.stage !== "cancelled" || s.payment_status !== "paid") && (
-                                <DropdownMenuSeparator />
-                              )}
-                              {isLiveSales && s.stage === "placed" && (
-                                <DropdownMenuItem onClick={() => confirmOrderMut.mutate(s.id)}>
-                                  <BadgeCheck className="mr-2 h-3.5 w-3.5" /> Confirm Order
+                              {isLiveOrders && s.status === "approved" && (
+                                <DropdownMenuItem onClick={() => setPayOrder(s)}>
+                                  <Banknote className="mr-2 h-3.5 w-3.5" /> Record Payment
                                 </DropdownMenuItem>
                               )}
-                              {isLiveSales && s.stage === "confirmed" && (
-                                <DropdownMenuItem onClick={() => setDispatchSale(s)}>
-                                  <Truck className="mr-2 h-3.5 w-3.5" /> Confirm Dispatch
+                              {isLiveOrders && s.payment_status === "paid" && s.status === "approved" && (
+                                <DropdownMenuItem onClick={() => setDispatchOrder(s)}>
+                                  <Truck className="mr-2 h-3.5 w-3.5" /> Dispatch
                                 </DropdownMenuItem>
                               )}
-                              {isLiveSales && s.stage === "dispatched" && (
-                                <DropdownMenuItem onClick={() => confirmDeliveryMut.mutate(s.id)}>
+                              {isLiveOrders && s.status === "dispatched" && (
+                                <DropdownMenuItem onClick={() => setDeliveryOrder(s)}>
                                   <PackageCheck className="mr-2 h-3.5 w-3.5" /> Confirm Delivery
                                 </DropdownMenuItem>
                               )}
-                              {isLiveSales && s.payment_status !== "paid" && (
-                                <DropdownMenuItem onClick={() => setPaySale(s)}>
-                                  <Banknote className="mr-2 h-3.5 w-3.5" /> {outstanding > 0 && Number(s.paid_amount) > 0 ? "Top Up Payment" : "Record Payment"}
+                              {isLiveOrders && s.status !== "delivered" && s.status !== "cancelled" && (
+                                <DropdownMenuSeparator />
+                              )}
+                              {isLiveOrders && s.status !== "delivered" && s.status !== "cancelled" && (
+                                <DropdownMenuItem className="text-danger focus:text-danger" onClick={() => cancelOrderMut.mutate(s.id)}>
+                                  <Trash2 className="mr-2 h-3.5 w-3.5" /> Cancel
                                 </DropdownMenuItem>
                               )}
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-danger focus:text-danger" onClick={() => setDeleteSale({ id: s.id, name: s.youth_name })}>
+                              <DropdownMenuItem className="text-danger focus:text-danger" onClick={() => setDeleteOrder({ id: s.id, name: s.order_number })}>
                                 <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
                               </DropdownMenuItem>
                             </DropdownMenuContent>
@@ -572,13 +696,13 @@ function UniformsPage() {
                   })}
                 </TableBody>
               </Table>
-              {pagedSalesTotal > 0 && (
+              {pagedOrdersTotal > 0 && (
                 <TablePagination
-                  page={salesPage}
-                  pageSize={SALES_PAGE_SIZE}
-                  total={pagedSalesTotal}
-                  totalPages={pagedSalesTotalPages}
-                  onPageChange={setSalesPage}
+                  page={ordersPage}
+                  pageSize={uniformSettings.ordersPageSize}
+                  total={pagedOrdersTotal}
+                  totalPages={pagedOrdersTotalPages}
+                  onPageChange={setOrdersPage}
                   onPageSizeChange={() => {}}
                 />
               )}
@@ -589,233 +713,333 @@ function UniformsPage() {
         {/* ══════════════════ REPORTS TAB ══════════════════ */}
         {tab === "reports" && (
           <>
+            {/* Filters */}
             <div className="mb-4 flex items-center gap-3">
               <DateRangeFilter value={reportRange} onChange={setReportRange} />
-              {reportRange.from && (
-                <span className="text-[9px] font-bold text-text-4">
-                  {reportSales.length} sale{reportSales.length !== 1 ? "s" : ""} in range
-                </span>
-              )}
+              <select
+                value={reportItem}
+                onChange={(e) => setReportItem(e.target.value)}
+                className="rounded-md border border-border bg-bg-3 px-2 py-1.5 text-[11px] text-text-2 outline-none hover:border-gold-3/50 focus:border-gold-3"
+              >
+                <option value="all">All Items</option>
+                {itemNames.map((name) => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
             </div>
 
-            <div className="mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-              <Kpi label="Units Sold"  value={String(reportKpis.units)}       trend="uniforms" tone="up"   />
-              <Kpi label="Revenue"     value={fmtKES(reportKpis.revenue)}     trend="expected" tone="info" />
-              <Kpi label="Collected"   value={fmtKES(reportKpis.collected)}   trend="received" tone="up"   />
-              <Kpi label="Outstanding" value={fmtKES(reportKpis.outstanding)} trend="not yet paid" tone={reportKpis.outstanding > 0 ? "warn" : "up"} />
-            </div>
-
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {/* Charts Dashboard */}
+            <div className="mb-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+              {/* Stock Levels by Item */}
               <Card>
                 <div className="border-b border-border px-3.5 py-2.5">
-                  <div className="text-[11px] font-bold text-gold">By Item</div>
-                </div>
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-b border-border bg-bg-3 hover:bg-bg-3">
-                      <TH>Item</TH>
-                      <TH className="text-right">Units</TH>
-                      <TH className="text-right">Revenue</TH>
-                      <TH className="text-right">Owed</TH>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {byItem.length === 0 ? (
-                      <TableRow><TableCell colSpan={4} className="py-4 text-center text-[11px] text-text-3">No sales in this period.</TableCell></TableRow>
-                    ) : byItem.map((row) => (
-                      <TableRow key={row.name} className="border-b border-border hover:bg-bg-2">
-                        <TD className="font-semibold text-foreground">{row.name}</TD>
-                        <TD className="text-right text-text-2">{row.qty}</TD>
-                        <TD className="text-right font-semibold text-foreground">{fmtKES(row.revenue)}</TD>
-                        <TD className="text-right text-danger">
-                          {row.revenue - row.collected > 0 ? fmtKES(row.revenue - row.collected) : "—"}
-                        </TD>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </Card>
-
-              <Card>
-                <div className="border-b border-border px-3.5 py-2.5">
-                  <div className="text-[11px] font-bold text-gold">Daily Activity</div>
-                </div>
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-b border-border bg-bg-3 hover:bg-bg-3">
-                      <TH>Date</TH>
-                      <TH className="text-right">Units</TH>
-                      <TH className="text-right">Revenue</TH>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {byDay.length === 0 ? (
-                      <TableRow><TableCell colSpan={3} className="py-4 text-center text-[11px] text-text-3">No activity in this period.</TableCell></TableRow>
-                    ) : byDay.map((row) => (
-                      <TableRow key={row.date} className="border-b border-border hover:bg-bg-2">
-                        <TD className="text-text-2">{row.date}</TD>
-                        <TD className="text-right text-foreground">{row.qty}</TD>
-                        <TD className="text-right font-semibold text-foreground">{fmtKES(row.revenue)}</TD>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </Card>
-            </div>
-
-            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Card>
-                <div className="border-b border-border px-3.5 py-2.5">
-                  <div className="text-[11px] font-bold text-gold">Production Activity</div>
-                </div>
-                <div className="grid grid-cols-3 divide-x divide-border">
-                  <div className="p-3 text-center">
-                    <div className="text-[18px] font-black text-foreground">{byActivity.sewing.toLocaleString()}</div>
-                    <div className="text-[9px] font-bold uppercase tracking-wide text-text-3">Sewn</div>
-                  </div>
-                  <div className="p-3 text-center">
-                    <div className="text-[18px] font-black text-foreground">{byActivity.logo.toLocaleString()}</div>
-                    <div className="text-[9px] font-bold uppercase tracking-wide text-text-3">Logo'd</div>
-                  </div>
-                  <div className="p-3 text-center">
-                    <div className="text-[18px] font-black text-foreground">{byActivity.branding.toLocaleString()}</div>
-                    <div className="text-[9px] font-bold uppercase tracking-wide text-text-3">Branded</div>
-                  </div>
-                </div>
-              </Card>
-
-              <Card>
-                <div className="border-b border-border px-3.5 py-2.5">
-                  <div className="text-[11px] font-bold text-gold">Order Pipeline</div>
-                </div>
-                <div className="grid grid-cols-4 divide-x divide-border">
-                  {(["placed", "confirmed", "dispatched", "delivered"] as const).map((st) => (
-                    <div key={st} className="p-3 text-center">
-                      <div className="text-[18px] font-black text-foreground">{byStage[st].toLocaleString()}</div>
-                      <div className="text-[9px] font-bold uppercase tracking-wide text-text-3">{STAGE_LABEL[st]}</div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <BarChart3 className="h-3.5 w-3.5 text-gold" />
+                      <div className="text-[11px] font-bold text-gold">Stock Levels by Item</div>
                     </div>
-                  ))}
+                    <button className="rounded-md border border-border bg-bg-3 px-2 py-1 text-[9px] font-bold text-text-2 hover:bg-bg-4">
+                      Export
+                    </button>
+                  </div>
+                </div>
+                <div className="p-3">
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={displayItems.map((i) => ({ name: i.name, available: i.available_stock, stockIn: i.stock_in, stockOut: i.stock_out_delivered }))}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
+                      <XAxis dataKey="name" tick={{ fontSize: 9 }} tickLine={false} axisLine={false} />
+                      <YAxis tick={{ fontSize: 9 }} tickLine={false} axisLine={false} />
+                      <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid var(--color-border)' }} />
+                      <Bar dataKey="available" fill="var(--color-success)" name="Available" />
+                      <Bar dataKey="stockIn" fill="var(--color-info)" name="Stock In" />
+                      <Bar dataKey="stockOut" fill="var(--color-warn)" name="Stock Out" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </Card>
+
+              {/* Revenue Trend */}
+              <Card>
+                <div className="border-b border-border px-3.5 py-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <TrendingUp className="h-3.5 w-3.5 text-gold" />
+                      <div className="text-[11px] font-bold text-gold">Revenue Trend</div>
+                    </div>
+                    <button className="rounded-md border border-border bg-bg-3 px-2 py-1 text-[9px] font-bold text-text-2 hover:bg-bg-4">
+                      Export
+                    </button>
+                  </div>
+                </div>
+                <div className="p-3">
+                  <ResponsiveContainer width="100%" height={200}>
+                    <LineChart data={groupByDay(displayOrders)}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
+                      <XAxis dataKey="date" tick={{ fontSize: 9 }} tickLine={false} axisLine={false} />
+                      <YAxis tick={{ fontSize: 9 }} tickLine={false} axisLine={false} tickFormatter={(v) => fmtKES(v)} />
+                      <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid var(--color-border)' }} formatter={(v: number) => fmtKES(v)} />
+                      <Line type="monotone" dataKey="revenue" stroke="var(--color-gold)" strokeWidth={2} dot={{ r: 3 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
                 </div>
               </Card>
             </div>
+
+            <div className="mb-4 grid grid-cols-1 gap-3 lg:grid-cols-3">
+              {/* Order Status Distribution */}
+              <Card>
+                <div className="border-b border-border px-3.5 py-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <PieChart className="h-3.5 w-3.5 text-gold" />
+                      <div className="text-[11px] font-bold text-gold">Order Status</div>
+                    </div>
+                    <button className="rounded-md border border-border bg-bg-3 px-2 py-1 text-[9px] font-bold text-text-2 hover:bg-bg-4">
+                      Export
+                    </button>
+                  </div>
+                </div>
+                <div className="p-3">
+                  <ResponsiveContainer width="100%" height={180}>
+                    <RechartsPieChart>
+                      <Pie
+                        data={Object.entries(byStatus).map(([name, value]) => ({ name: STATUS_LABEL[name as OrderStatus], value }))}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={40}
+                        outerRadius={60}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        <Cell fill="var(--color-neutral)" key="pending" />
+                        <Cell fill="var(--color-info)" key="approved" />
+                        <Cell fill="var(--color-gold)" key="paid" />
+                        <Cell fill="var(--color-warn)" key="dispatched" />
+                        <Cell fill="var(--color-success)" key="delivered" />
+                        <Cell fill="var(--color-danger)" key="cancelled" />
+                      </Pie>
+                      <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid var(--color-border)' }} />
+                    </RechartsPieChart>
+                  </ResponsiveContainer>
+                  <div className="mt-2 grid grid-cols-3 gap-1 text-[9px]">
+                    <div className="flex items-center gap-1"><div className="h-2 w-2 rounded-full bg-neutral" /> Pending</div>
+                    <div className="flex items-center gap-1"><div className="h-2 w-2 rounded-full bg-info" /> Approved</div>
+                    <div className="flex items-center gap-1"><div className="h-2 w-2 rounded-full bg-gold" /> Paid</div>
+                    <div className="flex items-center gap-1"><div className="h-2 w-2 rounded-full bg-warn" /> Dispatched</div>
+                    <div className="flex items-center gap-1"><div className="h-2 w-2 rounded-full bg-success" /> Delivered</div>
+                    <div className="flex items-center gap-1"><div className="h-2 w-2 rounded-full bg-danger" /> Cancelled</div>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Top Selling Items */}
+              <Card>
+                <div className="border-b border-border px-3.5 py-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="text-[11px] font-bold text-gold">Top Selling Items</div>
+                    <button className="rounded-md border border-border bg-bg-3 px-2 py-1 text-[9px] font-bold text-text-2 hover:bg-bg-4">
+                      Export
+                    </button>
+                  </div>
+                </div>
+                <div className="p-3">
+                  <ResponsiveContainer width="100%" height={180}>
+                    <BarChart data={groupByItem(displayOrders).slice(0, 5)} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
+                      <XAxis type="number" tick={{ fontSize: 9 }} tickLine={false} axisLine={false} tickFormatter={(v) => fmtKES(v)} />
+                      <YAxis dataKey="name" type="category" tick={{ fontSize: 9 }} tickLine={false} axisLine={false} width={80} />
+                      <Tooltip contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid var(--color-border)' }} formatter={(v: number) => fmtKES(v)} />
+                      <Bar dataKey="revenue" fill="var(--color-success)" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </Card>
+
+              {/* Cashflow Summary */}
+              <Card>
+                <div className="border-b border-border px-3.5 py-2.5">
+                  <div className="flex items-center justify-between">
+                    <div className="text-[11px] font-bold text-gold">Cashflow Summary</div>
+                    <button className="rounded-md border border-border bg-bg-3 px-2 py-1 text-[9px] font-bold text-text-2 hover:bg-bg-4">
+                      Export
+                    </button>
+                  </div>
+                </div>
+                <div className="p-3 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] text-text-3">Total Revenue</span>
+                    <span className="text-[11px] font-bold text-foreground">{fmtKES(statsKpis.totalRevenue)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] text-text-3">Paid Revenue</span>
+                    <span className="text-[11px] font-bold text-success">{fmtKES(statsKpis.paidRevenue)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] text-text-3">Pending Revenue</span>
+                    <span className="text-[11px] font-bold text-warn">{fmtKES(statsKpis.pendingRevenue)}</span>
+                  </div>
+                  <div className="h-px bg-border my-2" />
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] text-text-3">Total Orders</span>
+                    <span className="text-[11px] font-semibold text-foreground">{statsKpis.totalOrders}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] text-text-3">Paid Orders</span>
+                    <span className="text-[11px] font-semibold text-success">{statsKpis.paidOrders}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] text-text-3">Total Units</span>
+                    <span className="text-[11px] font-semibold text-foreground">{statsKpis.totalUnits}</span>
+                  </div>
+                </div>
+              </Card>
+            </div>
+
+            {/* Revenue by Item Table */}
+            <Card>
+              <div className="border-b border-border px-3.5 py-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="text-[11px] font-bold text-gold">Revenue by Item</div>
+                  <button className="rounded-md border border-border bg-bg-3 px-2 py-1 text-[9px] font-bold text-text-2 hover:bg-bg-4">
+                    Export CSV
+                  </button>
+                </div>
+              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-b border-border bg-bg-3 hover:bg-bg-3">
+                    <TH>Item</TH>
+                    <TH className="text-right">Units</TH>
+                    <TH className="text-right">Revenue</TH>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {groupByItem(statsOrders).length === 0 ? (
+                    <TableRow><TableCell colSpan={3} className="py-4 text-center text-[11px] text-text-3">No data for this period.</TableCell></TableRow>
+                  ) : groupByItem(statsOrders).map((row) => (
+                    <TableRow key={row.name} className="border-b border-border hover:bg-bg-2">
+                      <TD className="font-semibold text-foreground">{row.name}</TD>
+                      <TD className="text-right text-text-2">{row.qty}</TD>
+                      <TD className="text-right font-semibold text-foreground">{fmtKES(row.revenue)}</TD>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Card>
           </>
         )}
       </div>
 
       {/* ══════════════════ DIALOGS ══════════════════ */}
 
-      {/* Add SKU */}
-      <RecordFormDialog open={addSkuOpen} onOpenChange={setAddSkuOpen} title="Add Uniform Item"
-        fields={skuAddFields} submitLabel="Add Item"
-        onSubmit={(v) => createSkuMut.mutate({ name: v.name, inStock: parseInt(v.inStock || "0", 10), onOrder: parseInt(v.onOrder || "0", 10), unitPrice: v.unitPrice ? parseFloat(v.unitPrice) : null })}
+      {/* Add Item */}
+      <RecordFormDialog open={addItemOpen} onOpenChange={setAddItemOpen} title="Add Uniform Item"
+        fields={itemAddFields} submitLabel="Add Item"
+        onSubmit={(v) => createItemMut.mutate({ name: v.name, swatch: v.swatch || null, unitPrice: v.unitPrice ? parseFloat(v.unitPrice) : null })}
       />
 
-      {/* Edit SKU */}
-      <RecordFormDialog open={!!editSku} onOpenChange={(o) => { if (!o) setEditSku(null); }} title="Adjust Stock"
-        fields={skuEditFields} initial={editSku?.initial} submitLabel="Update Stock"
-        onSubmit={(v) => { if (!editSku) return; updateSkuMut.mutate({ id: editSku.id, input: { name: v.name, inStock: parseInt(v.inStock || "0", 10), onOrder: parseInt(v.onOrder || "0", 10), unitPrice: v.unitPrice ? parseFloat(v.unitPrice) : null } }); }}
+      {/* Edit Item */}
+      <RecordFormDialog open={!!editItem} onOpenChange={(o) => { if (!o) setEditItem(null); }} title="Edit Item"
+        fields={itemEditFields} initial={editItem?.initial} submitLabel="Update"
+        onSubmit={(v) => { if (!editItem) return; updateItemMut.mutate({ id: editItem.id, input: { name: v.name, swatch: v.swatch || null, unitPrice: v.unitPrice ? parseFloat(v.unitPrice) : null } }); }}
       />
 
-      {/* View SKU */}
-      <ViewRecordDialog open={!!viewSku} onOpenChange={(o) => { if (!o) setViewSku(null); }} title={viewSku?.name ?? ""}
-        fields={viewSku ? [
-          { label: "Item Name",  value: viewSku.name },
-          { label: "In Stock",   value: String(viewSku.in_stock) },
-          { label: "On Order",   value: String(viewSku.on_order) },
-          { label: "Unit Price", value: viewSku.unit_price != null ? fmtKES(viewSku.unit_price) : "—" },
-          { label: "Status",     value: <Pill tone={viewSku.in_stock < 50 ? "danger" : viewSku.in_stock < 200 ? "gold" : "success"}>{viewSku.in_stock < 50 ? "Critical" : viewSku.in_stock < 200 ? "Low Stock" : "OK"}</Pill> },
+      {/* View Item */}
+      <ViewRecordDialog open={!!viewItem} onOpenChange={(o) => { if (!o) setViewItem(null); }} title={viewItem?.name ?? ""}
+        fields={viewItem ? [
+          { label: "Item Name",  value: viewItem.name },
+          { label: "Stock In",   value: String(viewItem.stock_in) },
+          { label: "Stock Out",  value: String(viewItem.stock_out_delivered) },
+          { label: "Available", value: String(viewItem.available_stock) },
+          { label: "Pending",    value: String(viewItem.pending_youth_orders) },
+          { label: "Unit Price", value: viewItem.unit_price != null ? fmtKES(viewItem.unit_price) : "—" },
+          { label: "Status",     value: <Pill tone={viewItem.available_stock < uniformSettings.lowStockThreshold ? "danger" : viewItem.available_stock < uniformSettings.mediumStockThreshold ? "gold" : "success"}>{viewItem.available_stock < uniformSettings.lowStockThreshold ? "Critical" : viewItem.available_stock < uniformSettings.mediumStockThreshold ? "Low" : "OK"}</Pill> },
         ] : []}
       />
 
-      {/* Delete SKU */}
-      <AlertDialog open={!!deleteSku} onOpenChange={(o) => { if (!o) setDeleteSku(null); }}>
+      {/* Delete Item */}
+      <AlertDialog open={!!deleteItem} onOpenChange={(o) => { if (!o) setDeleteItem(null); }}>
         <AlertDialogContent className="border-border bg-white">
-          <AlertDialogHeader><AlertDialogTitle>Delete "{deleteSku?.name}"?</AlertDialogTitle><AlertDialogDescription>This cannot be undone.</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction className="bg-danger text-white hover:bg-danger/90" onClick={() => deleteSku && deleteSkuMut.mutate(deleteSku.id)}>Delete</AlertDialogAction></AlertDialogFooter>
+          <AlertDialogHeader><AlertDialogTitle>Delete "{deleteItem?.name}"?</AlertDialogTitle><AlertDialogDescription>This cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction className="bg-danger text-white hover:bg-danger/90" onClick={() => deleteItem && deleteItemMut.mutate(deleteItem.id)}>Delete</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
       {/* Add Stock Entry */}
-      <RecordFormDialog open={addEntryOpen} onOpenChange={setAddEntryOpen} title="Record Production Activity"
-        description="Log sewing, logo application, or branding done today. Only Sewing updates the in-store count — logo/branding are finishing steps on units already counted."
-        fields={buildEntryFields(skuNames)} submitLabel="Record"
+      <RecordFormDialog open={addEntryOpen} onOpenChange={setAddEntryOpen} title="Record Stock In"
+        description="Log stock additions (sewing, supplier delivery, etc.)"
+        fields={buildEntryFields(itemNames, activityNames)} submitLabel="Record"
         onSubmit={(v) => createEntryMut.mutate({
           itemName: v.item,
-          activity: (v.activity || "Sewing").toLowerCase() as "sewing" | "logo" | "branding",
+          activityName: v.activity,
           quantity: parseInt(v.quantity || "0", 10),
-          enteredAt: v.enteredAt || null,
-          notes: v.notes || null,
+          description: v.notes || null,
         })}
       />
 
       {/* Delete Stock Entry */}
       <AlertDialog open={!!deleteEntry} onOpenChange={(o) => { if (!o) setDeleteEntry(null); }}>
         <AlertDialogContent className="border-border bg-white">
-          <AlertDialogHeader><AlertDialogTitle>Delete entry "{deleteEntry?.name}"?</AlertDialogTitle><AlertDialogDescription>This removes the log entry but does not adjust the stock count. This cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogHeader><AlertDialogTitle>Delete entry "{deleteEntry?.name}"?</AlertDialogTitle><AlertDialogDescription>This cannot be undone.</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction className="bg-danger text-white hover:bg-danger/90" onClick={() => deleteEntry && deleteEntryMut.mutate(deleteEntry.id)}>Delete</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Record Sale */}
-      <RecordFormDialog open={saleOpen} onOpenChange={setSaleOpen} title="Record Sale"
-        description="Record a uniform sale to a youth (walk-in / in-person order)."
-        fields={buildSaleFields(skuNames)} submitLabel="Record Sale"
-        onSubmit={(v) => createSaleMut.mutate({ itemName: v.item, youthName: v.youthName, parishName: v.parish || null, size: v.size || null, deliveryLocation: v.deliveryLocation || null, quantity: parseInt(v.quantity || "1", 10), unitPrice: parseFloat(v.unitPrice || "0"), orderedAt: v.orderedAt || null, notes: v.notes || null })}
+      {/* New Order */}
+      <RecordFormDialog open={orderOpen} onOpenChange={setOrderOpen} title="New Order"
+        description="Create a new uniform order"
+        fields={buildOrderFields(itemNames)} submitLabel="Create Order"
+        onSubmit={(v) => createOrderMut.mutate({ itemName: v.item, youthId: null, cdmId: v.cdmId || null, quantity: parseInt(v.quantity || "1", 10), notes: v.notes || null })}
       />
 
-      {/* Edit Sale */}
-      <RecordFormDialog open={!!editSale} onOpenChange={(o) => { if (!o) setEditSale(null); }} title="Edit Sale"
-        fields={buildSaleEditFields(skuNames)} initial={editSale?.initial} submitLabel="Save Changes"
-        onSubmit={(v) => { if (!editSale) return; updateSaleMut.mutate({ id: editSale.id, input: { itemName: v.item, youthName: v.youthName, parishName: v.parish || null, size: v.size || null, deliveryLocation: v.deliveryLocation || null, quantity: parseInt(v.quantity || "1", 10), unitPrice: parseFloat(v.unitPrice || "0"), orderedAt: v.orderedAt || null, deliveredAt: v.deliveredAt || null, notes: v.notes || null } }); }}
-      />
-
-      {/* View Sale */}
-      <ViewRecordDialog open={!!viewSale} onOpenChange={(o) => { if (!o) setViewSale(null); }}
-        title={viewSale ? `${viewSale.youth_name} — ${viewSale.item_name}` : ""}
-        fields={viewSale ? (() => {
-          const total = viewSale.quantity * Number(viewSale.unit_price);
-          const owed  = total - Number(viewSale.paid_amount);
+      {/* View Order */}
+      <ViewRecordDialog open={!!viewOrder} onOpenChange={(o) => { if (!o) setViewOrder(null); }}
+        title={viewOrder ? `${viewOrder.order_number}` : ""}
+        fields={viewOrder ? (() => {
+          const total = viewOrder.quantity * (viewOrder.unit_price ?? 0);
           return [
-            { label: "Order Ref",    value: viewSale.order_ref },
-            { label: "Stage",        value: <Pill tone={STAGE_TONE[viewSale.stage]}>{STAGE_LABEL[viewSale.stage]}</Pill> },
-            { label: "Youth Name",   value: viewSale.youth_name },
-            { label: "Parish",       value: viewSale.parish_name ?? "—" },
-            { label: "Item",         value: viewSale.item_name },
-            { label: "Size",         value: viewSale.size ?? "—" },
-            { label: "Quantity",     value: String(viewSale.quantity) },
-            { label: "Unit Price",   value: fmtKES(viewSale.unit_price) },
-            { label: "Total Amount", value: fmtKES(total) },
-            { label: "Delivery Location", value: viewSale.delivery_location ?? "—", full: true },
-            { label: "Payment",      value: <Pill tone={payTone(viewSale.payment_status)}>{viewSale.payment_status}</Pill> },
-            { label: "Paid",         value: fmtKES(viewSale.paid_amount) },
-            { label: "Outstanding",  value: owed > 0 ? fmtKES(owed) : "Fully paid" },
-            { label: "Ordered",      value: fmtDate(viewSale.ordered_at) },
-            { label: "Confirmed",    value: viewSale.confirmed_at ? fmtDate(viewSale.confirmed_at) : "—" },
-            { label: "Dispatch Contact", value: viewSale.dispatch_contact_name ? `${viewSale.dispatch_contact_name}${viewSale.dispatch_contact_phone ? ` · ${viewSale.dispatch_contact_phone}` : ""}` : "—" },
-            { label: "Dispatch Method",  value: viewSale.dispatch_method ?? "—" },
-            { label: "Delivered",    value: viewSale.delivered_at ? fmtDate(viewSale.delivered_at) : "Not yet delivered" },
-            { label: "Paid At",      value: viewSale.paid_at ? fmtDate(viewSale.paid_at) : "—" },
-            { label: "Notes",        value: viewSale.notes ?? "—", full: true },
+            { label: "Order Number", value: viewOrder.order_number },
+            { label: "Status", value: <Pill tone={STATUS_TONE[viewOrder.status]}>{STATUS_LABEL[viewOrder.status]}</Pill> },
+            { label: "Youth", value: viewOrder.youth_name ?? viewOrder.cdm_id ?? "—" },
+            { label: "Parish", value: viewOrder.parish_name ?? "—" },
+            { label: "Item", value: viewOrder.item_name },
+            { label: "Quantity", value: String(viewOrder.quantity) },
+            { label: "Unit Price", value: fmtKES(viewOrder.unit_price ?? 0) },
+            { label: "Total", value: fmtKES(total) },
+            { label: "Payment Status", value: viewOrder.payment_status },
+            { label: "Payment Method", value: viewOrder.payment_method ?? "—" },
+            { label: "Ordered", value: fmtDate(viewOrder.ordered_at) },
+            { label: "Reviewed", value: viewOrder.reviewed_at ? fmtDate(viewOrder.reviewed_at) : "—" },
+            { label: "Dispatch Contact", value: viewOrder.dispatch_contact_name ?? "—" },
+            { label: "Dispatch Method", value: viewOrder.dispatch_method ?? "—" },
+            { label: "Dispatched", value: viewOrder.dispatched_at ? fmtDate(viewOrder.dispatched_at) : "—" },
+            { label: "Delivered", value: viewOrder.delivered_at ? fmtDate(viewOrder.delivered_at) : "—" },
+            { label: "Notes", value: viewOrder.review_notes ?? "—", full: true },
           ];
         })() : []}
       />
 
-      {/* Delete Sale */}
-      <AlertDialog open={!!deleteSale} onOpenChange={(o) => { if (!o) setDeleteSale(null); }}>
+      {/* Delete Order */}
+      <AlertDialog open={!!deleteOrder} onOpenChange={(o) => { if (!o) setDeleteOrder(null); }}>
         <AlertDialogContent className="border-border bg-white">
-          <AlertDialogHeader><AlertDialogTitle>Delete sale for "{deleteSale?.name}"?</AlertDialogTitle><AlertDialogDescription>This cannot be undone.</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction className="bg-danger text-white hover:bg-danger/90" onClick={() => deleteSale && deleteSaleMut.mutate(deleteSale.id)}>Delete</AlertDialogAction></AlertDialogFooter>
+          <AlertDialogHeader><AlertDialogTitle>Delete order "{deleteOrder?.name}"?</AlertDialogTitle><AlertDialogDescription>This cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction className="bg-danger text-white hover:bg-danger/90" onClick={() => deleteOrder && deleteOrderMut.mutate(deleteOrder.id)}>Delete</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
       {/* Payment dialog */}
-      <PaymentDialog sale={paySale} onClose={() => setPaySale(null)}
-        onConfirm={(id, total) => { payMut.mutate({ id, total }); setPaySale(null); }}
+      <PaymentDialog order={payOrder} onClose={() => setPayOrder(null)}
+        onConfirm={(id, method) => { payMut.mutate({ id, paymentMethod: method }); setPayOrder(null); }}
       />
 
       {/* Dispatch dialog */}
-      <DispatchDialog sale={dispatchSale} onClose={() => setDispatchSale(null)}
+      <DispatchDialog order={dispatchOrder} onClose={() => setDispatchOrder(null)}
         onConfirm={(id, input) => confirmDispatchMut.mutate({ id, ...input })}
+      />
+
+      {/* Delivery dialog */}
+      <DeliveryDialog order={deliveryOrder} onClose={() => setDeliveryOrder(null)}
+        onConfirm={(id, deliveredBy, notes) => confirmDeliveryMut.mutate({ id, deliveredBy, notes })}
       />
     </>
   );
@@ -824,37 +1048,33 @@ function UniformsPage() {
 /* ── payment dialog ── */
 
 function PaymentDialog({
-  sale, onClose, onConfirm,
-}: { sale: UniformSale | null; onClose: () => void; onConfirm: (id: string, totalPaid: number) => void }) {
-  const [amount, setAmount] = useState("");
-  useEffect(() => { if (sale) setAmount(""); }, [sale]);
-  if (!sale) return null;
+  order, onClose, onConfirm,
+}: { order: UniformOrder | null; onClose: () => void; onConfirm: (id: string, paymentMethod?: string) => void }) {
+  const [paymentMethod, setPaymentMethod] = useState("");
+  useEffect(() => { if (order) setPaymentMethod(""); }, [order]);
+  if (!order) return null;
 
-  const total       = sale.quantity * Number(sale.unit_price);
-  const alreadyPaid = Number(sale.paid_amount);
-  const remaining   = total - alreadyPaid;
+  const total = order.quantity * (order.unit_price ?? 0);
 
   return (
-    <Dialog open={!!sale} onOpenChange={(o) => { if (!o) onClose(); }}>
+    <Dialog open={!!order} onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="max-w-sm border-border bg-white text-foreground">
         <DialogHeader>
           <DialogTitle className="text-xl font-black text-gold">Record Payment</DialogTitle>
-          <DialogDescription>{sale.youth_name} — {sale.item_name} × {sale.quantity}</DialogDescription>
+          <DialogDescription>{order.order_number} — {order.item_name} × {order.quantity}</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <div className="rounded-lg border border-border bg-bg-2 p-3 text-[11px] space-y-1.5">
             <div className="flex justify-between"><span className="text-text-3">Total Due</span><span className="font-bold">{fmtKES(total)}</span></div>
-            {alreadyPaid > 0 && <div className="flex justify-between"><span className="text-text-3">Already Paid</span><span className="font-semibold text-success">{fmtKES(alreadyPaid)}</span></div>}
-            <div className="flex justify-between border-t border-border pt-1.5"><span className="font-semibold text-text-2">Outstanding</span><span className="font-bold text-danger">{fmtKES(remaining)}</span></div>
           </div>
           <label className="block space-y-1 text-[10px] font-bold uppercase tracking-wide text-text-3">
-            <span>Amount Received (KES)</span>
-            <Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={String(remaining)} className="mt-1" />
+            <span>Payment Method</span>
+            <Input value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} placeholder="e.g. Cash, M-Pesa, Bank Transfer" className="mt-1" />
           </label>
         </div>
         <DialogFooter>
           <button onClick={onClose} className="rounded-lg border border-border bg-bg-3 px-3 py-2 text-[11px] font-bold text-text-2">Cancel</button>
-          <button onClick={() => { const amt = parseFloat(amount || "0"); if (!amt || amt <= 0) { toast.error("Enter a valid amount"); return; } onConfirm(sale.id, alreadyPaid + amt); }} className="rounded-lg bg-primary px-4 py-2 text-[11px] font-bold text-primary-foreground hover:opacity-90">Record Payment</button>
+          <button onClick={() => { onConfirm(order.id, paymentMethod || null); }} className="rounded-lg bg-primary px-4 py-2 text-[11px] font-bold text-primary-foreground hover:opacity-90">Record Payment</button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -864,29 +1084,30 @@ function PaymentDialog({
 /* ── dispatch dialog ── */
 
 function DispatchDialog({
-  sale, onClose, onConfirm,
+  order, onClose, onConfirm,
 }: {
-  sale: UniformSale | null;
+  order: UniformOrder | null;
   onClose: () => void;
-  onConfirm: (id: string, input: { contactName: string; contactPhone?: string | null; method: string; scheduledAt?: string | null }) => void;
+  onConfirm: (id: string, input: { contactName: string; contactPhone?: string | null; method: string; scheduledAt?: string | null; notes?: string | null }) => void;
 }) {
   const [contactName, setContactName] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [method, setMethod] = useState("");
   const [scheduledAt, setScheduledAt] = useState("");
+  const [notes, setNotes] = useState("");
 
   useEffect(() => {
-    if (sale) { setContactName(""); setContactPhone(""); setMethod(""); setScheduledAt(""); }
-  }, [sale]);
+    if (order) { setContactName(""); setContactPhone(""); setMethod(""); setScheduledAt(""); setNotes(""); }
+  }, [order]);
 
-  if (!sale) return null;
+  if (!order) return null;
 
   return (
-    <Dialog open={!!sale} onOpenChange={(o) => { if (!o) onClose(); }}>
+    <Dialog open={!!order} onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="max-w-sm border-border bg-white text-foreground">
         <DialogHeader>
           <DialogTitle className="text-xl font-black text-gold">Confirm Dispatch</DialogTitle>
-          <DialogDescription>{sale.youth_name} — {sale.item_name} · {sale.order_ref}</DialogDescription>
+          <DialogDescription>{order.order_number} — {order.item_name}</DialogDescription>
         </DialogHeader>
         <div className="space-y-3">
           <label className="block space-y-1 text-[10px] font-bold uppercase tracking-wide text-text-3">
@@ -905,18 +1126,17 @@ function DispatchDialog({
             <span>Expected delivery date</span>
             <Input type="date" value={scheduledAt} onChange={(e) => setScheduledAt(e.target.value)} />
           </label>
-          {sale.delivery_location && (
-            <p className="rounded-lg border border-border bg-bg-2 p-2 text-[11px] text-text-2">
-              <span className="font-bold text-text-3">Deliver to:</span> {sale.delivery_location}
-            </p>
-          )}
+          <label className="block space-y-1 text-[10px] font-bold uppercase tracking-wide text-text-3">
+            <span>Notes</span>
+            <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Additional notes..." />
+          </label>
         </div>
         <DialogFooter>
           <button onClick={onClose} className="rounded-lg border border-border bg-bg-3 px-3 py-2 text-[11px] font-bold text-text-2">Cancel</button>
           <button
             onClick={() => {
               if (!contactName.trim() || !method.trim()) { toast.error("Contact person and method are required"); return; }
-              onConfirm(sale.id, { contactName: contactName.trim(), contactPhone: contactPhone.trim() || null, method: method.trim(), scheduledAt: scheduledAt || null });
+              onConfirm(order.id, { contactName: contactName.trim(), contactPhone: contactPhone.trim() || null, method: method.trim(), scheduledAt: scheduledAt || null, notes: notes.trim() || null });
             }}
             className="rounded-lg bg-primary px-4 py-2 text-[11px] font-bold text-primary-foreground hover:opacity-90"
           >
@@ -928,58 +1148,91 @@ function DispatchDialog({
   );
 }
 
+/* ── delivery dialog ── */
+
+function DeliveryDialog({
+  order, onClose, onConfirm,
+}: {
+  order: UniformOrder | null;
+  onClose: () => void;
+  onConfirm: (id: string, deliveredBy?: string, notes?: string) => void;
+}) {
+  const [deliveredBy, setDeliveredBy] = useState("");
+  const [notes, setNotes] = useState("");
+
+  useEffect(() => {
+    if (order) { setDeliveredBy(""); setNotes(""); }
+  }, [order]);
+
+  if (!order) return null;
+
+  return (
+    <Dialog open={!!order} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-sm border-border bg-white text-foreground">
+        <DialogHeader>
+          <DialogTitle className="text-xl font-black text-gold">Confirm Delivery</DialogTitle>
+          <DialogDescription>{order.order_number} — {order.item_name}</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <label className="block space-y-1 text-[10px] font-bold uppercase tracking-wide text-text-3">
+            <span>Delivered by (recipient name)</span>
+            <Input value={deliveredBy} onChange={(e) => setDeliveredBy(e.target.value)} placeholder="Youth name or recipient" />
+          </label>
+          <label className="block space-y-1 text-[10px] font-bold uppercase tracking-wide text-text-3">
+            <span>Notes</span>
+            <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Delivery notes..." />
+          </label>
+        </div>
+        <DialogFooter>
+          <button onClick={onClose} className="rounded-lg border border-border bg-bg-3 px-3 py-2 text-[11px] font-bold text-text-2">Cancel</button>
+          <button onClick={() => { onConfirm(order.id, deliveredBy || null, notes || null); }} className="rounded-lg bg-primary px-4 py-2 text-[11px] font-bold text-primary-foreground hover:opacity-90">Confirm Delivery</button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 /* ── script — types, constants & helpers ── */
 
-type TabId       = "stock" | "sales" | "reports";
-type SalesFilter = "all" | "pending" | "paid" | "unpaid";
+type TabId = "status" | "stock-in" | "stock-out" | "reports";
+type OrdersFilter = "all" | "pending" | "approved" | "paid" | "dispatched" | "delivered";
 
 const EMPTY_RANGE: DateRange = { from: undefined, to: undefined };
-const parishOptions = ORGANIZATION.flatMap((d) => d.parishes.map((p) => p.name));
 
-const skuAddFields: FieldDef[] = [
+const isLiveItems   = true;
+const isLiveEntries = true;
+const isLiveOrders  = true;
+
+const itemAddFields: FieldDef[] = [
   { key: "name",      label: "Item Name",                required: true, placeholder: "e.g. T-Shirt — Green" },
-  { key: "inStock",   label: "In Stock",                 type: "number", required: true, placeholder: "0" },
-  { key: "onOrder",   label: "On Order (from supplier)", type: "number", placeholder: "0" },
+  { key: "swatch",    label: "Color Swatch (CSS)",       placeholder: "e.g. #00ff00 or var(--color-success)" },
   { key: "unitPrice", label: "Unit Price (KES)",         type: "number", placeholder: "e.g. 450" },
 ];
 
-const skuEditFields: FieldDef[] = [
+const itemEditFields: FieldDef[] = [
   { key: "name",      label: "Item Name",                required: true },
-  { key: "inStock",   label: "In Stock",                 type: "number", required: true },
-  { key: "onOrder",   label: "On Order (from supplier)", type: "number", required: true },
+  { key: "swatch",    label: "Color Swatch (CSS)" },
   { key: "unitPrice", label: "Unit Price (KES)",         type: "number" },
 ];
 
-function buildEntryFields(skuNames: string[]): FieldDef[] {
-  const items = skuNames.length > 0 ? skuNames : MOCK_STOCK.map((s) => s.name);
+function buildEntryFields(itemNames: string[], activityNames: string[]): FieldDef[] {
+  const items = itemNames.length > 0 ? itemNames : MOCK_ITEMS.map((s) => s.name);
+  const activities = activityNames.length > 0 ? activityNames : ["Sewn", "Received from Supplier", "Damaged Return", "Audit Adjustment"];
   return [
-    { key: "item",      label: "Item / SKU",    type: "select", required: true, options: items },
-    { key: "activity",  label: "Activity",      type: "select", required: true, options: ["Sewing", "Logo", "Branding"] },
-    { key: "quantity",  label: "Quantity",      type: "number", required: true, placeholder: "e.g. 50" },
-    { key: "enteredAt", label: "Date (leave blank for today)", type: "date" },
-    { key: "notes",     label: "Notes",         type: "textarea", full: true, placeholder: "Batch #, sizes breakdown…" },
+    { key: "item",      label: "Item",           type: "select", required: true, options: items },
+    { key: "activity",  label: "Activity",       type: "select", required: true, options: activities },
+    { key: "quantity",  label: "Quantity",       type: "number", required: true, placeholder: "e.g. 50" },
+    { key: "notes",     label: "Notes",          type: "textarea", full: true, placeholder: "Batch #, sizes breakdown…" },
   ];
 }
 
-function buildSaleFields(skuNames: string[]): FieldDef[] {
-  const items = skuNames.length > 0 ? skuNames : MOCK_STOCK.map((s) => s.name);
+function buildOrderFields(itemNames: string[]): FieldDef[] {
+  const items = itemNames.length > 0 ? itemNames : MOCK_ITEMS.map((s) => s.name);
   return [
-    { key: "youthName", label: "Youth Name",       required: true, placeholder: "Full name" },
-    { key: "parish",    label: "Parish",            type: "select", options: parishOptions },
-    { key: "item",      label: "Item / SKU",        type: "select", required: true, options: items },
-    { key: "size",      label: "Size",               type: "select", options: ["S", "M", "L", "XL", "XXL"] },
-    { key: "quantity",  label: "Quantity",          type: "number", required: true, placeholder: "1" },
-    { key: "unitPrice", label: "Unit Price (KES)",  type: "number", placeholder: "e.g. 450" },
-    { key: "deliveryLocation", label: "Delivery Location", full: true, placeholder: "e.g. St. James Cathedral, Sunday Mass" },
-    { key: "orderedAt", label: "Order Date",        type: "date" },
-    { key: "notes",     label: "Notes",             type: "textarea", full: true },
-  ];
-}
-
-function buildSaleEditFields(skuNames: string[]): FieldDef[] {
-  return [
-    ...buildSaleFields(skuNames),
-    { key: "deliveredAt", label: "Delivery Date (blank = not yet delivered)", type: "date" },
+    { key: "item",      label: "Item",           type: "select", required: true, options: items },
+    { key: "cdmId",     label: "CDM ID",         placeholder: "CDM-XXXX" },
+    { key: "quantity",  label: "Quantity",       type: "number", required: true, placeholder: "1" },
+    { key: "notes",     label: "Notes",          type: "textarea", full: true },
   ];
 }
 
@@ -988,55 +1241,43 @@ const fmtDate = (iso: string) =>
 
 const fmtKES = (n: number) => `KES ${Math.round(n).toLocaleString()}`;
 
-const payTone = (s: PaymentStatus): "success" | "gold" | "danger" =>
-  s === "paid" ? "success" : s === "partial" ? "gold" : "danger";
-
-function groupByItem(sales: UniformSale[]) {
-  const m = new Map<string, { qty: number; revenue: number; collected: number }>();
-  for (const s of sales) {
-    const e = m.get(s.item_name) ?? { qty: 0, revenue: 0, collected: 0 };
-    m.set(s.item_name, { qty: e.qty + s.quantity, revenue: e.revenue + s.quantity * Number(s.unit_price), collected: e.collected + Number(s.paid_amount) });
+function groupByItem(orders: UniformOrder[]) {
+  const m = new Map<string, { qty: number; revenue: number }>();
+  for (const s of orders) {
+    const e = m.get(s.item_name) ?? { qty: 0, revenue: 0 };
+    m.set(s.item_name, { qty: e.qty + s.quantity, revenue: e.revenue + s.quantity * (s.unit_price ?? 0) });
   }
   return Array.from(m.entries()).map(([name, v]) => ({ name, ...v })).sort((a, b) => b.revenue - a.revenue);
 }
 
-function groupByDay(sales: UniformSale[]) {
+function groupByDay(orders: UniformOrder[]) {
   const m = new Map<string, { qty: number; revenue: number }>();
-  for (const s of sales) {
+  for (const s of orders) {
     const key = fmtDate(s.ordered_at);
     const e   = m.get(key) ?? { qty: 0, revenue: 0 };
-    m.set(key, { qty: e.qty + s.quantity, revenue: e.revenue + s.quantity * Number(s.unit_price) });
+    m.set(key, { qty: e.qty + s.quantity, revenue: e.revenue + s.quantity * (s.unit_price ?? 0) });
   }
   return Array.from(m.entries()).map(([date, v]) => ({ date, ...v }))
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 30);
 }
 
-const skuToInitial = (s: UniformSku): Record<string, string> => ({
-  name: s.name, inStock: String(s.in_stock), onOrder: String(s.on_order),
-  unitPrice: s.unit_price != null ? String(s.unit_price) : "",
+const itemToInitial = (s: UniformItemWithStock): Record<string, string> => ({
+  name: s.name, swatch: s.swatch ?? "", unitPrice: s.unit_price != null ? String(s.unit_price) : "",
 });
 
-const saleToInitial = (s: UniformSale): Record<string, string> => ({
-  youthName: s.youth_name, parish: s.parish_name ?? "", item: s.item_name,
-  size: s.size ?? "",
-  quantity: String(s.quantity), unitPrice: String(s.unit_price),
-  deliveryLocation: s.delivery_location ?? "",
-  orderedAt: s.ordered_at ? s.ordered_at.split("T")[0] : "",
-  deliveredAt: s.delivered_at ? s.delivered_at.split("T")[0] : "",
-  notes: s.notes ?? "",
-});
-
-const STAGE_TONE: Record<OrderStage, "neutral" | "info" | "gold" | "success" | "danger"> = {
-  placed: "neutral",
-  confirmed: "info",
+const STATUS_TONE: Record<OrderStatus, "neutral" | "info" | "gold" | "success" | "danger"> = {
+  pending: "neutral",
+  approved: "info",
+  paid: "gold",
   dispatched: "gold",
   delivered: "success",
   cancelled: "danger",
 };
 
-const STAGE_LABEL: Record<OrderStage, string> = {
-  placed: "Placed",
-  confirmed: "Confirmed",
+const STATUS_LABEL: Record<OrderStatus, string> = {
+  pending: "Pending",
+  approved: "Approved",
+  paid: "Paid",
   dispatched: "Dispatched",
   delivered: "Delivered",
   cancelled: "Cancelled",
@@ -1044,32 +1285,36 @@ const STAGE_LABEL: Record<OrderStage, string> = {
 
 /* ── mock data ── */
 
-const MOCK_STOCK = [
-  { id: "", name: "T-Shirt — Green",     swatch: "var(--color-success)", in_stock: 480, on_order: 200, unit_price: 450, created_at: "", updated_at: "" },
-  { id: "", name: "T-Shirt — Gold",      swatch: "var(--color-gold)",    in_stock: 120, on_order: 350, unit_price: 450, created_at: "", updated_at: "" },
-  { id: "", name: "Cap — Embroidered",   swatch: "var(--color-bg-4)",    in_stock: 240, on_order: 100, unit_price: 350, created_at: "", updated_at: "" },
-  { id: "", name: "Sash — Mission Week", swatch: "var(--color-danger)",  in_stock:  60, on_order: 180, unit_price: 250, created_at: "", updated_at: "" },
+const MOCK_ITEMS: UniformItemWithStock[] = [
+  { id: "", name: "T-Shirt — Green",     swatch: "var(--color-success)", unit_price: 450, created_at: "", updated_at: "", stock_in: 480, stock_out_delivered: 120, pending_youth_orders: 30, available_stock: 360 },
+  { id: "", name: "T-Shirt — Gold",      swatch: "var(--color-gold)",    unit_price: 450, created_at: "", updated_at: "", stock_in: 120, stock_out_delivered: 50,  pending_youth_orders: 20, available_stock: 70 },
+  { id: "", name: "Cap — Embroidered",   swatch: "var(--color-bg-4)",    unit_price: 350, created_at: "", updated_at: "", stock_in: 240, stock_out_delivered: 80, pending_youth_orders: 10, available_stock: 160 },
+  { id: "", name: "Sash — Mission Week", swatch: "var(--color-danger)",  unit_price: 250, created_at: "", updated_at: "", stock_in: 60,  stock_out_delivered: 20, pending_youth_orders: 5,  available_stock: 40 },
 ];
 
 const MOCK_ENTRIES: StockEntry[] = [
-  { id: "e1", sku_id: null, item_name: "T-Shirt — Green",     quantity: 50, activity: "sewing", notes: "Batch #3 — S×20 M×20 L×10", entered_at: "2026-06-19T09:00:00Z", created_at: "2026-06-19T09:00:00Z" },
-  { id: "e2", sku_id: null, item_name: "T-Shirt — Gold",      quantity: 30, activity: "sewing", notes: "Batch #2",                   entered_at: "2026-06-18T10:00:00Z", created_at: "2026-06-18T10:00:00Z" },
-  { id: "e3", sku_id: null, item_name: "Cap — Embroidered",   quantity: 20, activity: "logo",   notes: null,                         entered_at: "2026-06-17T11:00:00Z", created_at: "2026-06-17T11:00:00Z" },
-  { id: "e4", sku_id: null, item_name: "T-Shirt — Green",     quantity: 100, activity: "sewing", notes: "Initial batch",             entered_at: "2026-06-01T08:00:00Z", created_at: "2026-06-01T08:00:00Z" },
-  { id: "e5", sku_id: null, item_name: "Sash — Mission Week", quantity: 60, activity: "branding", notes: "Mission week batch",         entered_at: "2026-06-05T08:00:00Z", created_at: "2026-06-05T08:00:00Z" },
+  { id: "e1", item_id: null, item_name: "T-Shirt — Green",     activity_id: null, activity_name: "Sewn", quantity: 50, description: "Batch #3", created_at: "2026-06-19T09:00:00Z" },
+  { id: "e2", item_id: null, item_name: "T-Shirt — Gold",      activity_id: null, activity_name: "Sewn", quantity: 30, description: "Batch #2", created_at: "2026-06-18T10:00:00Z" },
+  { id: "e3", item_id: null, item_name: "Cap — Embroidered",   activity_id: null, activity_name: "Sewn", quantity: 20, description: null, created_at: "2026-06-17T11:00:00Z" },
+  { id: "e4", item_id: null, item_name: "T-Shirt — Green",     activity_id: null, activity_name: "Received from Supplier", quantity: 100, description: "Initial batch", created_at: "2026-06-01T08:00:00Z" },
+  { id: "e5", item_id: null, item_name: "Sash — Mission Week", activity_id: null, activity_name: "Sewn", quantity: 60, description: "Mission week batch", created_at: "2026-06-05T08:00:00Z" },
 ];
 
-const SALE_DEFAULTS = {
-  order_ref: "ORD-2026-00000", stage: "delivered" as const, delivery_location: null,
-  confirmed_at: null, confirmed_by: null, dispatch_contact_name: null, dispatch_contact_phone: null,
-  dispatch_method: null, dispatch_scheduled_at: null, dispatched_at: null, delivered_by: null,
-  youth_id: null, size: null,
+const ORDER_DEFAULTS = {
+  order_number: "ORD-2026-00000", ordered_by: null, youth_id: null, cdm_id: null,
+  reviewed_at: null, reviewed_by: null, review_notes: null,
+  payment_status: "pending" as const, paid_at: null, paid_by: null, payment_method: null,
+  dispatch_contact_name: null, dispatch_contact_phone: null, dispatch_method: null,
+  dispatch_scheduled_at: null, dispatched_at: null, dispatch_by: null, dispatch_notes: null,
+  delivered_at: null, delivered_by: null, delivery_notes: null,
+  created_by: null, updated_by: null, deleted_at: null, deleted_by: null,
+  status: "pending" as const,
 };
 
-const MOCK_SALES: UniformSale[] = [
-  { id: "m1", sku_id: null, item_name: "T-Shirt — Green",     youth_name: "John Kamau",   parish_name: "Kagio",    quantity: 1, unit_price: 450, ordered_at: "2026-06-15T09:00:00Z", delivered_at: "2026-06-17T14:00:00Z", paid_at: "2026-06-17T14:00:00Z", paid_amount: 450, payment_status: "paid",    notes: null, created_at: "2026-06-15T09:00:00Z", updated_at: "2026-06-17T14:00:00Z", ...SALE_DEFAULTS },
-  { id: "m2", sku_id: null, item_name: "T-Shirt — Gold",      youth_name: "Mary Wanjiku", parish_name: "Maragwā",  quantity: 1, unit_price: 450, ordered_at: "2026-06-16T10:00:00Z", delivered_at: null,                  paid_at: null,                   paid_amount: 0,   payment_status: "unpaid",  notes: null, created_at: "2026-06-16T10:00:00Z", updated_at: "2026-06-16T10:00:00Z", ...SALE_DEFAULTS, stage: "placed" },
-  { id: "m3", sku_id: null, item_name: "Cap — Embroidered",   youth_name: "Peter Otieno", parish_name: "Kangari",  quantity: 2, unit_price: 350, ordered_at: "2026-06-17T11:00:00Z", delivered_at: "2026-06-19T09:00:00Z", paid_at: null,                   paid_amount: 350, payment_status: "partial", notes: null, created_at: "2026-06-17T11:00:00Z", updated_at: "2026-06-19T09:00:00Z", ...SALE_DEFAULTS },
-  { id: "m4", sku_id: null, item_name: "T-Shirt — Green",     youth_name: "Grace Njoki",  parish_name: "Kiria-Ini",quantity: 1, unit_price: 450, ordered_at: "2026-06-18T08:00:00Z", delivered_at: null,                  paid_at: null,                   paid_amount: 0,   payment_status: "unpaid",  notes: null, created_at: "2026-06-18T08:00:00Z", updated_at: "2026-06-18T08:00:00Z", ...SALE_DEFAULTS, stage: "confirmed" },
-  { id: "m5", sku_id: null, item_name: "Sash — Mission Week", youth_name: "James Mutua",  parish_name: "Kagio",    quantity: 1, unit_price: 250, ordered_at: "2026-06-19T07:00:00Z", delivered_at: "2026-06-19T12:00:00Z", paid_at: "2026-06-19T12:00:00Z",  paid_amount: 250, payment_status: "paid",    notes: null, created_at: "2026-06-19T07:00:00Z", updated_at: "2026-06-19T12:00:00Z", ...SALE_DEFAULTS },
+const MOCK_ORDERS: UniformOrder[] = [
+  { id: "m1", ...ORDER_DEFAULTS, order_number: "ORD-2026-00001", item_id: null, item_name: "T-Shirt — Green", youth_name: "John Kamau", parish_name: "Kagio", quantity: 1, unit_price: 450, ordered_at: "2026-06-15T09:00:00Z", status: "delivered", payment_status: "paid" },
+  { id: "m2", ...ORDER_DEFAULTS, order_number: "ORD-2026-00002", item_id: null, item_name: "T-Shirt — Gold", youth_name: "Mary Wanjiku", parish_name: "Maragwā", quantity: 1, unit_price: 450, ordered_at: "2026-06-16T10:00:00Z", status: "pending", payment_status: "pending" },
+  { id: "m3", ...ORDER_DEFAULTS, order_number: "ORD-2026-00003", item_id: null, item_name: "Cap — Embroidered", youth_name: "Peter Otieno", parish_name: "Kangari", quantity: 2, unit_price: 350, ordered_at: "2026-06-17T11:00:00Z", status: "approved", payment_status: "paid" },
+  { id: "m4", ...ORDER_DEFAULTS, order_number: "ORD-2026-00004", item_id: null, item_name: "T-Shirt — Green", youth_name: "Grace Njoki", parish_name: "Kiria-Ini", quantity: 1, unit_price: 450, ordered_at: "2026-06-18T08:00:00Z", status: "dispatched", payment_status: "paid" },
+  { id: "m5", ...ORDER_DEFAULTS, order_number: "ORD-2026-00005", item_id: null, item_name: "Sash — Mission Week", youth_name: "James Mutua", parish_name: "Kagio", quantity: 1, unit_price: 250, ordered_at: "2026-06-19T07:00:00Z", status: "delivered", payment_status: "paid" },
 ];
