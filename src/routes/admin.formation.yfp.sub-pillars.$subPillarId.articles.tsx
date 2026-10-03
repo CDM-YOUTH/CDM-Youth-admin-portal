@@ -121,8 +121,13 @@ function YFPWeeklyArticles() {
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [dateRange, setDateRange] = useState<DateRange>({ from: undefined, to: undefined });
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [confirmAction, setConfirmAction] = useState<{ type: "publish" | "schedule" | "delete"; articleId: string } | null>(null);
-  const [articleMaterials, setArticleMaterials] = useState<Array<{ url: string; name: string; type: "image" | "pdf"; uploadedAt: string }>>([]);
+  const [confirmAction, setConfirmAction] = useState<{
+    type: "publish" | "schedule" | "delete";
+    articleId: string;
+  } | null>(null);
+  const [articleMaterials, setArticleMaterials] = useState<
+    Array<{ url: string; name: string; type: "image" | "pdf"; uploadedAt: string }>
+  >([]);
   const [uploadingMaterial, setUploadingMaterial] = useState(false);
 
   const filteredArticles = useMemo(() => {
@@ -144,19 +149,26 @@ function YFPWeeklyArticles() {
       filtered = filtered.filter((a) => {
         const titleMatch = a.article_title?.toLowerCase().includes(query) || false;
         const liturgicalMatch = a.liturgical_calendar_title?.toLowerCase().includes(query) || false;
-        const scriptureMatch = a.scripture_citations?.some((s: any) =>
-          s.reference?.toLowerCase().includes(query)
-        ) || false;
+        const scriptureMatch =
+          a.scripture_citations?.some((s: any) => s.reference?.toLowerCase().includes(query)) ||
+          false;
         const handbookMatch = a.handbook_page_reference?.toLowerCase().includes(query) || false;
-        const reflectionMatch = a.guided_reflection_questions?.some((q: string) =>
-          q.toLowerCase().includes(query)
-        ) || false;
+        const reflectionMatch =
+          a.guided_reflection_questions?.some((q: string) => q.toLowerCase().includes(query)) ||
+          false;
         const directiveMatch = a.pastoral_directive?.toLowerCase().includes(query) || false;
-        const materialMatch = a.materials?.some((m: any) =>
-          m.name?.toLowerCase().includes(query)
-        ) || false;
+        const materialMatch =
+          a.materials?.some((m: any) => m.name?.toLowerCase().includes(query)) || false;
 
-        return titleMatch || liturgicalMatch || scriptureMatch || handbookMatch || reflectionMatch || directiveMatch || materialMatch;
+        return (
+          titleMatch ||
+          liturgicalMatch ||
+          scriptureMatch ||
+          handbookMatch ||
+          reflectionMatch ||
+          directiveMatch ||
+          materialMatch
+        );
       });
     }
 
@@ -179,11 +191,16 @@ function YFPWeeklyArticles() {
         month: new Date(values.sunday_date).toLocaleString("default", { month: "long" }),
         liturgical_calendar_title: values.liturgical_calendar_title || undefined,
         scripture_citations: values.scripture_citations
-          ? values.scripture_citations.split(",").map((s: string) => ({ reference: s.trim(), text: "" }))
+          ? values.scripture_citations
+              .split(",")
+              .map((s: string) => ({ reference: s.trim(), text: "" }))
           : [],
         handbook_page_reference: values.handbook_page_reference || undefined,
         guided_reflection_questions: values.guided_reflection_questions
-          ? values.guided_reflection_questions.split("\n").map((q: string) => q.trim()).filter(Boolean)
+          ? values.guided_reflection_questions
+              .split("\n")
+              .map((q: string) => q.trim())
+              .filter(Boolean)
           : [],
         pastoral_directive: values.pastoral_directive || undefined,
         status: "Draft",
@@ -208,11 +225,16 @@ function YFPWeeklyArticles() {
         sunday_date: values.sunday_date,
         liturgical_calendar_title: values.liturgical_calendar_title || undefined,
         scripture_citations: values.scripture_citations
-          ? values.scripture_citations.split(",").map((s: string) => ({ reference: s.trim(), text: "" }))
+          ? values.scripture_citations
+              .split(",")
+              .map((s: string) => ({ reference: s.trim(), text: "" }))
           : [],
         handbook_page_reference: values.handbook_page_reference || undefined,
         guided_reflection_questions: values.guided_reflection_questions
-          ? values.guided_reflection_questions.split("\n").map((q: string) => q.trim()).filter(Boolean)
+          ? values.guided_reflection_questions
+              .split("\n")
+              .map((q: string) => q.trim())
+              .filter(Boolean)
           : [],
         pastoral_directive: values.pastoral_directive || undefined,
         materials: articleMaterials,
@@ -293,7 +315,12 @@ function YFPWeeklyArticles() {
       const isImage = file.type.startsWith("image/");
       setArticleMaterials([
         ...articleMaterials,
-        { url: data.publicUrl, name: file.name, type: isImage ? "image" : "pdf", uploadedAt: new Date().toISOString() },
+        {
+          url: data.publicUrl,
+          name: file.name,
+          type: isImage ? "image" : "pdf",
+          uploadedAt: new Date().toISOString(),
+        },
       ]);
       toast.success(`${file.name} uploaded successfully`);
     } catch (err) {
@@ -310,7 +337,8 @@ function YFPWeeklyArticles() {
       week_number: selectedArticle.week_number.toString(),
       sunday_date: selectedArticle.sunday_date,
       liturgical_calendar_title: selectedArticle.liturgical_calendar_title || "",
-      scripture_citations: selectedArticle.scripture_citations?.map((s: any) => s.reference).join(", ") || "",
+      scripture_citations:
+        selectedArticle.scripture_citations?.map((s: any) => s.reference).join(", ") || "",
       handbook_page_reference: selectedArticle.handbook_page_reference || "",
       guided_reflection_questions: selectedArticle.guided_reflection_questions?.join("\n") || "",
       pastoral_directive: selectedArticle.pastoral_directive || "",
@@ -330,7 +358,10 @@ function YFPWeeklyArticles() {
         description="Formation — Weekly Articles"
         action={
           <div className="flex items-center gap-3">
-            <button onClick={() => setCreateDialogOpen(true)} className="inline-flex items-center gap-2 rounded-lg bg-danger px-4 py-2 text-sm font-bold text-white hover:opacity-90">
+            <button
+              onClick={() => setCreateDialogOpen(true)}
+              className="inline-flex items-center gap-2 rounded-lg bg-danger px-4 py-2 text-sm font-bold text-white hover:opacity-90"
+            >
               <Plus className="h-4 w-4" />
               Add Article
             </button>
@@ -521,7 +552,8 @@ function YFPWeeklyArticles() {
               </select>
               <div className="text-slate-600">
                 <span className="font-semibold">
-                  {paginatedArticles.length > 0 ? startIdx + 1 : 0}-{Math.min(startIdx + itemsPerPage, filteredArticles.length)}
+                  {paginatedArticles.length > 0 ? startIdx + 1 : 0}-
+                  {Math.min(startIdx + itemsPerPage, filteredArticles.length)}
                 </span>
                 <span> of {filteredArticles.length} articles</span>
               </div>
@@ -599,12 +631,19 @@ function YFPWeeklyArticles() {
               {isEditingPanel ? (
                 <div className="space-y-3">
                   {ARTICLE_FORM_FIELDS.map((field) => (
-                    <div key={field.key} className="border-l-4 border-amber-400 bg-white rounded p-3 pl-3">
-                      <label className="text-xs font-bold uppercase text-slate-600 block mb-1">{field.label}</label>
+                    <div
+                      key={field.key}
+                      className="border-l-4 border-amber-400 bg-white rounded p-3 pl-3"
+                    >
+                      <label className="text-xs font-bold uppercase text-slate-600 block mb-1">
+                        {field.label}
+                      </label>
                       {field.type === "textarea" ? (
                         <textarea
                           value={editingValues[field.key] || ""}
-                          onChange={(e) => setEditingValues({ ...editingValues, [field.key]: e.target.value })}
+                          onChange={(e) =>
+                            setEditingValues({ ...editingValues, [field.key]: e.target.value })
+                          }
                           className="w-full rounded-lg border border-slate-200 px-2 py-1 text-xs mt-1 resize-both min-h-24 focus:border-gold-3 focus:text-black outline-none"
                           placeholder={field.placeholder}
                         />
@@ -612,20 +651,29 @@ function YFPWeeklyArticles() {
                         <input
                           type="number"
                           value={editingValues[field.key] || ""}
-                          onChange={(e) => setEditingValues({ ...editingValues, [field.key]: e.target.value })}
+                          onChange={(e) =>
+                            setEditingValues({ ...editingValues, [field.key]: e.target.value })
+                          }
                           className="w-full rounded-lg border border-slate-200 px-2 py-1 text-xs mt-1 focus:border-gold-3 focus:text-black outline-none"
                         />
                       ) : field.type === "date" ? (
                         <input
                           type="date"
                           value={editingValues[field.key] || ""}
-                          onChange={(e) => setEditingValues({ ...editingValues, [field.key]: e.target.value })}
+                          onChange={(e) =>
+                            setEditingValues({ ...editingValues, [field.key]: e.target.value })
+                          }
                           className="w-full rounded-lg border border-slate-200 px-2 py-1 text-xs mt-1 focus:border-gold-3 focus:text-black outline-none"
                         />
                       ) : field.type === "file" ? (
                         <div className="space-y-2">
                           <label className="inline-flex w-fit cursor-pointer items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100">
-                            <Icon icon={uploadingMaterial ? "mdi:loading" : "mdi:upload"} className={uploadingMaterial ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} />
+                            <Icon
+                              icon={uploadingMaterial ? "mdi:loading" : "mdi:upload"}
+                              className={
+                                uploadingMaterial ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"
+                              }
+                            />
                             {uploadingMaterial ? "Uploading…" : "Choose file"}
                             <input
                               type="file"
@@ -638,7 +686,10 @@ function YFPWeeklyArticles() {
                           {articleMaterials.length > 0 && (
                             <div className="grid grid-cols-2 gap-2">
                               {articleMaterials.map((material, idx) => (
-                                <div key={idx} className="border border-slate-200 rounded p-2 flex items-center justify-between text-xs">
+                                <div
+                                  key={idx}
+                                  className="border border-slate-200 rounded p-2 flex items-center justify-between text-xs"
+                                >
                                   <span className="truncate">{material.name}</span>
                                   <button
                                     onClick={() => {
@@ -658,7 +709,9 @@ function YFPWeeklyArticles() {
                         <input
                           type="text"
                           value={editingValues[field.key] || ""}
-                          onChange={(e) => setEditingValues({ ...editingValues, [field.key]: e.target.value })}
+                          onChange={(e) =>
+                            setEditingValues({ ...editingValues, [field.key]: e.target.value })
+                          }
                           className="w-full rounded-lg border border-slate-200 px-2 py-1 text-xs mt-1 focus:border-gold-3 focus:text-black outline-none"
                           placeholder={field.placeholder}
                         />
@@ -673,7 +726,8 @@ function YFPWeeklyArticles() {
                     <h3 className="text-xs font-bold uppercase text-slate-700 mb-3">
                       Scripture & Manual Reference
                     </h3>
-                    {selectedArticle.scripture_citations && selectedArticle.scripture_citations.length > 0 ? (
+                    {selectedArticle.scripture_citations &&
+                    selectedArticle.scripture_citations.length > 0 ? (
                       <div className="space-y-1">
                         {selectedArticle.scripture_citations.map((s: any) => (
                           <p key={s.reference} className="text-sm text-slate-900">
@@ -696,16 +750,19 @@ function YFPWeeklyArticles() {
                     <h3 className="text-xs font-bold uppercase text-slate-700 mb-3">
                       Reflection Questions
                     </h3>
-                    {selectedArticle.guided_reflection_questions && selectedArticle.guided_reflection_questions.length > 0 ? (
+                    {selectedArticle.guided_reflection_questions &&
+                    selectedArticle.guided_reflection_questions.length > 0 ? (
                       <div className="space-y-3">
-                        {selectedArticle.guided_reflection_questions.map((q: string, idx: number) => (
-                          <div key={idx} className="flex gap-3">
-                            <div className="h-6 w-6 min-w-6 rounded-full bg-slate-400 flex items-center justify-center text-xs font-bold text-white">
-                              {idx + 1}
+                        {selectedArticle.guided_reflection_questions.map(
+                          (q: string, idx: number) => (
+                            <div key={idx} className="flex gap-3">
+                              <div className="h-6 w-6 min-w-6 rounded-full bg-slate-400 flex items-center justify-center text-xs font-bold text-white">
+                                {idx + 1}
+                              </div>
+                              <p className="text-sm text-slate-700 pt-1">{q}</p>
                             </div>
-                            <p className="text-sm text-slate-700 pt-1">{q}</p>
-                          </div>
-                        ))}
+                          ),
+                        )}
                       </div>
                     ) : (
                       <p className="text-sm text-slate-500 italic">No reflection questions</p>
@@ -726,13 +783,14 @@ function YFPWeeklyArticles() {
 
                   {/* Materials Section */}
                   <div className="bg-white rounded p-4">
-                    <h3 className="text-xs font-bold uppercase text-slate-700 mb-3">
-                      Materials
-                    </h3>
+                    <h3 className="text-xs font-bold uppercase text-slate-700 mb-3">Materials</h3>
                     {articleMaterials.length > 0 ? (
                       <div className="grid grid-cols-2 gap-2">
                         {articleMaterials.map((material, idx) => (
-                          <div key={idx} className="border border-slate-200 rounded p-2 text-xs text-slate-900 truncate">
+                          <div
+                            key={idx}
+                            className="border border-slate-200 rounded p-2 text-xs text-slate-900 truncate"
+                          >
                             {material.name}
                           </div>
                         ))}
@@ -776,9 +834,11 @@ function YFPWeeklyArticles() {
             {confirmAction?.type === "delete" && "Delete Article?"}
           </AlertDialogTitle>
           <AlertDialogDescription>
-            {confirmAction?.type === "publish" && "This article will be published and visible to users."}
+            {confirmAction?.type === "publish" &&
+              "This article will be published and visible to users."}
             {confirmAction?.type === "schedule" && "This article will be scheduled for later."}
-            {confirmAction?.type === "delete" && "This article will be permanently deleted. This action cannot be undone."}
+            {confirmAction?.type === "delete" &&
+              "This article will be permanently deleted. This action cannot be undone."}
           </AlertDialogDescription>
           <div className="flex justify-end gap-2">
             <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -786,7 +846,8 @@ function YFPWeeklyArticles() {
               onClick={() => {
                 if (!confirmAction) return;
                 if (confirmAction.type === "publish") publishMut.mutate(confirmAction.articleId);
-                else if (confirmAction.type === "schedule") scheduleMut.mutate(confirmAction.articleId);
+                else if (confirmAction.type === "schedule")
+                  scheduleMut.mutate(confirmAction.articleId);
                 else if (confirmAction.type === "delete") deleteMut.mutate(confirmAction.articleId);
                 setConfirmAction(null);
               }}

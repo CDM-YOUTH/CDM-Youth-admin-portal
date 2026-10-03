@@ -20,6 +20,7 @@ import { Route as AdminCusaRouteImport } from './routes/admin.cusa'
 import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
 import { Route as AdminEnrollmentRouteImport } from './routes/admin.enrollment'
 import { Route as AdminEventsRouteImport } from './routes/admin.events'
+import { Route as AdminFinancesRouteImport } from './routes/admin.finances'
 import { Route as AdminFormationRouteImport } from './routes/admin.formation'
 import { Route as AdminLeadersRouteImport } from './routes/admin.leaders'
 import { Route as AdminMissionRouteImport } from './routes/admin.mission'
@@ -112,6 +113,11 @@ const AdminEnrollmentRoute = AdminEnrollmentRouteImport.update({
 const AdminEventsRoute = AdminEventsRouteImport.update({
   id: '/events',
   path: '/events',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminFinancesRoute = AdminFinancesRouteImport.update({
+  id: '/finances',
+  path: '/finances',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminFormationRoute = AdminFormationRouteImport.update({
@@ -321,6 +327,7 @@ export interface FileRoutesByFullPath {
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/enrollment': typeof AdminEnrollmentRoute
   '/admin/events': typeof AdminEventsRoute
+  '/admin/finances': typeof AdminFinancesRoute
   '/admin/formation': typeof AdminFormationRouteWithChildren
   '/admin/leaders': typeof AdminLeadersRoute
   '/admin/mission': typeof AdminMissionRoute
@@ -370,6 +377,7 @@ export interface FileRoutesByTo {
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/enrollment': typeof AdminEnrollmentRoute
   '/admin/events': typeof AdminEventsRoute
+  '/admin/finances': typeof AdminFinancesRoute
   '/admin/formation': typeof AdminFormationRouteWithChildren
   '/admin/leaders': typeof AdminLeadersRoute
   '/admin/mission': typeof AdminMissionRoute
@@ -421,6 +429,7 @@ export interface FileRoutesById {
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/enrollment': typeof AdminEnrollmentRoute
   '/admin/events': typeof AdminEventsRoute
+  '/admin/finances': typeof AdminFinancesRoute
   '/admin/formation': typeof AdminFormationRouteWithChildren
   '/admin/leaders': typeof AdminLeadersRoute
   '/admin/mission': typeof AdminMissionRoute
@@ -474,6 +483,7 @@ export interface FileRouteTypes {
     | '/admin/dashboard'
     | '/admin/enrollment'
     | '/admin/events'
+    | '/admin/finances'
     | '/admin/formation'
     | '/admin/leaders'
     | '/admin/mission'
@@ -523,6 +533,7 @@ export interface FileRouteTypes {
     | '/admin/dashboard'
     | '/admin/enrollment'
     | '/admin/events'
+    | '/admin/finances'
     | '/admin/formation'
     | '/admin/leaders'
     | '/admin/mission'
@@ -573,6 +584,7 @@ export interface FileRouteTypes {
     | '/admin/dashboard'
     | '/admin/enrollment'
     | '/admin/events'
+    | '/admin/finances'
     | '/admin/formation'
     | '/admin/leaders'
     | '/admin/mission'
@@ -711,6 +723,13 @@ declare module '@tanstack/react-router' {
       path: '/events'
       fullPath: '/admin/events'
       preLoaderRoute: typeof AdminEventsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/finances': {
+      id: '/admin/finances'
+      path: '/finances'
+      fullPath: '/admin/finances'
+      preLoaderRoute: typeof AdminFinancesRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/formation': {
@@ -1023,6 +1042,7 @@ interface AdminRouteChildren {
   AdminDashboardRoute: typeof AdminDashboardRoute
   AdminEnrollmentRoute: typeof AdminEnrollmentRoute
   AdminEventsRoute: typeof AdminEventsRoute
+  AdminFinancesRoute: typeof AdminFinancesRoute
   AdminFormationRoute: typeof AdminFormationRouteWithChildren
   AdminLeadersRoute: typeof AdminLeadersRoute
   AdminMissionRoute: typeof AdminMissionRoute
@@ -1044,6 +1064,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminDashboardRoute: AdminDashboardRoute,
   AdminEnrollmentRoute: AdminEnrollmentRoute,
   AdminEventsRoute: AdminEventsRoute,
+  AdminFinancesRoute: AdminFinancesRoute,
   AdminFormationRoute: AdminFormationRouteWithChildren,
   AdminLeadersRoute: AdminLeadersRoute,
   AdminMissionRoute: AdminMissionRoute,

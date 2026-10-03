@@ -189,8 +189,7 @@ async function seedInquiries() {
           fellowship: "Justice & Peace",
         },
         submitted_at: new Date("2026-01-05T13:10:00").toISOString(),
-        question_text:
-          "How do we address climate change as a matter of Catholic social teaching?",
+        question_text: "How do we address climate change as a matter of Catholic social teaching?",
         status: "Drafted",
         upvotes_count: 10,
         linked_article_id: null,
