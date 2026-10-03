@@ -305,8 +305,11 @@ function YFPWeeklyArticles() {
         }
       />
 
-      <div className="flex-1 overflow-y-auto px-5 py-4">
-        <Card>
+      <div className="flex flex-1 overflow-hidden gap-0">
+        {/* Left: Table - 50% */}
+        <div className="w-1/2 flex flex-col border-r border-border overflow-hidden">
+          <div className="px-5 py-4 flex-1 overflow-y-auto">
+            <Card>
           <TableToolbar
             searchValue={searchQuery}
             onSearchChange={(value) => {
@@ -354,7 +357,16 @@ function YFPWeeklyArticles() {
               </thead>
               <tbody>
                 {paginatedArticles.map((article) => (
-                  <tr key={article.id} className="border-b border-border/30 last:border-0 hover:bg-bg-3">
+                  <tr
+                    key={article.id}
+                    onClick={() => {
+                      setSelectedArticle(article);
+                      setArticleMaterials(article.materials || []);
+                    }}
+                    className={`border-b border-border/30 last:border-0 cursor-pointer ${
+                      selectedArticle?.id === article.id ? "bg-primary/10" : "hover:bg-bg-3"
+                    }`}
+                  >
                     <td className="px-3.5 py-2.5 text-[11px] font-semibold text-foreground">
                       <div>Week {article.week_number}: {article.article_title}</div>
                       {article.liturgical_calendar_title && (
@@ -452,7 +464,84 @@ function YFPWeeklyArticles() {
             onPageChange={pagination.setPage}
             onPageSizeChange={pagination.setPageSize}
           />
-        </Card>
+            </Card>
+          </div>
+        </div>
+
+        {/* Right: Detail Panel - 50% */}
+        {selectedArticle && (
+          <div className="w-1/2 flex flex-col border-l border-border bg-bg-2 overflow-hidden">
+            <div className="border-b border-border bg-white px-5 py-3 flex items-start justify-between flex-shrink-0">
+              <div>
+                <div className="text-[10px] font-bold uppercase text-text-3">Week {selectedArticle.week_number}</div>
+                <h2 className="text-[13px] font-bold text-text-1 mt-1">{selectedArticle.article_title}</h2>
+              </div>
+              <button
+                onClick={() => setEditDialogOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-md bg-primary px-2.5 py-1.5 text-[11px] font-bold text-white hover:opacity-90"
+              >
+                <Edit2 className="h-3.5 w-3.5" />
+                Edit
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+              <div>
+                <h3 className="text-[10px] font-bold uppercase text-text-2 mb-1">Title</h3>
+                <p className="text-[11px] text-text-1">{selectedArticle.article_title}</p>
+              </div>
+
+              <div>
+                <h3 className="text-[10px] font-bold uppercase text-text-2 mb-1">Sunday Date</h3>
+                <p className="text-[11px] text-text-1">
+                  {new Date(selectedArticle.sunday_date).toLocaleDateString("en-US", {
+                    month: "long",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                </p>
+              </div>
+
+              {selectedArticle.liturgical_calendar_title && (
+                <div>
+                  <h3 className="text-[10px] font-bold uppercase text-text-2 mb-1">Liturgical Title</h3>
+                  <p className="text-[11px] text-text-1">{selectedArticle.liturgical_calendar_title}</p>
+                </div>
+              )}
+
+              <div>
+                <h3 className="text-[10px] font-bold uppercase text-text-2 mb-1">Status</h3>
+                <Pill tone={selectedArticle.status === "Published" ? "success" : selectedArticle.status === "Scheduled" ? "warning" : "neutral"}>
+                  {selectedArticle.status}
+                </Pill>
+              </div>
+
+              {selectedArticle.scripture_citations?.length > 0 && (
+                <div>
+                  <h3 className="text-[10px] font-bold uppercase text-text-2 mb-1">Scripture</h3>
+                  <ul className="text-[11px] text-text-1 space-y-1">
+                    {selectedArticle.scripture_citations.map((s: any) => (
+                      <li key={s.reference}>{s.reference}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {articleMaterials.length > 0 && (
+                <div>
+                  <h3 className="text-[10px] font-bold uppercase text-text-2 mb-2">Materials</h3>
+                  <div className="grid grid-cols-2 gap-2">
+                    {articleMaterials.map((material, idx) => (
+                      <div key={idx} className="border border-border rounded p-2 text-[10px] text-text-1 truncate">
+                        {material.name}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Create Article Dialog */}
