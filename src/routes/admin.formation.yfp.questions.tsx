@@ -47,10 +47,39 @@ function YFPQuestionsPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
 
-  const { data: inquiries = [] } = useQuery({
-    queryKey: ["yfp-youth-inquiries"],
-    queryFn: () => fetchYouthInquiries(),
+  const { data: paginatedData = { data: [], total: 0 } } = useQuery({
+    queryKey: ["yfp-youth-inquiries", currentPage, itemsPerPage, filterStatus, searchQuery, dateRange],
+    queryFn: async () => {
+      const allInquiries = await fetchYouthInquiries({
+        status: filterStatus !== "all" ? filterStatus : undefined,
+        search: searchQuery || undefined,
+      });
+
+      // Client-side filtering by date range
+      let filtered = allInquiries;
+      if (dateRange.from) {
+        filtered = filtered.filter((i) => new Date(i.submitted_at) >= dateRange.from!);
+      }
+      if (dateRange.to) {
+        filtered = filtered.filter((i) => new Date(i.submitted_at) <= dateRange.to!);
+      }
+
+      // Server-side pagination simulation
+      const total = filtered.length;
+      const startIdx = (currentPage - 1) * itemsPerPage;
+      const paginatedInquiries = filtered.slice(startIdx, startIdx + itemsPerPage);
+
+      return {
+        data: paginatedInquiries,
+        total,
+        page: currentPage,
+        pageSize: itemsPerPage,
+        totalPages: Math.ceil(total / itemsPerPage),
+      };
+    },
   });
+
+  const inquiries = paginatedData.data;
 
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -117,40 +146,18 @@ function YFPQuestionsPage() {
     },
   });
 
-  const filteredInquiries = useMemo(() => {
-    let filtered = inquiries;
-
-    if (filterStatus !== "all") {
-      filtered = filtered.filter((i) => i.status === filterStatus);
-    }
-
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter((i) =>
-        i.question_text?.toLowerCase().includes(query) ||
-        i.inquiry_reference?.toLowerCase().includes(query)
-      );
-    }
-
-    if (dateRange.from) {
-      filtered = filtered.filter((i) => new Date(i.submitted_at) >= dateRange.from!);
-    }
-    if (dateRange.to) {
-      filtered = filtered.filter((i) => new Date(i.submitted_at) <= dateRange.to!);
-    }
-
+  const sortedInquiries = useMemo(() => {
+    let sorted = [...inquiries];
     if (sortBy === "upvotes") {
-      filtered = [...filtered].sort((a, b) => (b.upvotes_count || 0) - (a.upvotes_count || 0));
+      sorted.sort((a, b) => (b.upvotes_count || 0) - (a.upvotes_count || 0));
     } else {
-      filtered = [...filtered].sort((a, b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime());
+      sorted.sort((a, b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime());
     }
+    return sorted;
+  }, [inquiries, sortBy]);
 
-    return filtered;
-  }, [inquiries, filterStatus, searchQuery, sortBy, dateRange]);
-
-  const totalPages = Math.ceil(filteredInquiries.length / itemsPerPage);
-  const startIdx = (currentPage - 1) * itemsPerPage;
-  const paginatedInquiries = filteredInquiries.slice(startIdx, startIdx + itemsPerPage);
+  const totalPages = paginatedData.totalPages || 1;
+  const paginatedInquiries = sortedInquiries;
 
   const handleEditStart = () => {
     if (!selectedInquiry) return;
@@ -309,7 +316,7 @@ function YFPQuestionsPage() {
                   <thead className="border-b border-slate-200/70 bg-slate-50">
                     <tr>
                       <th className="px-4 py-2 text-left text-xs font-bold uppercase tracking-wide text-slate-700">
-                        Question
+                        Reference
                       </th>
                       <th className="px-4 py-2 text-left text-xs font-bold uppercase tracking-wide text-slate-700">
                         Submitted
@@ -345,14 +352,7 @@ function YFPQuestionsPage() {
                           }}
                         >
                           <td className="px-4 py-3">
-                            <div className="max-w-xs">
-                              <p className="text-xs font-semibold text-slate-900 line-clamp-2">
-                                {inquiry.question_text}
-                              </p>
-                              {inquiry.inquiry_reference && (
-                                <p className="text-xs text-slate-500 mt-1">Ref: {inquiry.inquiry_reference}</p>
-                              )}
-                            </div>
+                            <p className="text-xs font-bold text-slate-900">{inquiry.inquiry_reference}</p>
                           </td>
                           <td className="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">
                             {new Date(inquiry.submitted_at).toLocaleDateString("en-US", {
@@ -421,9 +421,9 @@ function YFPQuestionsPage() {
             <div className="mt-4 flex items-center justify-between text-xs">
               <div className="text-slate-600">
                 <span className="font-semibold">
-                  {paginatedInquiries.length > 0 ? startIdx + 1 : 0}-{Math.min(startIdx + itemsPerPage, filteredInquiries.length)}
+                  {paginatedInquiries.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0}-{Math.min(currentPage * itemsPerPage, paginatedData.total)}
                 </span>
-                <span> of {filteredInquiries.length} inquiries</span>
+                <span> of {paginatedData.total} inquiries</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="font-semibold">

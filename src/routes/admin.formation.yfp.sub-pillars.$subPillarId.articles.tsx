@@ -106,10 +106,49 @@ function YFPWeeklyArticles() {
     queryFn: () => fetchSubPillarById(subPillarId),
   });
 
-  const { data: articles = [] } = useQuery({
-    queryKey: ["yfp-weekly-articles", subPillarId],
-    queryFn: () => fetchWeeklyArticlesBySubPillarId(subPillarId),
+  const { data: paginatedData = { data: [], total: 0 } } = useQuery({
+    queryKey: ["yfp-weekly-articles", subPillarId, currentPage, itemsPerPage, filterStatus, searchQuery, dateRange],
+    queryFn: async () => {
+      const allArticles = await fetchWeeklyArticlesBySubPillarId(subPillarId);
+
+      // Client-side filtering
+      let filtered = allArticles;
+
+      if (filterStatus !== "all") {
+        filtered = filtered.filter((a) => a.status === filterStatus);
+      }
+
+      if (dateRange.from) {
+        filtered = filtered.filter((a) => new Date(a.sunday_date) >= dateRange.from!);
+      }
+      if (dateRange.to) {
+        filtered = filtered.filter((a) => new Date(a.sunday_date) <= dateRange.to!);
+      }
+
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        filtered = filtered.filter((a) =>
+          a.article_title?.toLowerCase().includes(query) ||
+          a.liturgical_calendar_title?.toLowerCase().includes(query)
+        );
+      }
+
+      // Server-side pagination simulation
+      const total = filtered.length;
+      const startIdx = (currentPage - 1) * itemsPerPage;
+      const paginatedArticles = filtered.slice(startIdx, startIdx + itemsPerPage);
+
+      return {
+        data: paginatedArticles,
+        total,
+        page: currentPage,
+        pageSize: itemsPerPage,
+        totalPages: Math.ceil(total / itemsPerPage),
+      };
+    },
   });
+
+  const articles = paginatedData.data;
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [createMaterials, setCreateMaterials] = useState<Array<{ url: string; name: string; type: "image" | "pdf"; uploadedAt: string }>>([]);
@@ -294,34 +333,8 @@ function YFPWeeklyArticles() {
     },
   });
 
-  const filteredArticles = useMemo(() => {
-    let filtered = articles;
-
-    if (filterStatus !== "all") {
-      filtered = filtered.filter((a) => a.status === filterStatus);
-    }
-
-    if (dateRange.from) {
-      filtered = filtered.filter((a) => new Date(a.sunday_date) >= dateRange.from!);
-    }
-    if (dateRange.to) {
-      filtered = filtered.filter((a) => new Date(a.sunday_date) <= dateRange.to!);
-    }
-
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter((a) =>
-        a.article_title?.toLowerCase().includes(query) ||
-        a.liturgical_calendar_title?.toLowerCase().includes(query)
-      );
-    }
-
-    return filtered;
-  }, [articles, filterStatus, dateRange, searchQuery]);
-
-  const totalPages = Math.ceil(filteredArticles.length / itemsPerPage);
-  const startIdx = (currentPage - 1) * itemsPerPage;
-  const paginatedArticles = filteredArticles.slice(startIdx, startIdx + itemsPerPage);
+  const totalPages = paginatedData.totalPages || 1;
+  const paginatedArticles = articles;
 
   const handleEditStart = () => {
     setEditingValues({
@@ -544,12 +557,9 @@ function YFPWeeklyArticles() {
             <div className="mt-4 flex items-center justify-between text-xs">
               <div className="text-slate-600">
                 <span className="font-semibold">
-                  {paginatedArticles.length > 0 ? startIdx + 1 : 0}-{Math.min(startIdx + itemsPerPage, filteredArticles.length)}
+                  {paginatedArticles.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : 0}-{Math.min(currentPage * itemsPerPage, paginatedData.total)}
                 </span>
-                <span> of {filteredArticles.length} articles</span>
-                {filteredArticles.length !== articles.length && (
-                  <span className="ml-2 text-slate-500">({articles.length} total)</span>
-                )}
+                <span> of {paginatedData.total} articles</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="font-semibold">
