@@ -181,7 +181,7 @@ function YFPQuestionsPage() {
                 setSearchQuery(e.target.value);
                 setCurrentPage(1);
               }}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs w-56"
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs w-56 focus:border-gold-3 focus:text-black outline-none"
               placeholder="Search inquiry or reference..."
             />
 
@@ -191,7 +191,7 @@ function YFPQuestionsPage() {
                 setFilterStatus(e.target.value === "all" ? undefined : e.target.value);
                 setCurrentPage(1);
               }}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold"
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold focus:border-gold-3 focus:text-black outline-none"
             >
               <option value="all">All</option>
               <option value="Needs_Answer">Needs Answer</option>
@@ -206,7 +206,7 @@ function YFPQuestionsPage() {
                 setItemsPerPage(parseInt(e.target.value));
                 setCurrentPage(1);
               }}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold ml-auto"
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold ml-auto focus:border-gold-3 focus:text-black outline-none"
             >
               <option value={5}>5 per page</option>
               <option value={10}>10 per page</option>
@@ -414,7 +414,7 @@ function YFPQuestionsPage() {
                     <select
                       value={editingValues.status}
                       onChange={(e) => setEditingValues({ ...editingValues, status: e.target.value })}
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs"
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs focus:border-gold-3 focus:text-black outline-none"
                     >
                       <option value="Needs_Answer">Needs Answer</option>
                       <option value="Drafted">Drafted</option>
@@ -430,7 +430,7 @@ function YFPQuestionsPage() {
                       onChange={(e) =>
                         setEditingValues({ ...editingValues, pastoral_response: e.target.value })
                       }
-                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs resize-both min-h-24"
+                      className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs resize-both min-h-24 focus:border-gold-3 focus:text-black outline-none"
                       placeholder="Enter pastoral response..."
                     />
                   </div>
@@ -494,7 +494,7 @@ function YFPQuestionsPage() {
               <textarea
                 value={newInquiry.question_text || ""}
                 onChange={(e) => setNewInquiry({ ...newInquiry, question_text: e.target.value })}
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm resize-none min-h-24"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm resize-none min-h-24 focus:border-gold-3 focus:text-black outline-none"
                 placeholder="Write the youth question..."
               />
             </div>

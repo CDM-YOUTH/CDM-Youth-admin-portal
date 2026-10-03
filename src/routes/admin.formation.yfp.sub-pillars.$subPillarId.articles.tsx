@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useParams } from "@tanstack/react-router";
-import { Plus, MoreVertical, Download, Edit2, Trash2, Check } from "lucide-react";
+import { Plus, MoreVertical, Download, Edit2, Check, X, Trash2 } from "lucide-react";
 import {
   fetchSubPillarById,
   fetchWeeklyArticlesBySubPillarId,
@@ -16,16 +16,9 @@ import {
   type FieldDef,
 } from "@/components/admin/composables/forms/record-form-dialog";
 import {
-  ColumnFilter,
-  ColumnHeader,
-  TableToolbar,
-  type ColumnFilterValue,
-} from "@/components/admin/composables/tables/table-filters";
-import {
-  TablePagination,
-  useServerPagination,
-} from "@/components/admin/composables/tables/table-pagination";
-import { Card, CardBody, Pill } from "@/components/admin/composables/ui-bits";
+  DateRangeFilter,
+  type DateRange,
+} from "@/components/admin/composables/pickers/date-range-filter";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -108,7 +101,6 @@ const ARTICLE_FORM_FIELDS: FieldDef[] = [
 function YFPWeeklyArticles() {
   const { subPillarId } = useParams({ from: Route.id });
   const qc = useQueryClient();
-  const pagination = useServerPagination(5);
 
   const { data: subPillar } = useQuery({
     queryKey: ["yfp-sub-pillar", subPillarId],
@@ -121,38 +113,59 @@ function YFPWeeklyArticles() {
   });
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedArticle, setSelectedArticle] = useState<any>(null);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filterStatus, setFilterStatus] = useState<string | undefined>();
+  const [isEditingPanel, setIsEditingPanel] = useState(false);
+  const [editingValues, setEditingValues] = useState<Record<string, string>>({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(5);
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [dateRange, setDateRange] = useState<DateRange>({ from: undefined, to: undefined });
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [confirmAction, setConfirmAction] = useState<{ type: "publish" | "schedule" | "delete"; articleId: string } | null>(null);
   const [articleMaterials, setArticleMaterials] = useState<Array<{ url: string; name: string; type: "image" | "pdf"; uploadedAt: string }>>([]);
   const [uploadingMaterial, setUploadingMaterial] = useState(false);
-  const [confirmAction, setConfirmAction] = useState<{ type: "publish" | "schedule" | "delete"; articleId: string } | null>(null);
 
   const filteredArticles = useMemo(() => {
     let filtered = allArticles;
 
-    if (filterStatus) {
+    if (filterStatus !== "all") {
       filtered = filtered.filter((a) => a.status === filterStatus);
+    }
+
+    if (dateRange.from) {
+      filtered = filtered.filter((a) => new Date(a.sunday_date) >= dateRange.from!);
+    }
+    if (dateRange.to) {
+      filtered = filtered.filter((a) => new Date(a.sunday_date) <= dateRange.to!);
     }
 
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter((a) =>
-        a.article_title?.toLowerCase().includes(query) ||
-        a.liturgical_calendar_title?.toLowerCase().includes(query)
-      );
+      filtered = filtered.filter((a) => {
+        const titleMatch = a.article_title?.toLowerCase().includes(query) || false;
+        const liturgicalMatch = a.liturgical_calendar_title?.toLowerCase().includes(query) || false;
+        const scriptureMatch = a.scripture_citations?.some((s: any) =>
+          s.reference?.toLowerCase().includes(query)
+        ) || false;
+        const handbookMatch = a.handbook_page_reference?.toLowerCase().includes(query) || false;
+        const reflectionMatch = a.guided_reflection_questions?.some((q: string) =>
+          q.toLowerCase().includes(query)
+        ) || false;
+        const directiveMatch = a.pastoral_directive?.toLowerCase().includes(query) || false;
+        const materialMatch = a.materials?.some((m: any) =>
+          m.name?.toLowerCase().includes(query)
+        ) || false;
+
+        return titleMatch || liturgicalMatch || scriptureMatch || handbookMatch || reflectionMatch || directiveMatch || materialMatch;
+      });
     }
 
-    return filtered.sort((a, b) => a.week_number - b.week_number);
-  }, [allArticles, filterStatus, searchQuery]);
+    return filtered;
+  }, [allArticles, filterStatus, dateRange, searchQuery]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredArticles.length / pagination.pageSize));
-  const safePage = Math.min(pagination.page, totalPages);
-  const paginatedArticles = filteredArticles.slice(
-    (safePage - 1) * pagination.pageSize,
-    safePage * pagination.pageSize
-  );
+  const totalPages = Math.ceil(filteredArticles.length / itemsPerPage);
+  const startIdx = (currentPage - 1) * itemsPerPage;
+  const paginatedArticles = filteredArticles.slice(startIdx, startIdx + itemsPerPage);
 
   const createMut = useMutation({
     mutationFn: async (values: Record<string, string>) => {
@@ -208,7 +221,7 @@ function YFPWeeklyArticles() {
     onSuccess: () => {
       toast.success("Article updated successfully");
       qc.invalidateQueries({ queryKey: ["yfp-weekly-articles", subPillarId] });
-      setEditDialogOpen(false);
+      setIsEditingPanel(false);
       setSelectedArticle(null);
     },
     onError: (error) => {
@@ -290,370 +303,471 @@ function YFPWeeklyArticles() {
     }
   };
 
+  const handleEditStart = () => {
+    if (!selectedArticle) return;
+    setEditingValues({
+      article_title: selectedArticle.article_title,
+      week_number: selectedArticle.week_number.toString(),
+      sunday_date: selectedArticle.sunday_date,
+      liturgical_calendar_title: selectedArticle.liturgical_calendar_title || "",
+      scripture_citations: selectedArticle.scripture_citations?.map((s: any) => s.reference).join(", ") || "",
+      handbook_page_reference: selectedArticle.handbook_page_reference || "",
+      guided_reflection_questions: selectedArticle.guided_reflection_questions?.join("\n") || "",
+      pastoral_directive: selectedArticle.pastoral_directive || "",
+    });
+    setArticleMaterials(selectedArticle.materials || []);
+    setIsEditingPanel(true);
+  };
+
+  const handleSaveEdit = () => {
+    updateMut.mutate(editingValues);
+  };
+
   return (
-    <>
+    <div className="flex h-screen flex-col overflow-hidden">
       <Topbar
         title={`${subPillar?.title} - Weekly Content`}
         description="Formation — Weekly Articles"
         action={
-          <button
-            onClick={() => setCreateDialogOpen(true)}
-            className="inline-flex h-8 items-center gap-1.5 rounded-md bg-danger px-3 text-[11px] font-bold text-white transition hover:opacity-90"
-          >
-            <Icon icon="mdi:plus" className="h-3.5 w-3.5" /> Add Article
-          </button>
+          <div className="flex items-center gap-3">
+            <button onClick={() => setCreateDialogOpen(true)} className="inline-flex items-center gap-2 rounded-lg bg-danger px-4 py-2 text-sm font-bold text-white hover:opacity-90">
+              <Plus className="h-4 w-4" />
+              Add Article
+            </button>
+            <button className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">
+              <Download className="h-4 w-4" />
+              Download
+            </button>
+          </div>
         }
       />
 
+      {/* Split Layout */}
       <div className="flex flex-1 overflow-hidden gap-0">
         {/* Left: Table - 50% */}
-        <div className="w-1/2 flex flex-col border-r border-border overflow-hidden">
-          <div className="px-5 py-4 flex-1 overflow-y-auto">
-            <Card>
-          <TableToolbar
-            searchValue={searchQuery}
-            onSearchChange={(value) => {
-              setSearchQuery(value);
-              pagination.reset();
-            }}
-            searchPlaceholder="Search by title or calendar reference…"
-          />
+        <div className="w-1/2 h-full flex flex-col border-r border-slate-200">
+          {/* Filters Bar */}
+          <div className="border-b border-slate-200 bg-white px-6 py-3 flex items-center gap-3 flex-shrink-0">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs w-56 focus:border-gold-3 focus:text-black outline-none"
+              placeholder="Search by title..."
+            />
 
-          <CardBody className="p-0">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
-                    <ColumnHeader
-                      label="Week & Title"
-                      filter={
-                        <ColumnFilter
-                          label="Status"
-                          mode="select"
-                          options={[
-                            { value: "Published", label: "Published" },
-                            { value: "Scheduled", label: "Scheduled" },
-                            { value: "Draft", label: "Draft" },
-                          ]}
-                          value={
-                            filterStatus ? { operator: "equals", value: filterStatus } : undefined
-                          }
-                          onChange={(v) => {
-                            setFilterStatus(v?.value);
-                            pagination.reset();
+            <select
+              value={filterStatus}
+              onChange={(e) => {
+                setFilterStatus(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold focus:border-gold-3 focus:text-black outline-none"
+            >
+              <option value="all">All</option>
+              <option value="Published">Published</option>
+              <option value="Scheduled">Scheduled</option>
+              <option value="Draft">Draft</option>
+            </select>
+
+            <DateRangeFilter
+              value={dateRange}
+              onChange={(range) => {
+                setDateRange(range);
+                setCurrentPage(1);
+              }}
+            />
+          </div>
+
+          {/* Table */}
+          <div className="flex-1 overflow-y-auto p-6">
+            <div className="rounded-xl border border-slate-200/70 bg-white shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="border-b border-slate-200/70 bg-slate-50">
+                    <tr>
+                      <th className="px-4 py-2 text-left text-xs font-bold uppercase tracking-wide text-slate-700">
+                        Week & Title
+                      </th>
+                      <th className="px-4 py-2 text-left text-xs font-bold uppercase tracking-wide text-slate-700">
+                        Sunday Date
+                      </th>
+                      <th className="px-4 py-2 text-left text-xs font-bold uppercase tracking-wide text-slate-700">
+                        Status
+                      </th>
+                      <th className="px-4 py-2 text-right text-xs font-bold uppercase tracking-wide text-slate-700">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedArticles.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-6 text-center text-sm text-slate-600">
+                          No articles found.
+                        </td>
+                      </tr>
+                    ) : (
+                      paginatedArticles.map((article) => (
+                        <tr
+                          key={article.id}
+                          className={`border-b border-slate-200/70 cursor-pointer ${
+                            selectedArticle?.id === article.id ? "bg-blue-50" : "hover:bg-slate-50"
+                          }`}
+                          onClick={() => {
+                            setSelectedArticle(article);
+                            setIsEditingPanel(false);
                           }}
-                        />
-                      }
-                    />
-                  </th>
-                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
-                    <ColumnHeader label="Sunday Date" />
-                  </th>
-                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
-                    <ColumnHeader label="Status" />
-                  </th>
-                  <th className="label-eyebrow px-3.5 py-2.5 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedArticles.map((article) => (
-                  <tr
-                    key={article.id}
-                    onClick={() => {
-                      setSelectedArticle(article);
-                      setArticleMaterials(article.materials || []);
-                    }}
-                    className={`border-b border-border/30 last:border-0 cursor-pointer ${
-                      selectedArticle?.id === article.id ? "bg-primary/10" : "hover:bg-bg-3"
-                    }`}
-                  >
-                    <td className="px-3.5 py-2.5 text-[11px] font-semibold text-foreground">
-                      <div>Week {article.week_number}: {article.article_title}</div>
-                      {article.liturgical_calendar_title && (
-                        <div className="text-[10px] text-text-3 mt-0.5">{article.liturgical_calendar_title}</div>
-                      )}
-                    </td>
-                    <td className="px-3.5 py-2.5 text-[11px] text-text-2">
-                      {new Date(article.sunday_date).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })}
-                    </td>
-                    <td className="px-3.5 py-2.5">
-                      <Pill
-                        tone={
-                          article.status === "Published"
-                            ? "success"
-                            : article.status === "Scheduled"
-                              ? "warning"
-                              : "neutral"
-                        }
-                      >
-                        {article.status}
-                      </Pill>
-                    </td>
-                    <td className="px-3.5 py-2.5 text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button
-                            type="button"
-                            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-bg-2 text-text-2 hover:border-gold-3 hover:text-gold"
-                          >
-                            <MoreVertical className="h-3.5 w-3.5" />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-40">
-                          <DropdownMenuItem
-                            onClick={() => {
-                              setSelectedArticle(article);
-                              setArticleMaterials(article.materials || []);
-                              setEditDialogOpen(true);
-                            }}
-                          >
-                            <Edit2 className="mr-2 h-3.5 w-3.5" /> Edit
-                          </DropdownMenuItem>
-                          {article.status !== "Published" && (
-                            <DropdownMenuItem
-                              onClick={() =>
-                                setConfirmAction({ type: "publish", articleId: article.id })
-                              }
+                        >
+                          <td className="px-4 py-3">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <Icon icon="mdi:book" className="h-4 w-4 text-slate-500" />
+                                <span className="font-semibold text-slate-900">
+                                  Week {article.week_number}: {article.article_title}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-slate-700">
+                            {new Date(article.sunday_date).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span
+                              className={`inline-block rounded-full px-2 py-1 text-xs font-bold ${
+                                article.status === "Published"
+                                  ? "bg-green-100 text-green-700"
+                                  : article.status === "Scheduled"
+                                    ? "bg-amber-100 text-amber-700"
+                                    : "bg-slate-100 text-slate-700"
+                              }`}
                             >
-                              <Check className="mr-2 h-3.5 w-3.5" /> Publish
-                            </DropdownMenuItem>
-                          )}
-                          {article.status !== "Scheduled" && (
-                            <DropdownMenuItem
-                              onClick={() =>
-                                setConfirmAction({ type: "schedule", articleId: article.id })
-                              }
-                            >
-                              Schedule
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="text-danger focus:text-danger"
-                            onClick={() =>
-                              setConfirmAction({ type: "delete", articleId: article.id })
-                            }
-                          >
-                            <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </td>
-                  </tr>
-                ))}
-                {paginatedArticles.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="px-3.5 py-6 text-center text-[12px] text-text-2">
-                      No articles found
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </CardBody>
+                              • {article.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <button className="text-slate-400 hover:text-slate-600">
+                                  <MoreVertical className="h-5 w-5" />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-32">
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    setConfirmAction({ type: "publish", articleId: article.id });
+                                  }}
+                                  disabled={article.status === "Published"}
+                                >
+                                  Publish
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    setConfirmAction({ type: "schedule", articleId: article.id });
+                                  }}
+                                  disabled={article.status === "Scheduled"}
+                                >
+                                  Schedule
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    setSelectedArticle(article);
+                                    handleEditStart();
+                                  }}
+                                >
+                                  <Edit2 className="mr-2 h-3.5 w-3.5" /> Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    setConfirmAction({ type: "delete", articleId: article.id });
+                                  }}
+                                  className="text-red-600 focus:text-red-600"
+                                >
+                                  <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
 
-          <TablePagination
-            page={safePage}
-            pageSize={pagination.pageSize}
-            total={filteredArticles.length}
-            totalPages={totalPages}
-            onPageChange={pagination.setPage}
-            onPageSizeChange={pagination.setPageSize}
-          />
-            </Card>
+            {/* Pagination */}
+            <div className="mt-4 flex items-center justify-between text-xs">
+              <select
+                value={itemsPerPage}
+                onChange={(e) => {
+                  setItemsPerPage(parseInt(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold focus:border-gold-3 focus:text-black outline-none"
+              >
+                <option value={5}>5 per page</option>
+                <option value={10}>10 per page</option>
+                <option value={20}>20 per page</option>
+                <option value={50}>50 per page</option>
+              </select>
+              <div className="text-slate-600">
+                <span className="font-semibold">
+                  {paginatedArticles.length > 0 ? startIdx + 1 : 0}-{Math.min(startIdx + itemsPerPage, filteredArticles.length)}
+                </span>
+                <span> of {filteredArticles.length} articles</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="rounded px-3 py-1 text-xs font-bold disabled:opacity-50 border border-slate-200 hover:bg-slate-50"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="rounded px-3 py-1 text-xs font-bold disabled:opacity-50 border border-slate-200 hover:bg-slate-50"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Right: Detail Panel - 50% */}
         {selectedArticle && (
-          <div className="w-1/2 flex flex-col border-l border-border bg-bg-2 overflow-hidden">
-            <div className="border-b border-border bg-white px-5 py-3 flex items-start justify-between flex-shrink-0">
+          <div className="w-1/2 h-full border-l border-slate-200 bg-slate-50 flex flex-col overflow-hidden">
+            {/* Header */}
+            <div className="border-b border-slate-200 bg-white p-3 flex items-start justify-between flex-shrink-0">
               <div>
-                <div className="text-[10px] font-bold uppercase text-text-3">Week {selectedArticle.week_number}</div>
-                <h2 className="text-[13px] font-bold text-text-1 mt-1">{selectedArticle.article_title}</h2>
-              </div>
-              <button
-                onClick={() => setEditDialogOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-md bg-primary px-2.5 py-1.5 text-[11px] font-bold text-white hover:opacity-90"
-              >
-                <Edit2 className="h-3.5 w-3.5" />
-                Edit
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
-              <div>
-                <h3 className="text-[10px] font-bold uppercase text-text-2 mb-1">Title</h3>
-                <p className="text-[11px] text-text-1">{selectedArticle.article_title}</p>
-              </div>
-
-              <div>
-                <h3 className="text-[10px] font-bold uppercase text-text-2 mb-1">Sunday Date</h3>
-                <p className="text-[11px] text-text-1">
+                <div className="text-xs font-bold uppercase tracking-wide text-slate-500">
                   {new Date(selectedArticle.sunday_date).toLocaleDateString("en-US", {
-                    month: "long",
+                    month: "short",
                     day: "numeric",
                     year: "numeric",
                   })}
-                </p>
-              </div>
-
-              {selectedArticle.liturgical_calendar_title && (
-                <div>
-                  <h3 className="text-[10px] font-bold uppercase text-text-2 mb-1">Liturgical Title</h3>
-                  <p className="text-[11px] text-text-1">{selectedArticle.liturgical_calendar_title}</p>
                 </div>
-              )}
-
-              <div>
-                <h3 className="text-[10px] font-bold uppercase text-text-2 mb-1">Status</h3>
-                <Pill tone={selectedArticle.status === "Published" ? "success" : selectedArticle.status === "Scheduled" ? "warning" : "neutral"}>
-                  {selectedArticle.status}
-                </Pill>
+                <h2 className="text-lg font-black text-slate-900 mt-1">
+                  Week {selectedArticle.week_number}: {selectedArticle.article_title}
+                </h2>
               </div>
-
-              {selectedArticle.scripture_citations?.length > 0 && (
-                <div>
-                  <h3 className="text-[10px] font-bold uppercase text-text-2 mb-1">Scripture</h3>
-                  <ul className="text-[11px] text-text-1 space-y-1">
-                    {selectedArticle.scripture_citations.map((s: any) => (
-                      <li key={s.reference}>{s.reference}</li>
-                    ))}
-                  </ul>
+              {isEditingPanel ? (
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSaveEdit}
+                    className="flex items-center gap-2 rounded-lg bg-danger px-3 py-2 text-xs font-bold text-white hover:opacity-90"
+                  >
+                    <Check className="h-4 w-4" />
+                    Save
+                  </button>
+                  <button
+                    onClick={() => setIsEditingPanel(false)}
+                    className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
                 </div>
+              ) : (
+                <button
+                  onClick={handleEditStart}
+                  className="flex items-center gap-2 rounded-lg bg-danger px-3 py-2 text-xs font-bold text-white hover:opacity-90"
+                >
+                  <Edit2 className="h-3 w-3" />
+                  Edit
+                </button>
               )}
+            </div>
 
-              {articleMaterials.length > 0 && (
-                <div>
-                  <h3 className="text-[10px] font-bold uppercase text-text-2 mb-2">Materials</h3>
-                  <div className="grid grid-cols-2 gap-2">
-                    {articleMaterials.map((material, idx) => (
-                      <div key={idx} className="border border-border rounded p-2 text-[10px] text-text-1 truncate">
-                        {material.name}
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-3">
+              {isEditingPanel ? (
+                <div className="space-y-3">
+                  {ARTICLE_FORM_FIELDS.map((field) => (
+                    <div key={field.key} className="border-l-4 border-amber-400 bg-white rounded p-3 pl-3">
+                      <label className="text-xs font-bold uppercase text-slate-600 block mb-1">{field.label}</label>
+                      {field.type === "textarea" ? (
+                        <textarea
+                          value={editingValues[field.key] || ""}
+                          onChange={(e) => setEditingValues({ ...editingValues, [field.key]: e.target.value })}
+                          className="w-full rounded-lg border border-slate-200 px-2 py-1 text-xs mt-1 resize-both min-h-24 focus:border-gold-3 focus:text-black outline-none"
+                          placeholder={field.placeholder}
+                        />
+                      ) : field.type === "number" ? (
+                        <input
+                          type="number"
+                          value={editingValues[field.key] || ""}
+                          onChange={(e) => setEditingValues({ ...editingValues, [field.key]: e.target.value })}
+                          className="w-full rounded-lg border border-slate-200 px-2 py-1 text-xs mt-1 focus:border-gold-3 focus:text-black outline-none"
+                        />
+                      ) : field.type === "date" ? (
+                        <input
+                          type="date"
+                          value={editingValues[field.key] || ""}
+                          onChange={(e) => setEditingValues({ ...editingValues, [field.key]: e.target.value })}
+                          className="w-full rounded-lg border border-slate-200 px-2 py-1 text-xs mt-1 focus:border-gold-3 focus:text-black outline-none"
+                        />
+                      ) : field.type === "file" ? (
+                        <div className="space-y-2">
+                          <label className="inline-flex w-fit cursor-pointer items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100">
+                            <Icon icon={uploadingMaterial ? "mdi:loading" : "mdi:upload"} className={uploadingMaterial ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} />
+                            {uploadingMaterial ? "Uploading…" : "Choose file"}
+                            <input
+                              type="file"
+                              accept={field.accept}
+                              onChange={(e) => handleMaterialUpload(e.target.files)}
+                              disabled={uploadingMaterial}
+                              className="hidden"
+                            />
+                          </label>
+                          {articleMaterials.length > 0 && (
+                            <div className="grid grid-cols-2 gap-2">
+                              {articleMaterials.map((material, idx) => (
+                                <div key={idx} className="border border-slate-200 rounded p-2 flex items-center justify-between text-xs">
+                                  <span className="truncate">{material.name}</span>
+                                  <button
+                                    onClick={() => {
+                                      const updated = articleMaterials.filter((_, i) => i !== idx);
+                                      setArticleMaterials(updated);
+                                    }}
+                                    className="text-red-600 ml-2"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <input
+                          type="text"
+                          value={editingValues[field.key] || ""}
+                          onChange={(e) => setEditingValues({ ...editingValues, [field.key]: e.target.value })}
+                          className="w-full rounded-lg border border-slate-200 px-2 py-1 text-xs mt-1 focus:border-gold-3 focus:text-black outline-none"
+                          placeholder={field.placeholder}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Scripture Section */}
+                  <div className="border-l-4 border-slate-400 bg-white rounded p-4">
+                    <h3 className="text-xs font-bold uppercase text-slate-700 mb-3">
+                      Scripture & Manual Reference
+                    </h3>
+                    {selectedArticle.scripture_citations && selectedArticle.scripture_citations.length > 0 ? (
+                      <div className="space-y-1">
+                        {selectedArticle.scripture_citations.map((s: any) => (
+                          <p key={s.reference} className="text-sm text-slate-900">
+                            {s.reference}
+                          </p>
+                        ))}
                       </div>
-                    ))}
+                    ) : (
+                      <p className="text-sm text-slate-500 italic">No scripture references</p>
+                    )}
+                    {selectedArticle.handbook_page_reference && (
+                      <p className="text-xs text-slate-600 mt-2 pt-2 border-t">
+                        <strong>ACC Manual:</strong> {selectedArticle.handbook_page_reference}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Reflection Questions Section */}
+                  <div className="bg-white rounded p-4">
+                    <h3 className="text-xs font-bold uppercase text-slate-700 mb-3">
+                      Reflection Questions
+                    </h3>
+                    {selectedArticle.guided_reflection_questions && selectedArticle.guided_reflection_questions.length > 0 ? (
+                      <div className="space-y-3">
+                        {selectedArticle.guided_reflection_questions.map((q: string, idx: number) => (
+                          <div key={idx} className="flex gap-3">
+                            <div className="h-6 w-6 min-w-6 rounded-full bg-slate-400 flex items-center justify-center text-xs font-bold text-white">
+                              {idx + 1}
+                            </div>
+                            <p className="text-sm text-slate-700 pt-1">{q}</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-slate-500 italic">No reflection questions</p>
+                    )}
+                  </div>
+
+                  {/* Pastoral Directive Section */}
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <h3 className="text-xs font-bold uppercase text-slate-700 mb-2">
+                      Pastoral Directive
+                    </h3>
+                    {selectedArticle.pastoral_directive ? (
+                      <p className="text-sm text-slate-700">{selectedArticle.pastoral_directive}</p>
+                    ) : (
+                      <p className="text-sm text-slate-500 italic">No pastoral directive</p>
+                    )}
+                  </div>
+
+                  {/* Materials Section */}
+                  <div className="bg-white rounded p-4">
+                    <h3 className="text-xs font-bold uppercase text-slate-700 mb-3">
+                      Materials
+                    </h3>
+                    {articleMaterials.length > 0 ? (
+                      <div className="grid grid-cols-2 gap-2">
+                        {articleMaterials.map((material, idx) => (
+                          <div key={idx} className="border border-slate-200 rounded p-2 text-xs text-slate-900 truncate">
+                            {material.name}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-500 italic">No materials uploaded yet</p>
+                    )}
+                  </div>
+
+                  {/* Status Section */}
+                  <div className="bg-white rounded p-4 border-b">
+                    <h3 className="text-xs font-bold uppercase text-slate-700 mb-2">Status</h3>
+                    <span
+                      className={`inline-block rounded-full px-3 py-1 text-xs font-bold ${
+                        selectedArticle.status === "Published"
+                          ? "bg-green-100 text-green-700"
+                          : selectedArticle.status === "Scheduled"
+                            ? "bg-amber-100 text-amber-700"
+                            : "bg-slate-100 text-slate-700"
+                      }`}
+                    >
+                      • {selectedArticle.status}
+                    </span>
                   </div>
                 </div>
               )}
             </div>
+
+            {/* Footer spacer */}
+            <div className="h-12 flex-shrink-0" />
           </div>
         )}
       </div>
 
-      {/* Create Article Dialog */}
-      <RecordFormDialog
-        open={createDialogOpen}
-        onOpenChange={setCreateDialogOpen}
-        title="Add Weekly Article"
-        description={`Add a formation article to ${subPillar?.title}`}
-        fields={ARTICLE_FORM_FIELDS}
-        submitLabel="Create Article"
-        onSubmit={(values) => createMut.mutate(values)}
-      />
-
-      {/* Edit Article Dialog */}
-      <AlertDialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <AlertDialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <AlertDialogTitle>Edit Article</AlertDialogTitle>
-          <div className="space-y-4 py-4">
-            {ARTICLE_FORM_FIELDS.filter((f) => f.key !== "materials").map((field) => (
-              <div key={field.key}>
-                <label className="text-xs font-bold uppercase text-text-2 block mb-1">{field.label}</label>
-                {field.type === "textarea" ? (
-                  <textarea
-                    value={selectedArticle?.[field.key] || ""}
-                    onChange={(e) =>
-                      setSelectedArticle({ ...selectedArticle, [field.key]: e.target.value })
-                    }
-                    className="w-full rounded border border-border bg-bg-3 px-2 py-1.5 text-[11px] resize-none min-h-20"
-                    placeholder={field.placeholder}
-                  />
-                ) : field.type === "number" ? (
-                  <input
-                    type="number"
-                    value={selectedArticle?.[field.key] || ""}
-                    onChange={(e) =>
-                      setSelectedArticle({ ...selectedArticle, [field.key]: e.target.value })
-                    }
-                    className="w-full rounded border border-border bg-bg-3 px-2 py-1.5 text-[11px]"
-                  />
-                ) : field.type === "date" ? (
-                  <input
-                    type="date"
-                    value={selectedArticle?.[field.key] || ""}
-                    onChange={(e) =>
-                      setSelectedArticle({ ...selectedArticle, [field.key]: e.target.value })
-                    }
-                    className="w-full rounded border border-border bg-bg-3 px-2 py-1.5 text-[11px]"
-                  />
-                ) : (
-                  <input
-                    type="text"
-                    value={selectedArticle?.[field.key] || ""}
-                    onChange={(e) =>
-                      setSelectedArticle({ ...selectedArticle, [field.key]: e.target.value })
-                    }
-                    className="w-full rounded border border-border bg-bg-3 px-2 py-1.5 text-[11px]"
-                    placeholder={field.placeholder}
-                  />
-                )}
-              </div>
-            ))}
-
-            {/* Materials Section */}
-            <div>
-              <label className="text-xs font-bold uppercase text-text-2 block mb-2">Materials</label>
-              <div className="space-y-2">
-                {articleMaterials.length > 0 && (
-                  <div className="grid grid-cols-2 gap-2">
-                    {articleMaterials.map((material, idx) => (
-                      <div key={idx} className="border border-border rounded p-2 flex items-center justify-between text-[11px]">
-                        <span className="truncate">{material.name}</span>
-                        <button
-                          onClick={() => {
-                            const updated = articleMaterials.filter((_, i) => i !== idx);
-                            setArticleMaterials(updated);
-                          }}
-                          className="text-danger ml-2"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <label className="inline-flex w-fit cursor-pointer items-center gap-1.5 rounded-md border border-border bg-bg-3 px-2.5 py-1.5 text-[11px] font-bold text-text-1 hover:bg-bg-4">
-                  <Icon icon={uploadingMaterial ? "mdi:loading" : "mdi:upload"} className={uploadingMaterial ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} />
-                  {uploadingMaterial ? "Uploading…" : "Choose file"}
-                  <input
-                    type="file"
-                    accept="image/*,.pdf"
-                    onChange={(e) => handleMaterialUpload(e.target.files)}
-                    disabled={uploadingMaterial}
-                    className="hidden"
-                  />
-                </label>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-2">
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => updateMut.mutate(selectedArticle)}
-              className="bg-primary hover:opacity-90"
-            >
-              Save Article
-            </AlertDialogAction>
-          </div>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Action Confirmation Dialog */}
+      {/* Confirmation Dialogs */}
       <AlertDialog open={!!confirmAction} onOpenChange={(open) => !open && setConfirmAction(null)}>
         <AlertDialogContent>
           <AlertDialogTitle>
@@ -676,13 +790,24 @@ function YFPWeeklyArticles() {
                 else if (confirmAction.type === "delete") deleteMut.mutate(confirmAction.articleId);
                 setConfirmAction(null);
               }}
-              className={confirmAction?.type === "delete" ? "bg-danger hover:opacity-90" : "bg-primary hover:opacity-90"}
+              className={confirmAction?.type === "delete" ? "bg-red-600 hover:bg-red-700" : ""}
             >
               {confirmAction?.type === "delete" ? "Delete" : "Confirm"}
             </AlertDialogAction>
           </div>
         </AlertDialogContent>
       </AlertDialog>
-    </>
+
+      {/* Create Article Dialog */}
+      <RecordFormDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+        title="Add Weekly Article"
+        description={`Add a formation article to ${subPillar?.title}`}
+        fields={ARTICLE_FORM_FIELDS}
+        submitLabel="Create Article"
+        onSubmit={(values) => createMut.mutate(values)}
+      />
+    </div>
   );
 }
