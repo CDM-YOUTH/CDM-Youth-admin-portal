@@ -33,7 +33,9 @@ function PortalHome() {
           />
         </div>
         <h1 className="text-display text-2xl font-black leading-tight text-danger">
-          Catholic Diocese<br />of Murang'a
+          Catholic Diocese
+          <br />
+          of Murang'a
         </h1>
         <p className="mt-2 text-[13px] text-text-2">Your home in the Diocese of Murang'a.</p>
       </section>
@@ -92,8 +94,12 @@ function PortalHome() {
 
       {/* Footer mark */}
       <section className="mt-8 mb-4 rounded-2xl bg-bg-2 p-4 text-center">
-        <div className="text-[11px] font-bold uppercase tracking-wider text-gold-3">Faith in Action</div>
-        <div className="mt-1 text-[12px] text-text-2">Empowering the youth of Murang'a since 1983.</div>
+        <div className="text-[11px] font-bold uppercase tracking-wider text-gold-3">
+          Faith in Action
+        </div>
+        <div className="mt-1 text-[12px] text-text-2">
+          Empowering the youth of Murang'a since 1983.
+        </div>
       </section>
 
       {user && (

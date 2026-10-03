@@ -5,7 +5,8 @@ import { likePattern } from "@/lib/utils";
 const db = supabase as any;
 
 export type PaymentStatus = "pending" | "paid" | "waived";
-export type OrderStatus = "pending" | "approved" | "paid" | "dispatched" | "delivered" | "cancelled";
+export type OrderStatus =
+  "pending" | "approved" | "paid" | "dispatched" | "delivered" | "cancelled";
 
 export type OrderType = "youth" | "patronage" | "walk_in";
 
@@ -88,12 +89,14 @@ export type UniformOrderUpdateInput = {
 export async function listUniformOrders(limit = 300): Promise<UniformOrder[]> {
   const { data, error } = await db
     .from("uniform_orders_with_status")
-    .select(`
+    .select(
+      `
       *,
       item:uniform_items(name, unit_price),
       youth:youths(id, first_name, last_name, parish_id),
       parish:parishes(name)
-    `)
+    `,
+    )
     .order("ordered_at", { ascending: false })
     .limit(limit);
   if (error) throw error;
@@ -120,12 +123,15 @@ export async function listUniformOrdersPaged(opts: {
 
   let query = db
     .from("uniform_orders_with_status")
-    .select(`
+    .select(
+      `
       *,
       item:uniform_items(name, unit_price),
       youth:youths(id, first_name, last_name, parish_id),
       parish:parishes(name)
-    `, { count: "exact" })
+    `,
+      { count: "exact" },
+    )
     .order("ordered_at", { ascending: false })
     .range(page * size, page * size + size - 1);
 
@@ -136,7 +142,7 @@ export async function listUniformOrdersPaged(opts: {
     query = query.eq("payment_status", opts.paymentStatus);
   }
   if (opts.from) query = query.gte("ordered_at", opts.from);
-  if (opts.to)   query = query.lte("ordered_at", `${opts.to}T23:59:59Z`);
+  if (opts.to) query = query.lte("ordered_at", `${opts.to}T23:59:59Z`);
   if (opts.q?.trim()) {
     const t = likePattern(opts.q);
     query = query.or(`cdm_id.ilike.${t},item.name.ilike.${t},parish.name.ilike.${t}`);
@@ -166,7 +172,8 @@ export async function createUniformOrder(input: UniformOrderInput): Promise<Unif
   }
 
   // Determine order type
-  const orderType: OrderType = input.orderType ?? (input.youthId || input.cdmId ? 'youth' : 'walk_in');
+  const orderType: OrderType =
+    input.orderType ?? (input.youthId || input.cdmId ? "youth" : "walk_in");
 
   const { data, error } = await db
     .from("uniform_orders")
@@ -182,12 +189,14 @@ export async function createUniformOrder(input: UniformOrderInput): Promise<Unif
       ordered_by_phone: input.orderedByPhone ?? null,
       deanery_id: input.deaneryId ?? null,
     })
-    .select(`
+    .select(
+      `
       *,
       item:uniform_items(name, unit_price),
       youth:youths(id, first_name, last_name, parish_id),
       parish:parishes(name)
-    `)
+    `,
+    )
     .single();
   if (error) throw error;
   const order = data as any;
@@ -197,19 +206,25 @@ export async function createUniformOrder(input: UniformOrderInput): Promise<Unif
     unit_price: order.item?.unit_price ?? 0,
     youth_name: order.youth ? `${order.youth.first_name} ${order.youth.last_name}` : null,
     parish_name: order.parish?.name ?? null,
-    status: 'pending',
+    status: "pending",
   };
 }
 
-export async function updateUniformOrder(id: string, input: UniformOrderUpdateInput): Promise<UniformOrder> {
+export async function updateUniformOrder(
+  id: string,
+  input: UniformOrderUpdateInput,
+): Promise<UniformOrder> {
   const payload: Record<string, unknown> = {};
   if (input.reviewNotes !== undefined) payload.review_notes = input.reviewNotes;
   if (input.paymentStatus !== undefined) payload.payment_status = input.paymentStatus;
   if (input.paymentMethod !== undefined) payload.payment_method = input.paymentMethod;
-  if (input.dispatchContactName !== undefined) payload.dispatch_contact_name = input.dispatchContactName;
-  if (input.dispatchContactPhone !== undefined) payload.dispatch_contact_phone = input.dispatchContactPhone;
+  if (input.dispatchContactName !== undefined)
+    payload.dispatch_contact_name = input.dispatchContactName;
+  if (input.dispatchContactPhone !== undefined)
+    payload.dispatch_contact_phone = input.dispatchContactPhone;
   if (input.dispatchMethod !== undefined) payload.dispatch_method = input.dispatchMethod;
-  if (input.dispatchScheduledAt !== undefined) payload.dispatch_scheduled_at = input.dispatchScheduledAt;
+  if (input.dispatchScheduledAt !== undefined)
+    payload.dispatch_scheduled_at = input.dispatchScheduledAt;
   if (input.dispatchNotes !== undefined) payload.dispatch_notes = input.dispatchNotes;
   if (input.deliveredBy !== undefined) payload.delivered_by = input.deliveredBy;
   if (input.deliveryNotes !== undefined) payload.delivery_notes = input.deliveryNotes;
@@ -218,12 +233,14 @@ export async function updateUniformOrder(id: string, input: UniformOrderUpdateIn
     .from("uniform_orders")
     .update(payload)
     .eq("id", id)
-    .select(`
+    .select(
+      `
       *,
       item:uniform_items(name, unit_price),
       youth:youths(id, first_name, last_name, parish_id),
       parish:parishes(name)
-    `)
+    `,
+    )
     .single();
   if (error) throw error;
   const order = data as any;
@@ -264,7 +281,13 @@ export async function recordPayment(id: string, paymentMethod?: string): Promise
 /** Stage 3: dispatch details — who's delivering, how, and when. */
 export async function confirmDispatch(
   id: string,
-  input: { contactName: string; contactPhone?: string | null; method: string; scheduledAt?: string | null; notes?: string | null },
+  input: {
+    contactName: string;
+    contactPhone?: string | null;
+    method: string;
+    scheduledAt?: string | null;
+    notes?: string | null;
+  },
 ): Promise<void> {
   const { data: auth } = await supabase.auth.getUser();
   const { error } = await db
@@ -283,7 +306,11 @@ export async function confirmDispatch(
 }
 
 /** Stage 4: confirm the item actually reached the youth. */
-export async function confirmDelivery(id: string, deliveredBy?: string | null, notes?: string | null): Promise<void> {
+export async function confirmDelivery(
+  id: string,
+  deliveredBy?: string | null,
+  notes?: string | null,
+): Promise<void> {
   const { error } = await db
     .from("uniform_orders")
     .update({
@@ -334,10 +361,12 @@ export async function searchOrderRecipients(opts: {
   const pattern = likePattern(q);
   let youthQuery = db
     .from("youths")
-    .select(`
+    .select(
+      `
       id, cdm_id, first_name, last_name, parish_id,
       parish:parishes(id, name, deanery_id, deanery:deaneries(name))
-    `)
+    `,
+    )
     .ilike("first_name", pattern);
 
   if (deaneryId) {
@@ -353,10 +382,12 @@ export async function searchOrderRecipients(opts: {
 
   let patronageQuery = db
     .from("patronage_team")
-    .select(`
+    .select(
+      `
       id, first_name, last_name, parish_id,
       parish:parishes(id, name, deanery_id, deanery:deaneries(name))
-    `)
+    `,
+    )
     .ilike("first_name", pattern);
 
   if (deaneryId) {

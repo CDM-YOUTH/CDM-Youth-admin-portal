@@ -45,7 +45,7 @@ RLS-protected data or leaks a service-role key to the browser:
 1. **`@/integrations/supabase/client`** (`supabase`) — anon/publishable key, browser + SSR safe, subject to Row
    Level Security. This is what almost all `src/lib/db/**` query modules and route components use directly.
 2. **`@/integrations/supabase/client.server`** (`supabaseAdmin`) — service-role key, **bypasses RLS**. Server-only
-   (throws if misused client-side isn't enforced by code — enforced by *never importing it from a client component*).
+   (throws if misused client-side isn't enforced by code — enforced by _never importing it from a client component_).
    Use only in server functions/API routes for trusted admin operations.
 3. **`@/integrations/supabase/auth-middleware`** (`requireSupabaseAuth`) — TanStack Start server middleware that
    validates a `Bearer` token from the request and hands `{ supabase, userId, claims }` to `next()`, where that
@@ -64,15 +64,16 @@ pattern, built from helpers in `src/lib/api/server-client.ts`:
 ```ts
 export const APIRoute = createAPIFileRoute("/api/youths")({
   GET: async ({ request }) => {
-    const guard = await guardRequest(request);       // auth + rate limit + role/scope lookup
+    const guard = await guardRequest(request); // auth + rate limit + role/scope lookup
     if ("error" in guard) return guard.error;
     // ... build a Supabase query, apply applyCallerScope() to enforce org scoping ...
-    return jsonOk({ data, total, page, size });        // or jsonError(message, status)
+    return jsonOk({ data, total, page, size }); // or jsonError(message, status)
   },
 });
 ```
 
 Key pieces from `src/lib/api/`:
+
 - `auth.ts` — `verifyAuth(request)` validates the `Authorization: Bearer <token>` header against Supabase and
   returns claims.
 - `rate-limiter.ts` — in-memory sliding-window limiter keyed by `userId` (120 req/60s). Explicitly **no
@@ -93,6 +94,7 @@ follow whichever pattern the sibling code in that domain already uses.
 
 Query modules organized by domain, each exporting typed row types and fetch/mutate functions built on the
 `supabase` client:
+
 - `youth-records/` — `youths.ts`, `enrollments.ts`, `leaders.ts`, `cusa.ts`, `profiles.ts`, `import.ts` (bulk CSV
   import)
 - `activities/` — `events.ts`, `mission.ts`
@@ -159,7 +161,7 @@ first, since it's already committed history.
 
 ## Planning docs (not yet implemented)
 
-`docs/backend-architecture-proposal.md` and `docs/security-hosting-golive-plan.md` describe a *proposed* future
+`docs/backend-architecture-proposal.md` and `docs/security-hosting-golive-plan.md` describe a _proposed_ future
 split into a dedicated `cdm-backend` service plus independent frontend repos, and a security/go-live audit. Both
 are proposals under review, not the current architecture — don't assume the split has happened. The security audit
 does flag real, still-unfixed gaps worth knowing about if you touch auth/OTP code (OTP brute-force is unthrottled,

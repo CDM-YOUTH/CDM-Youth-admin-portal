@@ -18,9 +18,7 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
   }, [isMobile]);
 
   return (
-    <Ctx.Provider
-      value={{ collapsed, setCollapsed, toggle: () => setCollapsed((v) => !v) }}
-    >
+    <Ctx.Provider value={{ collapsed, setCollapsed, toggle: () => setCollapsed((v) => !v) }}>
       {children}
     </Ctx.Provider>
   );

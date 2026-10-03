@@ -1,7 +1,20 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,6 +26,8 @@ export type FieldDef = {
   label: string;
   type?: "text" | "number" | "email" | "tel" | "date" | "textarea" | "select" | "image" | "file";
   options?: string[];
+  /** Display labels for options (when you want to store IDs but show names) */
+  optionLabels?: string[];
   placeholder?: string;
   required?: boolean;
   /** When set, value is auto-derived from another field's value */
@@ -97,7 +112,9 @@ export function RecordFormDialog({
       <DialogContent className="max-h-[calc(100vh-1rem)] w-[calc(100vw-1rem)] max-w-2xl overflow-y-auto border-border bg-white p-4 text-foreground sm:p-6">
         <DialogHeader>
           <DialogTitle className="text-display text-xl font-black text-gold">{title}</DialogTitle>
-          {description && <DialogDescription className="text-[12px] text-text-3">{description}</DialogDescription>}
+          {description && (
+            <DialogDescription className="text-[12px] text-text-3">{description}</DialogDescription>
+          )}
         </DialogHeader>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -108,7 +125,10 @@ export function RecordFormDialog({
             const wrapperClass = `w-full space-y-1 text-[10px] font-bold uppercase tracking-wide ${isErr ? "text-danger" : "text-text-3"} ${f.full || f.type === "textarea" ? "sm:col-span-2" : ""}`;
             return (
               <label key={f.key} className={wrapperClass}>
-                <span>{f.label}{f.required ? " *" : ""}</span>
+                <span>
+                  {f.label}
+                  {f.required ? " *" : ""}
+                </span>
                 {renderField(f, val, (v) => setField(f.key, v), opts)}
               </label>
             );
@@ -143,7 +163,13 @@ function renderField(
   options?: string[],
 ) {
   if (field.type === "textarea") {
-    return <Textarea value={value} onChange={(e) => onChange(e.target.value)} placeholder={field.placeholder ?? field.label} />;
+    return (
+      <Textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={field.placeholder ?? field.label}
+      />
+    );
   }
   if (field.type === "image") {
     return <ImageUpload value={value} onChange={onChange} bucket={field.bucket ?? "passports"} />;
@@ -160,12 +186,19 @@ function renderField(
     );
   }
   if (field.type === "select") {
+    const selectedLabel = field.optionLabels
+      ? field.optionLabels[options?.indexOf(value) ?? -1]
+      : value;
     return (
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger><SelectValue placeholder={field.placeholder ?? `Select ${field.label.toLowerCase()}`} /></SelectTrigger>
+        <SelectTrigger>
+          <SelectValue placeholder={field.placeholder ?? `Select ${field.label.toLowerCase()}`} />
+        </SelectTrigger>
         <SelectContent>
-          {(options ?? []).map((opt) => (
-            <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+          {(options ?? []).map((opt, idx) => (
+            <SelectItem key={opt} value={opt}>
+              {field.optionLabels?.[idx] ?? opt}
+            </SelectItem>
           ))}
         </SelectContent>
       </Select>
@@ -181,7 +214,15 @@ function renderField(
   );
 }
 
-function ImageUpload({ value, onChange, bucket }: { value: string; onChange: (v: string) => void; bucket: string }) {
+function ImageUpload({
+  value,
+  onChange,
+  bucket,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  bucket: string;
+}) {
   const [uploading, setUploading] = useState(false);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -215,7 +256,11 @@ function ImageUpload({ value, onChange, bucket }: { value: string; onChange: (v:
   return (
     <div className="flex items-center gap-3 rounded-lg border border-border bg-bg-2 p-2 normal-case tracking-normal">
       {value ? (
-        <img src={value} alt="Passport" className="h-16 w-16 rounded-md border border-border object-cover" />
+        <img
+          src={value}
+          alt="Passport"
+          className="h-16 w-16 rounded-md border border-border object-cover"
+        />
       ) : (
         <div className="flex h-16 w-16 items-center justify-center rounded-md border border-dashed border-border bg-bg-3 text-text-4">
           <Icon icon="mdi:upload" className="h-5 w-5" />
@@ -223,9 +268,19 @@ function ImageUpload({ value, onChange, bucket }: { value: string; onChange: (v:
       )}
       <div className="flex flex-1 flex-col gap-1.5">
         <label className="inline-flex w-fit cursor-pointer items-center gap-1.5 rounded-md border border-border bg-bg-3 px-2.5 py-1.5 text-[11px] font-bold text-text-1 hover:bg-bg-4">
-          {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Icon icon="mdi:upload" className="h-3.5 w-3.5" />}
+          {uploading ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Icon icon="mdi:upload" className="h-3.5 w-3.5" />
+          )}
           {uploading ? "Uploading…" : value ? "Replace photo" : "Choose passport photo"}
-          <input type="file" accept="image/*" className="hidden" onChange={handleUpload} disabled={uploading} />
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleUpload}
+            disabled={uploading}
+          />
         </label>
         {value && (
           <button
@@ -300,9 +355,19 @@ function FileUpload({
       )}
       <div className="flex items-center gap-2">
         <label className="inline-flex w-fit cursor-pointer items-center gap-1.5 rounded-md border border-border bg-bg-3 px-2.5 py-1.5 text-[11px] font-bold text-text-1 hover:bg-bg-4">
-          {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Icon icon="mdi:upload" className="h-3.5 w-3.5" />}
+          {uploading ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Icon icon="mdi:upload" className="h-3.5 w-3.5" />
+          )}
           {uploading ? "Uploading…" : value ? "Replace file" : "Choose file"}
-          <input type="file" accept={accept} className="hidden" onChange={handleUpload} disabled={uploading} />
+          <input
+            type="file"
+            accept={accept}
+            className="hidden"
+            onChange={handleUpload}
+            disabled={uploading}
+          />
         </label>
         {value && (
           <button

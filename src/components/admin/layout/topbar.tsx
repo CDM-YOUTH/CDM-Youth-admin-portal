@@ -83,7 +83,11 @@ export function UserMenu() {
           </button>
         </DropdownMenuTrigger>
 
-        <DropdownMenuContent align="end" sideOffset={8} className="w-56 border border-black/10 shadow-lg">
+        <DropdownMenuContent
+          align="end"
+          sideOffset={8}
+          className="w-56 border border-black/10 shadow-lg"
+        >
           {/* User info header */}
           <DropdownMenuLabel className="flex items-center gap-2.5 pb-2.5 pt-2">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-danger text-[10px] font-bold text-white">
@@ -95,7 +99,9 @@ export function UserMenu() {
                 <div className="truncate text-[10px] font-normal text-gray-400">{user!.email}</div>
               )}
               {user?.position && (
-                <div className="truncate text-[10px] font-normal text-gray-400">{user.position}</div>
+                <div className="truncate text-[10px] font-normal text-gray-400">
+                  {user.position}
+                </div>
               )}
             </div>
           </DropdownMenuLabel>
@@ -220,9 +226,7 @@ export function Topbar({
           <div className="mt-0.5 hidden text-[11px] text-text-3 sm:block">{description}</div>
         )}
       </div>
-      {action && (
-        <div className="flex items-center gap-2">{action}</div>
-      )}
+      {action && <div className="flex items-center gap-2">{action}</div>}
     </div>
   );
 }
@@ -240,9 +244,7 @@ export function TopbarTab({
     <button
       onClick={onClick}
       className={`flex h-12 shrink-0 items-center whitespace-nowrap border-b-2 px-3.5 text-[11px] font-semibold transition-colors ${
-        active
-          ? "border-danger text-danger"
-          : "border-transparent text-text-3 hover:text-text-1"
+        active ? "border-danger text-danger" : "border-transparent text-text-3 hover:text-text-1"
       }`}
     >
       {children}
@@ -250,13 +252,7 @@ export function TopbarTab({
   );
 }
 
-export function TopbarButton({
-  children,
-  onClick,
-}: {
-  children: ReactNode;
-  onClick?: () => void;
-}) {
+export function TopbarButton({ children, onClick }: { children: ReactNode; onClick?: () => void }) {
   const label = typeof children === "string" ? children : "Action";
 
   return (

@@ -15,7 +15,9 @@ function sod(d: Date): Date {
   return r;
 }
 
-function today(): Date { return sod(new Date()); }
+function today(): Date {
+  return sod(new Date());
+}
 
 function daysAgo(n: number): Date {
   const d = today();
@@ -38,15 +40,22 @@ function fmt(d: Date): string {
 type PresetKey = "today" | "yesterday" | "7d" | "14d" | "30d" | "3m" | "6m" | "1y" | "custom";
 
 const PRESETS: { key: PresetKey; label: string; getRange: () => DateRange }[] = [
-  { key: "today",     label: "Today",         getRange: () => ({ from: today(),        to: today()        }) },
-  { key: "yesterday", label: "Yesterday",     getRange: () => { const d = daysAgo(1);  return { from: d, to: d }; } },
-  { key: "7d",        label: "Last 7 days",   getRange: () => ({ from: daysAgo(6),     to: today()        }) },
-  { key: "14d",       label: "Last 14 days",  getRange: () => ({ from: daysAgo(13),    to: today()        }) },
-  { key: "30d",       label: "Last 30 days",  getRange: () => ({ from: daysAgo(29),    to: today()        }) },
-  { key: "3m",        label: "Last 3 months", getRange: () => ({ from: monthsAgo(3),   to: today()        }) },
-  { key: "6m",        label: "Last 6 months", getRange: () => ({ from: monthsAgo(6),   to: today()        }) },
-  { key: "1y",        label: "Last year",     getRange: () => ({ from: monthsAgo(12),  to: today()        }) },
-  { key: "custom",    label: "Custom",        getRange: () => ({ from: undefined,       to: undefined      }) },
+  { key: "today", label: "Today", getRange: () => ({ from: today(), to: today() }) },
+  {
+    key: "yesterday",
+    label: "Yesterday",
+    getRange: () => {
+      const d = daysAgo(1);
+      return { from: d, to: d };
+    },
+  },
+  { key: "7d", label: "Last 7 days", getRange: () => ({ from: daysAgo(6), to: today() }) },
+  { key: "14d", label: "Last 14 days", getRange: () => ({ from: daysAgo(13), to: today() }) },
+  { key: "30d", label: "Last 30 days", getRange: () => ({ from: daysAgo(29), to: today() }) },
+  { key: "3m", label: "Last 3 months", getRange: () => ({ from: monthsAgo(3), to: today() }) },
+  { key: "6m", label: "Last 6 months", getRange: () => ({ from: monthsAgo(6), to: today() }) },
+  { key: "1y", label: "Last year", getRange: () => ({ from: monthsAgo(12), to: today() }) },
+  { key: "custom", label: "Custom", getRange: () => ({ from: undefined, to: undefined }) },
 ];
 
 function detectPreset(r: DateRange): PresetKey {
@@ -54,11 +63,11 @@ function detectPreset(r: DateRange): PresetKey {
   const t = today().getTime();
   const f = r.from.getTime();
   const to = (r.to ?? today()).getTime();
-  if (f === t && to === t)                                return "today";
+  if (f === t && to === t) return "today";
   if (f === daysAgo(1).getTime() && to === daysAgo(1).getTime()) return "yesterday";
-  if (f === daysAgo(6).getTime()  && to === t)           return "7d";
-  if (f === daysAgo(13).getTime() && to === t)           return "14d";
-  if (f === daysAgo(29).getTime() && to === t)           return "30d";
+  if (f === daysAgo(6).getTime() && to === t) return "7d";
+  if (f === daysAgo(13).getTime() && to === t) return "14d";
+  if (f === daysAgo(29).getTime() && to === t) return "30d";
   return "custom";
 }
 
@@ -74,9 +83,11 @@ export function getRangeLabel(r: DateRange): string {
 
 export function inDateRange(isoDate: string, r: DateRange): boolean {
   if (!r.from) return true;
-  const ts   = new Date(isoDate).getTime();
+  const ts = new Date(isoDate).getTime();
   const from = sod(r.from).getTime();
-  const to   = r.to ? new Date(r.to).setHours(23, 59, 59, 999) : new Date(r.from).setHours(23, 59, 59, 999);
+  const to = r.to
+    ? new Date(r.to).setHours(23, 59, 59, 999)
+    : new Date(r.from).setHours(23, 59, 59, 999);
   return ts >= from && ts <= to;
 }
 
@@ -96,11 +107,14 @@ export function DateRangeFilter({
   const [activePreset, setActivePreset] = useState<PresetKey>(() => detectPreset(value));
 
   const handleOpen = (o: boolean) => {
-    if (o) { setDraft(value); setActivePreset(detectPreset(value)); }
+    if (o) {
+      setDraft(value);
+      setActivePreset(detectPreset(value));
+    }
     setOpen(o);
   };
 
-  const handlePreset = (p: typeof PRESETS[number]) => {
+  const handlePreset = (p: (typeof PRESETS)[number]) => {
     setActivePreset(p.key);
     if (p.key !== "custom") setDraft(p.getRange());
   };
@@ -112,8 +126,15 @@ export function DateRangeFilter({
     setActivePreset("custom");
   };
 
-  const apply = () => { onChange(draft); setOpen(false); };
-  const clear  = () => { const e: DateRange = { from: undefined, to: undefined }; onChange(e); setOpen(false); };
+  const apply = () => {
+    onChange(draft);
+    setOpen(false);
+  };
+  const clear = () => {
+    const e: DateRange = { from: undefined, to: undefined };
+    onChange(e);
+    setOpen(false);
+  };
 
   return (
     <Popover open={open} onOpenChange={handleOpen}>

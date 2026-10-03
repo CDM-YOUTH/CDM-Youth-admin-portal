@@ -43,7 +43,10 @@ export async function listFormationItems(publishedOnly = true): Promise<Formatio
 
 export async function createFormationItem(input: FormationItemInput): Promise<FormationItem> {
   const tags = input.tags
-    ? input.tags.split(",").map((t: string) => t.trim()).filter(Boolean)
+    ? input.tags
+        .split(",")
+        .map((t: string) => t.trim())
+        .filter(Boolean)
     : [];
 
   const { data, error } = await db
@@ -64,9 +67,15 @@ export async function createFormationItem(input: FormationItemInput): Promise<Fo
   return data as FormationItem;
 }
 
-export async function updateFormationItem(id: string, input: FormationItemInput): Promise<FormationItem> {
+export async function updateFormationItem(
+  id: string,
+  input: FormationItemInput,
+): Promise<FormationItem> {
   const tags = input.tags
-    ? input.tags.split(",").map((t: string) => t.trim()).filter(Boolean)
+    ? input.tags
+        .split(",")
+        .map((t: string) => t.trim())
+        .filter(Boolean)
     : [];
 
   const { data, error } = await db

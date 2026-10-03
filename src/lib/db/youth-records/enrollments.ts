@@ -62,12 +62,12 @@ export async function listEnrollmentsPaged(opts: {
     .range(page * size, page * size + size - 1);
 
   // Own-table filters
-  if (opts.year)   query = query.eq("year", opts.year);
+  if (opts.year) query = query.eq("year", opts.year);
   if (opts.status) query = query.eq("status", opts.status);
 
   // Embedded table filters — use real table name "youths", not alias "youth"
-  if (opts.deaneryId)    query = query.eq("youths.deanery_id",    opts.deaneryId);
-  if (opts.parishId)     query = query.eq("youths.parish_id",     opts.parishId);
+  if (opts.deaneryId) query = query.eq("youths.deanery_id", opts.deaneryId);
+  if (opts.parishId) query = query.eq("youths.parish_id", opts.parishId);
   if (opts.outstationId) query = query.eq("youths.outstation_id", opts.outstationId);
 
   // Text search on youth name / CDM (own columns of the joined table)
@@ -118,7 +118,12 @@ export async function createEnrollment(input: EnrollInput) {
     enrollmentId: data.id,
     youthId: youth.id,
     action: "create",
-    after: { cdmId: input.cdmId, year, paymentRef: input.paymentRef ?? null, status: input.status ?? "paid" },
+    after: {
+      cdmId: input.cdmId,
+      year,
+      paymentRef: input.paymentRef ?? null,
+      status: input.status ?? "paid",
+    },
   });
   return data;
 }
@@ -213,11 +218,12 @@ export async function deleteEnrollment(id: string) {
   });
 }
 
-export async function updateEnrollmentStatus(
-  id: string,
-  status: "paid" | "pending" | "waived",
-) {
-  const { data: prev } = await supabase.from("enrollments").select("status, youth_id").eq("id", id).maybeSingle();
+export async function updateEnrollmentStatus(id: string, status: "paid" | "pending" | "waived") {
+  const { data: prev } = await supabase
+    .from("enrollments")
+    .select("status, youth_id")
+    .eq("id", id)
+    .maybeSingle();
   const { error } = await supabase.from("enrollments").update({ status }).eq("id", id);
   if (error) throw error;
   await logEnrollmentAudit({

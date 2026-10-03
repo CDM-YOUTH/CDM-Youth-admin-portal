@@ -10,12 +10,46 @@ import {
 
 const EMOJI_CATEGORIES = {
   "Church & Faith": ["⛪", "✝️", "🙏", "📖", "🕯️", "🔔", "💒", "⚱️", "🙋", "🕊️"],
-  "Mary, Mother of God": ["👑", "🤱", "👶", "💙", "🙏", "🕊️", "⭐", "🌹", "📿", "🕯️", "💝", "🌟", "🌙", "🩵", "💎", "🙋‍♀️"],
-  "Marian Devotion": ["💒", "🕯️", "📿", "🌹", "💙", "🌸", "⛪", "🎀", "✨", "💝", "🫂", "🏵️", "🙏", "👑", "🕊️", "⭐"],
+  "Mary, Mother of God": [
+    "👑",
+    "🤱",
+    "👶",
+    "💙",
+    "🙏",
+    "🕊️",
+    "⭐",
+    "🌹",
+    "📿",
+    "🕯️",
+    "💝",
+    "🌟",
+    "🌙",
+    "🩵",
+    "💎",
+    "🙋‍♀️",
+  ],
+  "Marian Devotion": [
+    "💒",
+    "🕯️",
+    "📿",
+    "🌹",
+    "💙",
+    "🌸",
+    "⛪",
+    "🎀",
+    "✨",
+    "💝",
+    "🫂",
+    "🏵️",
+    "🙏",
+    "👑",
+    "🕊️",
+    "⭐",
+  ],
   "Rosary & Prayer": ["📿", "🔟", "🙏", "🕯️", "💫", "✨", "⭐", "🌹", "💚", "💛"],
-  "Sacramentals": ["📿", "✝️", "🕯️", "💍", "🔔", "🙏", "💧", "🌿", "✨", "🥦"],
+  Sacramentals: ["📿", "✝️", "🕯️", "💍", "🔔", "🙏", "💧", "🌿", "✨", "🥦"],
   "Eucharist & Mass": ["🕯️", "🍇", "🍷", "🥖", "🍞", "🔔", "💒", "👼", "✨", "⭐"],
-  "Sacraments": ["💍", "🕯️", "🍇", "🍷", "💒", "👨‍⚖️", "👼", "💝", "🔔", "✝️"],
+  Sacraments: ["💍", "🕯️", "🍇", "🍷", "💒", "👨‍⚖️", "👼", "💝", "🔔", "✝️"],
   "People & Community": ["👥", "👨‍👩‍👧‍👦", "👨‍🦱", "👩", "👦", "👶", "🤝", "💪", "🫂", "🧑‍🤝‍🧑"],
   "Activities & Learning": ["📚", "📖", "✍️", "🎓", "🧠", "💡", "🎯", "📝", "📋", "🗣️"],
   "Nature & Creation": ["🌍", "🌿", "🌱", "🌸", "🌞", "🌙", "⭐", "🦋", "🐦", "🌊"],
@@ -23,7 +57,7 @@ const EMOJI_CATEGORIES = {
   "Service & Help": ["🤝", "💼", "🏥", "🏫", "🏠", "🍽️", "🤲", "🧡", "⚕️", "📱"],
   "Celebration & Joy": ["🎉", "🎊", "🎈", "⭐", "🌟", "✨", "🎆", "🎇", "🥳", "😊"],
   "Virtues & Values": ["🦁", "🛡️", "🔑", "👑", "💎", "🏆", "🎖️", "⚡", "🔥", "💫"],
-  "Symbols": ["✝️", "☦️", "🕎", "☪️", "🔯", "☯️", "🔱", "⚜️", "💒", "🕋"],
+  Symbols: ["✝️", "☦️", "🕎", "☪️", "🔯", "☯️", "🔱", "⚜️", "💒", "🕋"],
 };
 
 export function IconColorPicker({
@@ -42,14 +76,12 @@ export function IconColorPicker({
 
   // Flatten all emojis with their category names for search
   const allEmojis = Object.entries(EMOJI_CATEGORIES).flatMap(([category, emojis]) =>
-    emojis.map((emoji) => ({ emoji, category }))
+    emojis.map((emoji) => ({ emoji, category })),
   );
 
   // Filter based on search term (searches category names)
   const filteredEmojis = searchTerm
-    ? allEmojis.filter((item) =>
-        item.category.toLowerCase().includes(searchTerm.toLowerCase())
-      )
+    ? allEmojis.filter((item) => item.category.toLowerCase().includes(searchTerm.toLowerCase()))
     : allEmojis;
 
   return (

@@ -76,9 +76,7 @@ function EventDetail() {
                 key={p.id}
                 className="flex items-start gap-3 rounded-xl border border-border bg-white px-3 py-2 text-[12px]"
               >
-                <span className="font-bold text-danger">
-                  {p.start_time?.slice(0, 5) ?? "—"}
-                </span>
+                <span className="font-bold text-danger">{p.start_time?.slice(0, 5) ?? "—"}</span>
                 <span className="text-text-1">{p.activity}</span>
               </li>
             ))}
@@ -126,11 +124,7 @@ function EventDetail() {
         {e.registrations.length} registered · {e.checkin_count} checked in
       </p>
 
-      <button
-        type="button"
-        onClick={() => navigate({ to: "/portal/events" })}
-        className="sr-only"
-      >
+      <button type="button" onClick={() => navigate({ to: "/portal/events" })} className="sr-only">
         back
       </button>
     </div>

@@ -53,6 +53,9 @@ import { Route as ApiSheetsLeadershipRouteImport } from './routes/api/sheets/lea
 import { Route as ApiUniformsOrdersRouteImport } from './routes/api/uniforms/orders'
 import { Route as ApiUniformsSkusRouteImport } from './routes/api/uniforms/skus'
 import { Route as PortalEventsEventIdRouteImport } from './routes/portal.events.$eventId'
+import { Route as AdminFormationYfpAnalyticsRouteImport } from './routes/admin.formation.yfp.analytics'
+import { Route as AdminFormationYfpPillarsPillarIdSubPillarsRouteImport } from './routes/admin.formation.yfp.pillars.$pillarId.sub-pillars'
+import { Route as AdminFormationYfpSubPillarsSubPillarIdArticlesRouteImport } from './routes/admin.formation.yfp.sub-pillars.$subPillarId.articles'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -275,6 +278,24 @@ const PortalEventsEventIdRoute = PortalEventsEventIdRouteImport.update({
   path: '/$eventId',
   getParentRoute: () => PortalEventsRoute,
 } as any)
+const AdminFormationYfpAnalyticsRoute =
+  AdminFormationYfpAnalyticsRouteImport.update({
+    id: '/analytics',
+    path: '/analytics',
+    getParentRoute: () => AdminFormationYfpRoute,
+  } as any)
+const AdminFormationYfpPillarsPillarIdSubPillarsRoute =
+  AdminFormationYfpPillarsPillarIdSubPillarsRouteImport.update({
+    id: '/pillars/$pillarId/sub-pillars',
+    path: '/pillars/$pillarId/sub-pillars',
+    getParentRoute: () => AdminFormationYfpRoute,
+  } as any)
+const AdminFormationYfpSubPillarsSubPillarIdArticlesRoute =
+  AdminFormationYfpSubPillarsSubPillarIdArticlesRouteImport.update({
+    id: '/sub-pillars/$subPillarId/articles',
+    path: '/sub-pillars/$subPillarId/articles',
+    getParentRoute: () => AdminFormationYfpRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -314,13 +335,16 @@ export interface FileRoutesByFullPath {
   '/admin/event-checkin/$eventId': typeof AdminEventCheckinEventIdRoute
   '/admin/event/$eventId': typeof AdminEventEventIdRoute
   '/admin/formation/bulletin': typeof AdminFormationBulletinRoute
-  '/admin/formation/yfp': typeof AdminFormationYfpRoute
+  '/admin/formation/yfp': typeof AdminFormationYfpRouteWithChildren
   '/api/admin/invite-user': typeof ApiAdminInviteUserRoute
   '/api/sheets/errors': typeof ApiSheetsErrorsRoute
   '/api/sheets/leadership': typeof ApiSheetsLeadershipRoute
   '/api/uniforms/orders': typeof ApiUniformsOrdersRoute
   '/api/uniforms/skus': typeof ApiUniformsSkusRoute
   '/portal/events/$eventId': typeof PortalEventsEventIdRoute
+  '/admin/formation/yfp/analytics': typeof AdminFormationYfpAnalyticsRoute
+  '/admin/formation/yfp/pillars/$pillarId/sub-pillars': typeof AdminFormationYfpPillarsPillarIdSubPillarsRoute
+  '/admin/formation/yfp/sub-pillars/$subPillarId/articles': typeof AdminFormationYfpSubPillarsSubPillarIdArticlesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -358,13 +382,16 @@ export interface FileRoutesByTo {
   '/admin/event-checkin/$eventId': typeof AdminEventCheckinEventIdRoute
   '/admin/event/$eventId': typeof AdminEventEventIdRoute
   '/admin/formation/bulletin': typeof AdminFormationBulletinRoute
-  '/admin/formation/yfp': typeof AdminFormationYfpRoute
+  '/admin/formation/yfp': typeof AdminFormationYfpRouteWithChildren
   '/api/admin/invite-user': typeof ApiAdminInviteUserRoute
   '/api/sheets/errors': typeof ApiSheetsErrorsRoute
   '/api/sheets/leadership': typeof ApiSheetsLeadershipRoute
   '/api/uniforms/orders': typeof ApiUniformsOrdersRoute
   '/api/uniforms/skus': typeof ApiUniformsSkusRoute
   '/portal/events/$eventId': typeof PortalEventsEventIdRoute
+  '/admin/formation/yfp/analytics': typeof AdminFormationYfpAnalyticsRoute
+  '/admin/formation/yfp/pillars/$pillarId/sub-pillars': typeof AdminFormationYfpPillarsPillarIdSubPillarsRoute
+  '/admin/formation/yfp/sub-pillars/$subPillarId/articles': typeof AdminFormationYfpSubPillarsSubPillarIdArticlesRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -405,13 +432,16 @@ export interface FileRoutesById {
   '/admin/event-checkin/$eventId': typeof AdminEventCheckinEventIdRoute
   '/admin/event/$eventId': typeof AdminEventEventIdRoute
   '/admin/formation/bulletin': typeof AdminFormationBulletinRoute
-  '/admin/formation/yfp': typeof AdminFormationYfpRoute
+  '/admin/formation/yfp': typeof AdminFormationYfpRouteWithChildren
   '/api/admin/invite-user': typeof ApiAdminInviteUserRoute
   '/api/sheets/errors': typeof ApiSheetsErrorsRoute
   '/api/sheets/leadership': typeof ApiSheetsLeadershipRoute
   '/api/uniforms/orders': typeof ApiUniformsOrdersRoute
   '/api/uniforms/skus': typeof ApiUniformsSkusRoute
   '/portal/events/$eventId': typeof PortalEventsEventIdRoute
+  '/admin/formation/yfp/analytics': typeof AdminFormationYfpAnalyticsRoute
+  '/admin/formation/yfp/pillars/$pillarId/sub-pillars': typeof AdminFormationYfpPillarsPillarIdSubPillarsRoute
+  '/admin/formation/yfp/sub-pillars/$subPillarId/articles': typeof AdminFormationYfpSubPillarsSubPillarIdArticlesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -460,6 +490,9 @@ export interface FileRouteTypes {
     | '/api/uniforms/orders'
     | '/api/uniforms/skus'
     | '/portal/events/$eventId'
+    | '/admin/formation/yfp/analytics'
+    | '/admin/formation/yfp/pillars/$pillarId/sub-pillars'
+    | '/admin/formation/yfp/sub-pillars/$subPillarId/articles'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -504,6 +537,9 @@ export interface FileRouteTypes {
     | '/api/uniforms/orders'
     | '/api/uniforms/skus'
     | '/portal/events/$eventId'
+    | '/admin/formation/yfp/analytics'
+    | '/admin/formation/yfp/pillars/$pillarId/sub-pillars'
+    | '/admin/formation/yfp/sub-pillars/$subPillarId/articles'
   id:
     | '__root__'
     | '/'
@@ -550,6 +586,9 @@ export interface FileRouteTypes {
     | '/api/uniforms/orders'
     | '/api/uniforms/skus'
     | '/portal/events/$eventId'
+    | '/admin/formation/yfp/analytics'
+    | '/admin/formation/yfp/pillars/$pillarId/sub-pillars'
+    | '/admin/formation/yfp/sub-pillars/$subPillarId/articles'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -882,17 +921,55 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PortalEventsEventIdRouteImport
       parentRoute: typeof PortalEventsRoute
     }
+    '/admin/formation/yfp/analytics': {
+      id: '/admin/formation/yfp/analytics'
+      path: '/analytics'
+      fullPath: '/admin/formation/yfp/analytics'
+      preLoaderRoute: typeof AdminFormationYfpAnalyticsRouteImport
+      parentRoute: typeof AdminFormationYfpRoute
+    }
+    '/admin/formation/yfp/pillars/$pillarId/sub-pillars': {
+      id: '/admin/formation/yfp/pillars/$pillarId/sub-pillars'
+      path: '/pillars/$pillarId/sub-pillars'
+      fullPath: '/admin/formation/yfp/pillars/$pillarId/sub-pillars'
+      preLoaderRoute: typeof AdminFormationYfpPillarsPillarIdSubPillarsRouteImport
+      parentRoute: typeof AdminFormationYfpRoute
+    }
+    '/admin/formation/yfp/sub-pillars/$subPillarId/articles': {
+      id: '/admin/formation/yfp/sub-pillars/$subPillarId/articles'
+      path: '/sub-pillars/$subPillarId/articles'
+      fullPath: '/admin/formation/yfp/sub-pillars/$subPillarId/articles'
+      preLoaderRoute: typeof AdminFormationYfpSubPillarsSubPillarIdArticlesRouteImport
+      parentRoute: typeof AdminFormationYfpRoute
+    }
   }
 }
 
+interface AdminFormationYfpRouteChildren {
+  AdminFormationYfpAnalyticsRoute: typeof AdminFormationYfpAnalyticsRoute
+  AdminFormationYfpPillarsPillarIdSubPillarsRoute: typeof AdminFormationYfpPillarsPillarIdSubPillarsRoute
+  AdminFormationYfpSubPillarsSubPillarIdArticlesRoute: typeof AdminFormationYfpSubPillarsSubPillarIdArticlesRoute
+}
+
+const AdminFormationYfpRouteChildren: AdminFormationYfpRouteChildren = {
+  AdminFormationYfpAnalyticsRoute: AdminFormationYfpAnalyticsRoute,
+  AdminFormationYfpPillarsPillarIdSubPillarsRoute:
+    AdminFormationYfpPillarsPillarIdSubPillarsRoute,
+  AdminFormationYfpSubPillarsSubPillarIdArticlesRoute:
+    AdminFormationYfpSubPillarsSubPillarIdArticlesRoute,
+}
+
+const AdminFormationYfpRouteWithChildren =
+  AdminFormationYfpRoute._addFileChildren(AdminFormationYfpRouteChildren)
+
 interface AdminFormationRouteChildren {
   AdminFormationBulletinRoute: typeof AdminFormationBulletinRoute
-  AdminFormationYfpRoute: typeof AdminFormationYfpRoute
+  AdminFormationYfpRoute: typeof AdminFormationYfpRouteWithChildren
 }
 
 const AdminFormationRouteChildren: AdminFormationRouteChildren = {
   AdminFormationBulletinRoute: AdminFormationBulletinRoute,
-  AdminFormationYfpRoute: AdminFormationYfpRoute,
+  AdminFormationYfpRoute: AdminFormationYfpRouteWithChildren,
 }
 
 const AdminFormationRouteWithChildren = AdminFormationRoute._addFileChildren(

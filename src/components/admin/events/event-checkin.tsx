@@ -2,12 +2,27 @@ import { useMemo, useState } from "react";
 import { QrCode, Search, Users, Link2, UserPlus, Check, X, Camera, Download } from "lucide-react";
 import { Card, CardBody, CardHead, Pill } from "@/components/admin/composables/ui-bits";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ORGANIZATION } from "@/lib/mock-data";
 import { YOUTH_REGISTRY, type YouthRecord } from "@/lib/youth-data";
-import { TablePagination, usePagination } from "@/components/admin/composables/tables/table-pagination";
+import {
+  TablePagination,
+  usePagination,
+} from "@/components/admin/composables/tables/table-pagination";
 
 type CheckinKind = "member" | "guest";
 export type CheckinEntry = {
@@ -78,7 +93,10 @@ export function EventCheckinPanel({ eventId, eventName }: { eventId: string; eve
     deanery: string;
     phone: string;
   }) => {
-    const newSerial = YOUTH_REGISTRY.length + entries.filter((e) => e.kind === "member" && e.id.startsWith("walk-")).length + 1;
+    const newSerial =
+      YOUTH_REGISTRY.length +
+      entries.filter((e) => e.kind === "member" && e.id.startsWith("walk-")).length +
+      1;
     const cdmId = `CDM-2026-${pad(newSerial, 5)}`;
     const id = `walk-${Date.now()}`;
     setEntries((prev) => [
@@ -136,9 +154,15 @@ export function EventCheckinPanel({ eventId, eventName }: { eventId: string; eve
           })}
         </div>
 
-        {tab === "search" && <SearchTab onCheckIn={(y) => checkInMember(y, "search")} checkedIds={checkedIds} />}
-        {tab === "qr" && <QrTab onCheckIn={(y) => checkInMember(y, "qr")} checkedIds={checkedIds} />}
-        {tab === "bulk" && <BulkTab onCheckIn={(y) => checkInMember(y, "bulk")} checkedIds={checkedIds} />}
+        {tab === "search" && (
+          <SearchTab onCheckIn={(y) => checkInMember(y, "search")} checkedIds={checkedIds} />
+        )}
+        {tab === "qr" && (
+          <QrTab onCheckIn={(y) => checkInMember(y, "qr")} checkedIds={checkedIds} />
+        )}
+        {tab === "bulk" && (
+          <BulkTab onCheckIn={(y) => checkInMember(y, "bulk")} checkedIds={checkedIds} />
+        )}
         {tab === "kiosk" && <KioskTab eventId={eventId} eventName={eventName} />}
 
         <DayRegister entries={entries} onRemove={removeEntry} />
@@ -196,7 +220,10 @@ function SearchTab({
         {results.map((y) => {
           const done = checkedIds.has(y.id);
           return (
-            <div key={y.id} className="flex items-center gap-2 rounded-lg border border-border bg-bg-2 p-2.5">
+            <div
+              key={y.id}
+              className="flex items-center gap-2 rounded-lg border border-border bg-bg-2 p-2.5"
+            >
               <div className="min-w-0 flex-1">
                 <div className="text-[12px] font-bold text-text-1">{y.name}</div>
                 <div className="text-[10px] text-text-3">
@@ -212,7 +239,13 @@ function SearchTab({
                     : "bg-primary text-primary-foreground hover:opacity-90"
                 }`}
               >
-                {done ? <><Check className="h-3 w-3" /> Checked in</> : "Check in"}
+                {done ? (
+                  <>
+                    <Check className="h-3 w-3" /> Checked in
+                  </>
+                ) : (
+                  "Check in"
+                )}
               </button>
             </div>
           );
@@ -335,10 +368,7 @@ function BulkTab({
   const [parishId, setParishId] = useState<string>(parishes[0]?.id ?? "");
   const [picked, setPicked] = useState<Set<string>>(new Set());
 
-  const roster = useMemo(
-    () => YOUTH_REGISTRY.filter((y) => y.parishId === parishId),
-    [parishId],
-  );
+  const roster = useMemo(() => YOUTH_REGISTRY.filter((y) => y.parishId === parishId), [parishId]);
 
   const toggle = (id: string) => {
     setPicked((prev) => {
@@ -361,23 +391,45 @@ function BulkTab({
   return (
     <div className="space-y-2">
       <div className="grid gap-2 md:grid-cols-2">
-        <Select value={deanery} onValueChange={(v) => { setDeanery(v); setParishId(""); }}>
-          <SelectTrigger><SelectValue placeholder="Deanery" /></SelectTrigger>
+        <Select
+          value={deanery}
+          onValueChange={(v) => {
+            setDeanery(v);
+            setParishId("");
+          }}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Deanery" />
+          </SelectTrigger>
           <SelectContent>
-            {ORGANIZATION.map((d) => <SelectItem key={d.code} value={d.code}>{d.name}</SelectItem>)}
+            {ORGANIZATION.map((d) => (
+              <SelectItem key={d.code} value={d.code}>
+                {d.name}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
         <Select value={parishId} onValueChange={setParishId}>
-          <SelectTrigger><SelectValue placeholder="Parish" /></SelectTrigger>
+          <SelectTrigger>
+            <SelectValue placeholder="Parish" />
+          </SelectTrigger>
           <SelectContent>
-            {parishes.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+            {parishes.map((p) => (
+              <SelectItem key={p.id} value={p.id}>
+                {p.name}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
       <div className="flex items-center justify-between text-[10px] text-text-3">
-        <span>{roster.length} youth in roster · {picked.size} selected</span>
+        <span>
+          {roster.length} youth in roster · {picked.size} selected
+        </span>
         <div className="flex gap-2">
-          <button onClick={selectAll} className="font-bold text-gold underline">Select all</button>
+          <button onClick={selectAll} className="font-bold text-gold underline">
+            Select all
+          </button>
           <button
             onClick={checkInSelected}
             disabled={picked.size === 0}
@@ -405,7 +457,9 @@ function BulkTab({
               />
               <div className="min-w-0 flex-1">
                 <div className="truncate text-[11px] font-bold text-text-1">{y.name}</div>
-                <div className="text-[9px] text-text-3">{y.cdmId} · {y.churchName}</div>
+                <div className="text-[9px] text-text-3">
+                  {y.cdmId} · {y.churchName}
+                </div>
               </div>
               {done && <Pill tone="success">Checked in</Pill>}
             </label>
@@ -418,7 +472,10 @@ function BulkTab({
 
 function KioskTab({ eventId, eventName }: { eventId: string; eventName: string }) {
   const [copied, setCopied] = useState(false);
-  const url = typeof window !== "undefined" ? `${window.location.origin}/checkin/${eventId}` : `/checkin/${eventId}`;
+  const url =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/checkin/${eventId}`
+      : `/checkin/${eventId}`;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(url)}`;
 
   const copy = async () => {
@@ -438,7 +495,8 @@ function KioskTab({ eventId, eventName }: { eventId: string; eventName: string }
       </div>
       <div className="space-y-2">
         <div className="text-[11px] text-text-2">
-          Open this link on a tablet at the entrance. Youth enter their <strong>Unique No.</strong> to check themselves in.
+          Open this link on a tablet at the entrance. Youth enter their <strong>Unique No.</strong>{" "}
+          to check themselves in.
         </div>
         <div className="flex items-center gap-2 rounded-lg border border-border bg-bg-2 p-2.5">
           <code className="min-w-0 flex-1 truncate text-[11px] text-text-1">{url}</code>
@@ -457,7 +515,13 @@ function KioskTab({ eventId, eventName }: { eventId: string; eventName: string }
   );
 }
 
-function DayRegister({ entries, onRemove }: { entries: CheckinEntry[]; onRemove: (id: string) => void }) {
+function DayRegister({
+  entries,
+  onRemove,
+}: {
+  entries: CheckinEntry[];
+  onRemove: (id: string) => void;
+}) {
   const [filter, setFilter] = useState("");
   const orderedEntries = useMemo(() => {
     const kindRank: Record<CheckinKind, number> = { member: 0, guest: 1 };
@@ -477,7 +541,9 @@ function DayRegister({ entries, onRemove }: { entries: CheckinEntry[]; onRemove:
 
   const exportCsv = () => {
     const header = "Time,CDM No,Name,Type,Parish,Method";
-    const rows = orderedEntries.map((e) => `${e.time},${e.cdmId},"${e.name}",${e.kind},"${e.parish}",${e.method}`);
+    const rows = orderedEntries.map(
+      (e) => `${e.time},${e.cdmId},"${e.name}",${e.kind},"${e.parish}",${e.method}`,
+    );
     const csv = [header, ...rows].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const a = document.createElement("a");
@@ -570,10 +636,22 @@ function WalkInDialog({
   state: "closed" | "ask" | "guest" | "enroll";
   setState: (s: "closed" | "ask" | "guest" | "enroll") => void;
   onGuest: (d: { name: string; phone: string; parish: string }) => void;
-  onEnroll: (d: { name: string; gender: string; parish: string; deanery: string; phone: string }) => void;
+  onEnroll: (d: {
+    name: string;
+    gender: string;
+    parish: string;
+    deanery: string;
+    phone: string;
+  }) => void;
 }) {
   const [guest, setGuest] = useState({ name: "", phone: "", parish: "" });
-  const [enroll, setEnroll] = useState({ name: "", gender: "", parish: "", deanery: "", phone: "" });
+  const [enroll, setEnroll] = useState({
+    name: "",
+    gender: "",
+    parish: "",
+    deanery: "",
+    phone: "",
+  });
   const parishes = ORGANIZATION.flatMap((d) => d.parishes.map((p) => p.name));
 
   return (
@@ -582,7 +660,9 @@ function WalkInDialog({
         {state === "ask" && (
           <>
             <DialogHeader>
-              <DialogTitle className="text-display text-lg font-black">Walk-in Attendee</DialogTitle>
+              <DialogTitle className="text-display text-lg font-black">
+                Walk-in Attendee
+              </DialogTitle>
             </DialogHeader>
             <div className="space-y-2 py-2">
               <p className="text-[12px] text-text-2">
@@ -594,14 +674,18 @@ function WalkInDialog({
                   className="rounded-lg border border-success/40 bg-success-soft p-3 text-left"
                 >
                   <div className="text-[12px] font-bold text-success">Yes — Joining CDM</div>
-                  <div className="text-[10px] text-text-3">Quick enrollment + auto-generates a Unique No.</div>
+                  <div className="text-[10px] text-text-3">
+                    Quick enrollment + auto-generates a Unique No.
+                  </div>
                 </button>
                 <button
                   onClick={() => setState("guest")}
                   className="rounded-lg border border-info/40 bg-info-soft p-3 text-left"
                 >
                   <div className="text-[12px] font-bold text-info">No — Just visiting</div>
-                  <div className="text-[10px] text-text-3">Logged as a guest, counted separately.</div>
+                  <div className="text-[10px] text-text-3">
+                    Logged as a guest, counted separately.
+                  </div>
                 </button>
               </div>
             </div>
@@ -614,20 +698,40 @@ function WalkInDialog({
             </DialogHeader>
             <div className="space-y-2 py-2">
               <Field label="Full name">
-                <Input value={guest.name} onChange={(e) => setGuest({ ...guest, name: e.target.value })} maxLength={100} />
+                <Input
+                  value={guest.name}
+                  onChange={(e) => setGuest({ ...guest, name: e.target.value })}
+                  maxLength={100}
+                />
               </Field>
               <Field label="Phone (optional)">
-                <Input value={guest.phone} onChange={(e) => setGuest({ ...guest, phone: e.target.value })} maxLength={20} />
+                <Input
+                  value={guest.phone}
+                  onChange={(e) => setGuest({ ...guest, phone: e.target.value })}
+                  maxLength={20}
+                />
               </Field>
               <Field label="Parish (optional)">
-                <Input value={guest.parish} onChange={(e) => setGuest({ ...guest, parish: e.target.value })} maxLength={80} />
+                <Input
+                  value={guest.parish}
+                  onChange={(e) => setGuest({ ...guest, parish: e.target.value })}
+                  maxLength={80}
+                />
               </Field>
             </div>
             <DialogFooter>
-              <button onClick={() => setState("ask")} className="rounded-lg border border-border bg-bg-3 px-3 py-1.5 text-[11px] font-bold text-text-2">Back</button>
+              <button
+                onClick={() => setState("ask")}
+                className="rounded-lg border border-border bg-bg-3 px-3 py-1.5 text-[11px] font-bold text-text-2"
+              >
+                Back
+              </button>
               <button
                 disabled={!guest.name.trim()}
-                onClick={() => { onGuest(guest); setGuest({ name: "", phone: "", parish: "" }); }}
+                onClick={() => {
+                  onGuest(guest);
+                  setGuest({ name: "", phone: "", parish: "" });
+                }}
                 className="rounded-lg bg-primary px-3 py-1.5 text-[11px] font-bold text-primary-foreground disabled:opacity-40"
               >
                 Check in guest
@@ -638,18 +742,33 @@ function WalkInDialog({
         {state === "enroll" && (
           <>
             <DialogHeader>
-              <DialogTitle className="text-display text-lg font-black">Quick Enroll & Check In</DialogTitle>
+              <DialogTitle className="text-display text-lg font-black">
+                Quick Enroll & Check In
+              </DialogTitle>
             </DialogHeader>
             <div className="grid gap-2 py-2 md:grid-cols-2">
               <Field label="Full name">
-                <Input value={enroll.name} onChange={(e) => setEnroll({ ...enroll, name: e.target.value })} maxLength={100} />
+                <Input
+                  value={enroll.name}
+                  onChange={(e) => setEnroll({ ...enroll, name: e.target.value })}
+                  maxLength={100}
+                />
               </Field>
               <Field label="Phone">
-                <Input value={enroll.phone} onChange={(e) => setEnroll({ ...enroll, phone: e.target.value })} maxLength={20} />
+                <Input
+                  value={enroll.phone}
+                  onChange={(e) => setEnroll({ ...enroll, phone: e.target.value })}
+                  maxLength={20}
+                />
               </Field>
               <Field label="Gender">
-                <Select value={enroll.gender} onValueChange={(v) => setEnroll({ ...enroll, gender: v })}>
-                  <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                <Select
+                  value={enroll.gender}
+                  onValueChange={(v) => setEnroll({ ...enroll, gender: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select" />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Female">Female</SelectItem>
                     <SelectItem value="Male">Male</SelectItem>
@@ -657,18 +776,36 @@ function WalkInDialog({
                 </Select>
               </Field>
               <Field label="Deanery">
-                <Select value={enroll.deanery} onValueChange={(v) => setEnroll({ ...enroll, deanery: v })}>
-                  <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                <Select
+                  value={enroll.deanery}
+                  onValueChange={(v) => setEnroll({ ...enroll, deanery: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select" />
+                  </SelectTrigger>
                   <SelectContent>
-                    {ORGANIZATION.map((d) => <SelectItem key={d.code} value={d.name}>{d.name}</SelectItem>)}
+                    {ORGANIZATION.map((d) => (
+                      <SelectItem key={d.code} value={d.name}>
+                        {d.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </Field>
               <Field label="Parish">
-                <Select value={enroll.parish} onValueChange={(v) => setEnroll({ ...enroll, parish: v })}>
-                  <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                <Select
+                  value={enroll.parish}
+                  onValueChange={(v) => setEnroll({ ...enroll, parish: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select" />
+                  </SelectTrigger>
                   <SelectContent>
-                    {parishes.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                    {parishes.map((p) => (
+                      <SelectItem key={p} value={p}>
+                        {p}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </Field>
@@ -677,10 +814,18 @@ function WalkInDialog({
               A Unique No. (CDM-2026-XXXXX) will be generated automatically on check-in.
             </div>
             <DialogFooter>
-              <button onClick={() => setState("ask")} className="rounded-lg border border-border bg-bg-3 px-3 py-1.5 text-[11px] font-bold text-text-2">Back</button>
+              <button
+                onClick={() => setState("ask")}
+                className="rounded-lg border border-border bg-bg-3 px-3 py-1.5 text-[11px] font-bold text-text-2"
+              >
+                Back
+              </button>
               <button
                 disabled={!enroll.name.trim() || !enroll.gender || !enroll.parish}
-                onClick={() => { onEnroll(enroll); setEnroll({ name: "", gender: "", parish: "", deanery: "", phone: "" }); }}
+                onClick={() => {
+                  onEnroll(enroll);
+                  setEnroll({ name: "", gender: "", parish: "", deanery: "", phone: "" });
+                }}
                 className="rounded-lg bg-primary px-3 py-1.5 text-[11px] font-bold text-primary-foreground disabled:opacity-40"
               >
                 Enroll & check in

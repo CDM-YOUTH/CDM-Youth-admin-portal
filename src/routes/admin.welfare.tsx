@@ -7,10 +7,18 @@ import { toast } from "sonner";
 import { MoreVertical, Eye, Pencil, Trash2 } from "lucide-react";
 import { Topbar, TopbarButton } from "@/components/admin/layout/topbar";
 import { Card, CardBody, CardHead, Pill } from "@/components/admin/composables/ui-bits";
-import { RecordFormDialog, type FieldDef } from "@/components/admin/composables/forms/record-form-dialog";
+import {
+  RecordFormDialog,
+  type FieldDef,
+} from "@/components/admin/composables/forms/record-form-dialog";
 import { ViewRecordDialog } from "@/components/admin/composables/forms/view-record-dialog";
 import { TablePagination } from "@/components/admin/composables/tables/table-pagination";
-import { FilterRow, FilterSearch, FilterSelect, FilterClear } from "@/components/admin/composables/tables/table-filters";
+import {
+  FilterRow,
+  FilterSearch,
+  FilterSelect,
+  FilterClear,
+} from "@/components/admin/composables/tables/table-filters";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -72,10 +80,12 @@ export const Route = createFileRoute("/admin/welfare")({
 function WelfarePage() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
-  const [addOpen,       setAddOpen]       = useState(false);
-  const [viewing,       setViewing]       = useState<WelfareCaseRow | null>(null);
-  const [editing,       setEditing]       = useState<{ id: string; initial: Record<string, string> } | null>(null);
-  const [deleteTarget,  setDeleteTarget]  = useState<{ id: string; ref: string } | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [viewing, setViewing] = useState<WelfareCaseRow | null>(null);
+  const [editing, setEditing] = useState<{ id: string; initial: Record<string, string> } | null>(
+    null,
+  );
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; ref: string } | null>(null);
   const qc = useQueryClient();
 
   const setFilter = (patch: Partial<WelfareSearch>) => {
@@ -93,7 +103,15 @@ function WelfarePage() {
   });
 
   const { data: resp, isLoading } = useQuery({
-    queryKey: ["welfare-cases", search.page, search.size, search.q, parishId, search.status, search.urgency],
+    queryKey: [
+      "welfare-cases",
+      search.page,
+      search.size,
+      search.q,
+      parishId,
+      search.status,
+      search.urgency,
+    ],
     queryFn: () =>
       listWelfareCasesPaged({
         page: search.page - 1,
@@ -144,34 +162,69 @@ function WelfarePage() {
   });
 
   const parishFilterOptions = (org?.parishes ?? []).map((p) => ({ value: p.id, label: p.name }));
-  const parishNameOptions   = (org?.parishes ?? []).map((p) => p.name);
+  const parishNameOptions = (org?.parishes ?? []).map((p) => p.name);
   const hasFilter = !!(search.q || search.parish_id || search.status || search.urgency);
 
   const caseAddFieldsLive: FieldDef[] = [
-    { key: "category", label: "Case Category", type: "select", required: true, options: CATEGORY_OPTIONS },
-    { key: "urgency",  label: "Urgency",        type: "select", required: true, options: URGENCY_OPTIONS },
-    { key: "parish",   label: "Parish",          type: "select", options: parishNameOptions.length ? parishNameOptions : ["(loading…)"] },
-    { key: "assigned", label: "Assigned To",     placeholder: "e.g. Fr. James / Sr. Mary / Office" },
-    { key: "cdmId",    label: "Youth CDM No. (if known)", placeholder: "CDM-2026-00001 — leave blank to keep anonymous" },
-    { key: "notes",    label: "Confidential Notes", type: "textarea", full: true,
-      placeholder: "Describe the situation — visible only to assigned personnel and diocese admin." },
+    {
+      key: "category",
+      label: "Case Category",
+      type: "select",
+      required: true,
+      options: CATEGORY_OPTIONS,
+    },
+    { key: "urgency", label: "Urgency", type: "select", required: true, options: URGENCY_OPTIONS },
+    {
+      key: "parish",
+      label: "Parish",
+      type: "select",
+      options: parishNameOptions.length ? parishNameOptions : ["(loading…)"],
+    },
+    { key: "assigned", label: "Assigned To", placeholder: "e.g. Fr. James / Sr. Mary / Office" },
+    {
+      key: "cdmId",
+      label: "Youth CDM No. (if known)",
+      placeholder: "CDM-2026-00001 — leave blank to keep anonymous",
+    },
+    {
+      key: "notes",
+      label: "Confidential Notes",
+      type: "textarea",
+      full: true,
+      placeholder: "Describe the situation — visible only to assigned personnel and diocese admin.",
+    },
   ];
 
   const caseEditFieldsLive: FieldDef[] = [
-    { key: "category", label: "Case Category", type: "select", required: true, options: CATEGORY_OPTIONS },
-    { key: "urgency",  label: "Urgency",        type: "select", required: true, options: URGENCY_OPTIONS },
-    { key: "status",   label: "Status",          type: "select", required: true, options: STATUS_OPTIONS },
-    { key: "parish",   label: "Parish",          type: "select", options: parishNameOptions.length ? parishNameOptions : ["(loading…)"] },
-    { key: "assigned", label: "Assigned To",     placeholder: "e.g. Fr. James / Sr. Mary / Office" },
-    { key: "cdmId",    label: "Youth CDM No.",   placeholder: "CDM-2026-00001" },
-    { key: "notes",    label: "Confidential Notes", type: "textarea", full: true },
+    {
+      key: "category",
+      label: "Case Category",
+      type: "select",
+      required: true,
+      options: CATEGORY_OPTIONS,
+    },
+    { key: "urgency", label: "Urgency", type: "select", required: true, options: URGENCY_OPTIONS },
+    { key: "status", label: "Status", type: "select", required: true, options: STATUS_OPTIONS },
+    {
+      key: "parish",
+      label: "Parish",
+      type: "select",
+      options: parishNameOptions.length ? parishNameOptions : ["(loading…)"],
+    },
+    { key: "assigned", label: "Assigned To", placeholder: "e.g. Fr. James / Sr. Mary / Office" },
+    { key: "cdmId", label: "Youth CDM No.", placeholder: "CDM-2026-00001" },
+    { key: "notes", label: "Confidential Notes", type: "textarea", full: true },
   ];
 
   return (
     <>
       <Topbar
         title="Welfare Cases"
-        description={isLoading ? "Loading cases…" : "Confidential case management — Diocese, Deanery and Parish admins see only what their role permits."}
+        description={
+          isLoading
+            ? "Loading cases…"
+            : "Confidential case management — Diocese, Deanery and Parish admins see only what their role permits."
+        }
         action={<TopbarButton onClick={() => setAddOpen(true)}>+ New Case</TopbarButton>}
       />
       <div className="flex-1 overflow-y-auto">
@@ -208,10 +261,14 @@ function WelfarePage() {
 
         <div className="px-5 py-4">
           <div className="mb-4 grid grid-cols-1 gap-2.5 sm:grid-cols-4">
-            <MiniStat label="Open"           value={String(kpis?.open       ?? 5)}  tone="danger"  />
-            <MiniStat label="Urgent"         value={String(kpis?.urgent     ?? 2)}  tone="danger"  />
-            <MiniStat label="In Progress"    value={String(kpis?.inProgress ?? 12)} tone="gold"    />
-            <MiniStat label="Resolved (30d)" value={String(kpis?.resolved30d ?? 34)} tone="success" />
+            <MiniStat label="Open" value={String(kpis?.open ?? 5)} tone="danger" />
+            <MiniStat label="Urgent" value={String(kpis?.urgent ?? 2)} tone="danger" />
+            <MiniStat label="In Progress" value={String(kpis?.inProgress ?? 12)} tone="gold" />
+            <MiniStat
+              label="Resolved (30d)"
+              value={String(kpis?.resolved30d ?? 34)}
+              tone="success"
+            />
           </div>
 
           <Card>
@@ -230,7 +287,9 @@ function WelfarePage() {
                 <div
                   key={c.id}
                   className={`rounded-lg border p-3 ${
-                    c.urgency === "high" ? "border-danger/40 bg-danger-soft/20" : "border-border bg-bg-2"
+                    c.urgency === "high"
+                      ? "border-danger/40 bg-danger-soft/20"
+                      : "border-border bg-bg-2"
                   }`}
                 >
                   <div className="mb-1.5 flex items-center justify-between">
@@ -240,7 +299,9 @@ function WelfarePage() {
                       <Pill tone={statusTone(c.status)}>{c.status.replace("_", " ")}</Pill>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-[9px] text-text-3">{new Date(c.opened_at).toLocaleString()}</span>
+                      <span className="text-[9px] text-text-3">
+                        {new Date(c.opened_at).toLocaleString()}
+                      </span>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <button className="rounded p-1 hover:bg-bg-3">
@@ -251,7 +312,9 @@ function WelfarePage() {
                           <DropdownMenuItem onClick={() => setViewing(c)}>
                             <Eye className="mr-2 h-3.5 w-3.5" /> View
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => setEditing({ id: c.id, initial: caseToInitial(c) })}>
+                          <DropdownMenuItem
+                            onClick={() => setEditing({ id: c.id, initial: caseToInitial(c) })}
+                          >
                             <Pencil className="mr-2 h-3.5 w-3.5" /> Edit
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
@@ -268,7 +331,9 @@ function WelfarePage() {
                   <div className="text-[12px] font-semibold text-foreground">{c.category}</div>
                   <div className="mt-0.5 flex items-center justify-between text-[10px] text-text-3">
                     <span>{c.parish_name ?? "—"}</span>
-                    <span>Assigned: <span className="text-text-1">{c.assigned_to ?? "Unassigned"}</span></span>
+                    <span>
+                      Assigned: <span className="text-text-1">{c.assigned_to ?? "Unassigned"}</span>
+                    </span>
                   </div>
                 </div>
               ))}
@@ -279,8 +344,18 @@ function WelfarePage() {
                 pageSize={search.size}
                 total={total}
                 totalPages={totalPages}
-                onPageChange={(p) => navigate({ search: (prev: WelfareSearch) => ({ ...prev, page: p }), replace: true })}
-                onPageSizeChange={(s) => navigate({ search: (prev: WelfareSearch) => ({ ...prev, size: s, page: 1 }), replace: true })}
+                onPageChange={(p) =>
+                  navigate({
+                    search: (prev: WelfareSearch) => ({ ...prev, page: p }),
+                    replace: true,
+                  })
+                }
+                onPageSizeChange={(s) =>
+                  navigate({
+                    search: (prev: WelfareSearch) => ({ ...prev, size: s, page: 1 }),
+                    replace: true,
+                  })
+                }
               />
             )}
           </Card>
@@ -297,12 +372,12 @@ function WelfarePage() {
         submitLabel="Open Case"
         onSubmit={(values) => {
           createMut.mutate({
-            category:    values.category,
-            urgency:     (values.urgency || "medium") as WelfareUrgency,
-            parishName:  values.parish   || null,
-            cdmId:       values.cdmId    || null,
-            assignedTo:  values.assigned || null,
-            notes:       values.notes    || null,
+            category: values.category,
+            urgency: (values.urgency || "medium") as WelfareUrgency,
+            parishName: values.parish || null,
+            cdmId: values.cdmId || null,
+            assignedTo: values.assigned || null,
+            notes: values.notes || null,
           });
         }}
       />
@@ -310,7 +385,9 @@ function WelfarePage() {
       {/* Edit Case */}
       <RecordFormDialog
         open={!!editing}
-        onOpenChange={(o) => { if (!o) setEditing(null); }}
+        onOpenChange={(o) => {
+          if (!o) setEditing(null);
+        }}
         title="Edit Welfare Case"
         description="Changing status to resolved or closed will timestamp the resolution."
         fields={caseEditFieldsLive}
@@ -321,13 +398,13 @@ function WelfarePage() {
           updateMut.mutate({
             id: editing.id,
             input: {
-              category:   values.category,
-              urgency:    (values.urgency || "medium") as WelfareUrgency,
-              status:     (values.status  || "open")   as WelfareStatus,
-              parishName: values.parish   || null,
-              cdmId:      values.cdmId    || null,
+              category: values.category,
+              urgency: (values.urgency || "medium") as WelfareUrgency,
+              status: (values.status || "open") as WelfareStatus,
+              parishName: values.parish || null,
+              cdmId: values.cdmId || null,
               assignedTo: values.assigned || null,
-              notes:      values.notes    || null,
+              notes: values.notes || null,
             },
           });
         }}
@@ -336,24 +413,48 @@ function WelfarePage() {
       {/* View Case */}
       <ViewRecordDialog
         open={!!viewing}
-        onOpenChange={(o) => { if (!o) setViewing(null); }}
+        onOpenChange={(o) => {
+          if (!o) setViewing(null);
+        }}
         title={viewing ? `Case ${viewing.case_ref}` : ""}
-        fields={viewing ? [
-          { label: "Case Reference", value: viewing.case_ref },
-          { label: "Category",       value: viewing.category },
-          { label: "Urgency",        value: <Pill tone={urgencyTone(viewing.urgency)}>{viewing.urgency}</Pill> },
-          { label: "Status",         value: <Pill tone={statusTone(viewing.status)}>{viewing.status.replace("_", " ")}</Pill> },
-          { label: "Parish",         value: viewing.parish_name ?? "—" },
-          { label: "CDM No.",        value: viewing.cdm_id ?? "—" },
-          { label: "Assigned To",    value: viewing.assigned_to ?? "Unassigned" },
-          { label: "Opened",         value: new Date(viewing.opened_at).toLocaleString() },
-          { label: "Resolved",       value: viewing.resolved_at ? new Date(viewing.resolved_at).toLocaleString() : "—" },
-          { label: "Notes",          value: viewing.notes ?? "—", full: true },
-        ] : []}
+        fields={
+          viewing
+            ? [
+                { label: "Case Reference", value: viewing.case_ref },
+                { label: "Category", value: viewing.category },
+                {
+                  label: "Urgency",
+                  value: <Pill tone={urgencyTone(viewing.urgency)}>{viewing.urgency}</Pill>,
+                },
+                {
+                  label: "Status",
+                  value: (
+                    <Pill tone={statusTone(viewing.status)}>
+                      {viewing.status.replace("_", " ")}
+                    </Pill>
+                  ),
+                },
+                { label: "Parish", value: viewing.parish_name ?? "—" },
+                { label: "CDM No.", value: viewing.cdm_id ?? "—" },
+                { label: "Assigned To", value: viewing.assigned_to ?? "Unassigned" },
+                { label: "Opened", value: new Date(viewing.opened_at).toLocaleString() },
+                {
+                  label: "Resolved",
+                  value: viewing.resolved_at ? new Date(viewing.resolved_at).toLocaleString() : "—",
+                },
+                { label: "Notes", value: viewing.notes ?? "—", full: true },
+              ]
+            : []
+        }
       />
 
       {/* Delete Confirm */}
-      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => { if (!o) setDeleteTarget(null); }}>
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(o) => {
+          if (!o) setDeleteTarget(null);
+        }}
+      >
         <AlertDialogContent className="border-border bg-white">
           <AlertDialogHeader>
             <AlertDialogTitle>Delete {deleteTarget?.ref}?</AlertDialogTitle>
@@ -376,7 +477,15 @@ function WelfarePage() {
   );
 }
 
-function MiniStat({ label, value, tone }: { label: string; value: string; tone: "danger" | "gold" | "success" }) {
+function MiniStat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: "danger" | "gold" | "success";
+}) {
   const color = tone === "danger" ? "text-danger" : tone === "gold" ? "text-gold" : "text-success";
   return (
     <div className="rounded-xl border border-border bg-card p-3.5">
@@ -391,22 +500,27 @@ function MiniStat({ label, value, tone }: { label: string; value: string; tone: 
 /* ------------------------------------------------------------------ */
 
 const CATEGORY_OPTIONS = [
-  "Mental Health", "Early Pregnancy", "Substance Abuse", "School Fees",
-  "Family Crisis", "Bereavement", "Physical Disability", "Other",
+  "Mental Health",
+  "Early Pregnancy",
+  "Substance Abuse",
+  "School Fees",
+  "Family Crisis",
+  "Bereavement",
+  "Physical Disability",
+  "Other",
 ];
 const URGENCY_OPTIONS = ["high", "medium", "low"];
-const STATUS_OPTIONS  = ["open", "in_progress", "resolved", "closed"];
-
+const STATUS_OPTIONS = ["open", "in_progress", "resolved", "closed"];
 
 function caseToInitial(c: WelfareCaseRow): Record<string, string> {
   return {
     category: c.category,
-    urgency:  c.urgency,
-    status:   c.status,
-    parish:   c.parish_name ?? "",
+    urgency: c.urgency,
+    status: c.status,
+    parish: c.parish_name ?? "",
     assigned: c.assigned_to ?? "",
-    cdmId:    c.cdm_id ?? "",
-    notes:    c.notes ?? "",
+    cdmId: c.cdm_id ?? "",
+    notes: c.notes ?? "",
   };
 }
 
@@ -421,4 +535,6 @@ function statusTone(s: string): "success" | "info" | "gold" | "neutral" {
   return "neutral";
 }
 
-export function _unused(): ReactNode { return null; }
+export function _unused(): ReactNode {
+  return null;
+}

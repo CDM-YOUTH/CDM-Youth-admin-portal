@@ -121,15 +121,17 @@ export async function listLeadersPaged(opts: {
     .order("start_date", { ascending: false })
     .range(page * size, page * size + size - 1);
 
-  if (opts.level)        query = query.eq("level", opts.level);
-  if (opts.active)       query = query.is("end_date", null);
+  if (opts.level) query = query.eq("level", opts.level);
+  if (opts.active) query = query.is("end_date", null);
   // Filter on the youth's own org, not the role's served-at org, so filters work on any tab level
-  if (opts.deaneryId)    query = query.eq("youths.deanery_id", opts.deaneryId);
-  if (opts.parishId)     query = query.eq("youths.parish_id", opts.parishId);
+  if (opts.deaneryId) query = query.eq("youths.deanery_id", opts.deaneryId);
+  if (opts.parishId) query = query.eq("youths.parish_id", opts.parishId);
   if (opts.outstationId) query = query.eq("youths.outstation_id", opts.outstationId);
   if (opts.q?.trim()) {
     const t = likePattern(opts.q);
-    query = query.or(`cdm_id.ilike.${t},full_name.ilike.${t},phone.ilike.${t}`, { referencedTable: "youths" });
+    query = query.or(`cdm_id.ilike.${t},full_name.ilike.${t},phone.ilike.${t}`, {
+      referencedTable: "youths",
+    });
   }
 
   const { data, error, count } = await query;
@@ -140,14 +142,14 @@ export async function listLeadersPaged(opts: {
 export async function appointLeader(input: LeadershipRoleInput): Promise<LeadershipRoleRow> {
   const { data, error } = await db()
     .insert({
-      youth_id:      input.youthId,
-      role_id:       input.roleId,
-      level:         input.level,
-      deanery_id:    input.deaneryId    ?? null,
-      parish_id:     input.parishId     ?? null,
+      youth_id: input.youthId,
+      role_id: input.roleId,
+      level: input.level,
+      deanery_id: input.deaneryId ?? null,
+      parish_id: input.parishId ?? null,
       outstation_id: input.outstationId ?? null,
-      start_date:    input.startDate    ?? new Date().toISOString().slice(0, 10),
-      notes:         input.notes?.trim() || null,
+      start_date: input.startDate ?? new Date().toISOString().slice(0, 10),
+      notes: input.notes?.trim() || null,
     })
     .select(SEL)
     .single();
@@ -171,10 +173,10 @@ export type LeadershipRoleUpdate = {
 
 export async function updateLeader(id: string, input: LeadershipRoleUpdate): Promise<void> {
   const patch: Record<string, unknown> = {};
-  if (input.roleId     !== undefined) patch.role_id    = input.roleId;
-  if (input.level      !== undefined) patch.level      = input.level;
-  if (input.startDate  !== undefined) patch.start_date = input.startDate;
-  if (input.notes      !== undefined) patch.notes      = input.notes?.trim() || null;
+  if (input.roleId !== undefined) patch.role_id = input.roleId;
+  if (input.level !== undefined) patch.level = input.level;
+  if (input.startDate !== undefined) patch.start_date = input.startDate;
+  if (input.notes !== undefined) patch.notes = input.notes?.trim() || null;
   const { error } = await db().update(patch).eq("id", id);
   if (error) throw error;
 }
@@ -208,8 +210,16 @@ export async function bulkImportLeaders(
 
   for (const row of rows) {
     const cdm = row.cdmId?.trim();
-    if (!cdm) { errors.push("Row missing CDM ID — skipped"); skipped++; continue; }
-    if (!row.roleName?.trim()) { errors.push(`${cdm}: missing role — skipped`); skipped++; continue; }
+    if (!cdm) {
+      errors.push("Row missing CDM ID — skipped");
+      skipped++;
+      continue;
+    }
+    if (!row.roleName?.trim()) {
+      errors.push(`${cdm}: missing role — skipped`);
+      skipped++;
+      continue;
+    }
 
     // Resolve role name → UUID (create if unknown)
     let roleId = roleIdByName.get(row.roleName.trim().toLowerCase());
@@ -230,7 +240,11 @@ export async function bulkImportLeaders(
       .select("id, full_name")
       .eq("cdm_id", cdm)
       .maybeSingle();
-    if (!youth) { errors.push(`${cdm}: not found in youth records — skipped`); skipped++; continue; }
+    if (!youth) {
+      errors.push(`${cdm}: not found in youth records — skipped`);
+      skipped++;
+      continue;
+    }
 
     const ids = resolveOrgIds(org, row.deaneryName, row.parishName, row.outstationName);
 
@@ -242,20 +256,27 @@ export async function bulkImportLeaders(
       .eq("level", row.level)
       .is("end_date", null)
       .maybeSingle();
-    if (existing) { skipped++; continue; }
+    if (existing) {
+      skipped++;
+      continue;
+    }
 
     const { error: insErr } = await db().insert({
-      youth_id:      youth.id,
-      role_id:       roleId,
-      level:         row.level,
-      deanery_id:    ids.deanery_id,
-      parish_id:     ids.parish_id,
+      youth_id: youth.id,
+      role_id: roleId,
+      level: row.level,
+      deanery_id: ids.deanery_id,
+      parish_id: ids.parish_id,
       outstation_id: ids.outstation_id,
-      start_date:    new Date().toISOString().slice(0, 10),
+      start_date: new Date().toISOString().slice(0, 10),
     });
 
-    if (insErr) { errors.push(`${cdm}: ${insErr.message}`); skipped++; }
-    else { inserted++; }
+    if (insErr) {
+      errors.push(`${cdm}: ${insErr.message}`);
+      skipped++;
+    } else {
+      inserted++;
+    }
   }
 
   return { inserted, skipped, errors };

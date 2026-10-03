@@ -29,7 +29,15 @@ export async function getDashboardCounts(year?: number): Promise<DashboardCounts
 
 export type LiveAnalytics = {
   units: AnalyticsUnit[];
-  upcomingEvents: { id: string; name: string; venue: string; parish: string; day: string; month: string; registered: number }[];
+  upcomingEvents: {
+    id: string;
+    name: string;
+    venue: string;
+    parish: string;
+    day: string;
+    month: string;
+    registered: number;
+  }[];
   pendingEnrollments: number;
 };
 
@@ -45,16 +53,22 @@ export async function getLiveAnalytics(year?: number): Promise<LiveAnalytics> {
   const [youthsRes, enrolledRes, cusaRes, eventsRes] = await Promise.all([
     supabase
       .from("youths")
-      .select("id, gender, category, deanery:deaneries(name), parish:parishes(name), outstation:outstations(name)")
+      .select(
+        "id, gender, category, deanery:deaneries(name), parish:parishes(name), outstation:outstations(name)",
+      )
       .limit(10000),
     supabase
       .from("enrollments")
-      .select("id, status, youth:youths(id, gender, deanery:deaneries(name), parish:parishes(name), outstation:outstations(name))")
+      .select(
+        "id, status, youth:youths(id, gender, deanery:deaneries(name), parish:parishes(name), outstation:outstations(name))",
+      )
       .eq("year", y)
       .limit(10000),
     supabase
       .from("cusa_members")
-      .select("id, leadership_role, institution, youth:youths(gender, deanery:deaneries(name), parish:parishes(name), outstation:outstations(name))")
+      .select(
+        "id, leadership_role, institution, youth:youths(gender, deanery:deaneries(name), parish:parishes(name), outstation:outstations(name))",
+      )
       .limit(10000),
     supabase
       .from("events")
@@ -104,19 +118,26 @@ export async function getLiveAnalytics(year?: number): Promise<LiveAnalytics> {
   };
   for (const y of (youthsRes.data ?? []) as Array<YouthBucket & { category: string | null }>) {
     const key = k(y.deanery?.name, y.parish?.name, y.outstation?.name);
-    const cat = (y.category ?? "Secondary").toLowerCase() as "primary" | "secondary" | "tertiary" | "working";
+    const cat = (y.category ?? "Secondary").toLowerCase() as
+      "primary" | "secondary" | "tertiary" | "working";
     bump(key, { youths: 1, [cat]: 1 } as Partial<Counts>);
   }
   const pendingEnrollments = (enrolledRes.data ?? []).filter(
     (e: { status: string }) => e.status === "pending",
   ).length;
 
-  for (const e of (enrolledRes.data ?? []) as Array<{ status: string; youth: YouthBucket | null }>) {
+  for (const e of (enrolledRes.data ?? []) as Array<{
+    status: string;
+    youth: YouthBucket | null;
+  }>) {
     const yo = e.youth;
     if (!yo) continue;
     bump(k(yo.deanery?.name, yo.parish?.name, yo.outstation?.name), { enrolled: 1 });
   }
-  for (const c of (cusaRes.data ?? []) as Array<{ leadership_role: string | null; youth: YouthBucket | null }>) {
+  for (const c of (cusaRes.data ?? []) as Array<{
+    leadership_role: string | null;
+    youth: YouthBucket | null;
+  }>) {
     const yo = c.youth;
     if (!yo) continue;
     bump(k(yo.deanery?.name, yo.parish?.name, yo.outstation?.name), {
@@ -134,7 +155,7 @@ export async function getLiveAnalytics(year?: number): Promise<LiveAnalytics> {
         // Spread parish-level (no outstation) counts only across the FIRST
         // outstation, so totals don't double-count when youths lack outstation.
         const isFirst = parish.churches[0]?.id === church.id;
-        const orphan = isFirst ? buckets.get(k(deanery.name, parish.name, "")) ?? empty : empty;
+        const orphan = isFirst ? (buckets.get(k(deanery.name, parish.name, "")) ?? empty) : empty;
         const totals: Counts = {
           youths: exact.youths + orphan.youths,
           enrolled: exact.enrolled + orphan.enrolled,
@@ -169,15 +190,30 @@ export async function getLiveAnalytics(year?: number): Promise<LiveAnalytics> {
     ),
   );
 
-  const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
-  const upcomingEvents = ((eventsRes.data ?? []) as Array<{
-    id: string;
-    name: string;
-    event_date: string | null;
-    venue: string | null;
-    parish: { name: string } | null;
-    deanery: { name: string } | null;
-  }>).map((e) => {
+  const months = [
+    "JAN",
+    "FEB",
+    "MAR",
+    "APR",
+    "MAY",
+    "JUN",
+    "JUL",
+    "AUG",
+    "SEP",
+    "OCT",
+    "NOV",
+    "DEC",
+  ];
+  const upcomingEvents = (
+    (eventsRes.data ?? []) as Array<{
+      id: string;
+      name: string;
+      event_date: string | null;
+      venue: string | null;
+      parish: { name: string } | null;
+      deanery: { name: string } | null;
+    }>
+  ).map((e) => {
     const d = e.event_date ? new Date(e.event_date) : null;
     return {
       id: e.id,

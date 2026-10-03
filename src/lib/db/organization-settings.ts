@@ -50,11 +50,21 @@ export async function fetchUniformSettings(): Promise<UniformSettings> {
   const settingsMap = new Map(settings.map((s) => [s.key, s.value]));
 
   return {
-    lowStockThreshold: (settingsMap.get("uniform_low_stock_threshold") as any)?.value ?? DEFAULT_UNIFORM_SETTINGS.lowStockThreshold,
-    mediumStockThreshold: (settingsMap.get("uniform_medium_stock_threshold") as any)?.value ?? DEFAULT_UNIFORM_SETTINGS.mediumStockThreshold,
-    itemsPageSize: (settingsMap.get("uniform_items_page_size") as any)?.value ?? DEFAULT_UNIFORM_SETTINGS.itemsPageSize,
-    entriesPageSize: (settingsMap.get("uniform_entries_page_size") as any)?.value ?? DEFAULT_UNIFORM_SETTINGS.entriesPageSize,
-    ordersPageSize: (settingsMap.get("uniform_orders_page_size") as any)?.value ?? DEFAULT_UNIFORM_SETTINGS.ordersPageSize,
+    lowStockThreshold:
+      (settingsMap.get("uniform_low_stock_threshold") as any)?.value ??
+      DEFAULT_UNIFORM_SETTINGS.lowStockThreshold,
+    mediumStockThreshold:
+      (settingsMap.get("uniform_medium_stock_threshold") as any)?.value ??
+      DEFAULT_UNIFORM_SETTINGS.mediumStockThreshold,
+    itemsPageSize:
+      (settingsMap.get("uniform_items_page_size") as any)?.value ??
+      DEFAULT_UNIFORM_SETTINGS.itemsPageSize,
+    entriesPageSize:
+      (settingsMap.get("uniform_entries_page_size") as any)?.value ??
+      DEFAULT_UNIFORM_SETTINGS.entriesPageSize,
+    ordersPageSize:
+      (settingsMap.get("uniform_orders_page_size") as any)?.value ??
+      DEFAULT_UNIFORM_SETTINGS.ordersPageSize,
   };
 }
 

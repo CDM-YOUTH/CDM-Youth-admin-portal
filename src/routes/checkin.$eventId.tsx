@@ -40,9 +40,13 @@ function KioskPage() {
     <main className="flex min-h-screen items-center justify-center bg-background px-6 py-10">
       <div className="w-full max-w-md space-y-6 rounded-2xl border border-border bg-card p-8 shadow-lg">
         <div className="text-center">
-          <div className="text-[10px] font-bold uppercase tracking-widest text-gold">CDM Self Check-in</div>
+          <div className="text-[10px] font-bold uppercase tracking-widest text-gold">
+            CDM Self Check-in
+          </div>
           <h1 className="text-display mt-1 text-2xl font-black text-foreground">{event.name}</h1>
-          <p className="mt-1 text-[12px] text-text-3">{event.date} · {event.venue}</p>
+          <p className="mt-1 text-[12px] text-text-3">
+            {event.date} · {event.venue}
+          </p>
         </div>
 
         <div className="space-y-2">
@@ -68,7 +72,9 @@ function KioskPage() {
         {result && (
           <div
             className={`flex items-center gap-3 rounded-lg p-4 ${
-              result.ok ? "border border-success/40 bg-success-soft" : "border border-danger/40 bg-danger-soft"
+              result.ok
+                ? "border border-success/40 bg-success-soft"
+                : "border border-danger/40 bg-danger-soft"
             }`}
           >
             {result.ok ? (

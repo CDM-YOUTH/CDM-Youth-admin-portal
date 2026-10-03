@@ -60,7 +60,7 @@ export async function listPatronagePaged(opts: {
 
   let q = db().select(
     "*, deanery:deaneries(name), parish:parishes(name), outstation:outstations(name)",
-    { count: "exact" }
+    { count: "exact" },
   );
 
   // Filter by soft-delete status
@@ -121,7 +121,7 @@ export async function createPatronage(input: PatronageTeamInput): Promise<Patron
       deanery_id: input.deaneryId,
       parish_id: input.parishId,
       outstation_id: input.outstationId,
-      start_date: input.startDate || new Date().toISOString().split('T')[0],
+      start_date: input.startDate || new Date().toISOString().split("T")[0],
     })
     .select("*, deanery:deaneries(name), parish:parishes(name), outstation:outstations(name)")
     .single();
@@ -131,7 +131,7 @@ export async function createPatronage(input: PatronageTeamInput): Promise<Patron
 
 export async function updatePatronage(
   id: string,
-  input: PatronageTeamUpdate
+  input: PatronageTeamUpdate,
 ): Promise<PatronageTeamRow> {
   const updates: Record<string, unknown> = {};
   if (input.name !== undefined) updates.name = input.name.trim();
@@ -153,16 +153,12 @@ export async function updatePatronage(
 }
 
 export async function deletePatronage(id: string): Promise<void> {
-  const { error } = await db()
-    .update({ deleted_at: new Date().toISOString() })
-    .eq("id", id);
+  const { error } = await db().update({ deleted_at: new Date().toISOString() }).eq("id", id);
   if (error) throw error;
 }
 
 export async function bulkDeletePatronage(ids: string[]): Promise<void> {
   if (ids.length === 0) return;
-  const { error } = await db()
-    .update({ deleted_at: new Date().toISOString() })
-    .in("id", ids);
+  const { error } = await db().update({ deleted_at: new Date().toISOString() }).in("id", ids);
   if (error) throw error;
 }

@@ -73,9 +73,7 @@ export function isStaff(role: string): boolean {
 
 // Convenience: verify auth + rate-limit in one call.
 // Returns { error: Response } when blocked, or { userId, role, scopeDeaneryId, scopeParishId } when clear.
-export async function guardRequest(
-  request: Request,
-): Promise<
+export async function guardRequest(request: Request): Promise<
   | { error: Response }
   | {
       userId: string;

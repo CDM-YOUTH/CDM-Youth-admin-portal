@@ -2,17 +2,9 @@ import type { ReactNode } from "react";
 
 /* ---------- Card ---------- */
 
-export function Card({
-  children,
-  className = "",
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
+export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <div
-      className={`overflow-hidden rounded-xl border border-border bg-card ${className}`}
-    >
+    <div className={`overflow-hidden rounded-xl border border-border bg-card ${className}`}>
       {children}
     </div>
   );

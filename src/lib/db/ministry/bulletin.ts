@@ -62,20 +62,14 @@ export async function listBulletinCategories(): Promise<BulletinCategory[]> {
   return (data ?? []) as BulletinCategory[];
 }
 
-export async function getBulletinCategory(
-  id: string
-): Promise<BulletinCategory> {
-  const { data, error } = await db
-    .from("bulletin_categories")
-    .select("*")
-    .eq("id", id)
-    .single();
+export async function getBulletinCategory(id: string): Promise<BulletinCategory> {
+  const { data, error } = await db.from("bulletin_categories").select("*").eq("id", id).single();
   if (error) throw error;
   return data as BulletinCategory;
 }
 
 export async function createBulletinCategory(
-  input: BulletinCategoryInput
+  input: BulletinCategoryInput,
 ): Promise<BulletinCategory> {
   const { data, error } = await db
     .from("bulletin_categories")
@@ -94,7 +88,7 @@ export async function createBulletinCategory(
 
 export async function updateBulletinCategory(
   id: string,
-  input: BulletinCategoryInput
+  input: BulletinCategoryInput,
 ): Promise<BulletinCategory> {
   const { data, error } = await db
     .from("bulletin_categories")
@@ -113,10 +107,7 @@ export async function updateBulletinCategory(
 }
 
 export async function deleteBulletinCategory(id: string): Promise<void> {
-  const { error } = await db
-    .from("bulletin_categories")
-    .delete()
-    .eq("id", id);
+  const { error } = await db.from("bulletin_categories").delete().eq("id", id);
   if (error) throw error;
 }
 
@@ -124,14 +115,16 @@ export async function deleteBulletinCategory(id: string): Promise<void> {
 
 export async function listBulletinItems(
   categoryId?: string,
-  publishedOnly = true
+  publishedOnly = true,
 ): Promise<BulletinItem[]> {
   let q = db
     .from("formation_items")
-    .select(`
+    .select(
+      `
       *,
       bulletin_categories:category_id (*)
-    `)
+    `,
+    )
     .order("created_at", { ascending: false })
     .limit(200);
 
@@ -155,10 +148,12 @@ export async function listBulletinItems(
 export async function getBulletinItem(id: string): Promise<BulletinItem> {
   const { data, error } = await db
     .from("formation_items")
-    .select(`
+    .select(
+      `
       *,
       bulletin_categories:category_id (*)
-    `)
+    `,
+    )
     .eq("id", id)
     .single();
   if (error) throw error;
@@ -168,9 +163,7 @@ export async function getBulletinItem(id: string): Promise<BulletinItem> {
   } as BulletinItem;
 }
 
-export async function createBulletinItem(
-  input: BulletinItemInput
-): Promise<BulletinItem> {
+export async function createBulletinItem(input: BulletinItemInput): Promise<BulletinItem> {
   const tags = input.tags
     ? input.tags
         .split(",")
@@ -195,7 +188,7 @@ export async function createBulletinItem(
       `
       *,
       bulletin_categories:category_id (*)
-    `
+    `,
     )
     .single();
   if (error) throw error;
@@ -207,7 +200,7 @@ export async function createBulletinItem(
 
 export async function updateBulletinItem(
   id: string,
-  input: BulletinItemInput
+  input: BulletinItemInput,
 ): Promise<BulletinItem> {
   const tags = input.tags
     ? input.tags
@@ -233,7 +226,7 @@ export async function updateBulletinItem(
       `
       *,
       bulletin_categories:category_id (*)
-    `
+    `,
     )
     .single();
   if (error) throw error;
@@ -244,10 +237,7 @@ export async function updateBulletinItem(
 }
 
 export async function deleteBulletinItem(id: string): Promise<void> {
-  const { error } = await db
-    .from("formation_items")
-    .delete()
-    .eq("id", id);
+  const { error } = await db.from("formation_items").delete().eq("id", id);
   if (error) throw error;
 }
 
@@ -255,16 +245,11 @@ export async function publishBulletinItem(id: string): Promise<BulletinItem> {
   return updateBulletinItemPublish(id, true);
 }
 
-export async function unpublishBulletinItem(
-  id: string
-): Promise<BulletinItem> {
+export async function unpublishBulletinItem(id: string): Promise<BulletinItem> {
   return updateBulletinItemPublish(id, false);
 }
 
-async function updateBulletinItemPublish(
-  id: string,
-  published: boolean
-): Promise<BulletinItem> {
+async function updateBulletinItemPublish(id: string, published: boolean): Promise<BulletinItem> {
   const { data, error } = await db
     .from("formation_items")
     .update({ published })
@@ -273,7 +258,7 @@ async function updateBulletinItemPublish(
       `
       *,
       bulletin_categories:category_id (*)
-    `
+    `,
     )
     .single();
   if (error) throw error;

@@ -31,13 +31,12 @@ async function main() {
   // ---- 1. Create (or find) the auth user ----
   let uid;
 
-  const { data: created, error: createError } =
-    await supabase.auth.admin.createUser({
-      email: "cdmoffice@diocese.ke",
-      password: "office123",
-      email_confirm: true,
-      user_metadata: { full_name: "CDM Office" },
-    });
+  const { data: created, error: createError } = await supabase.auth.admin.createUser({
+    email: "cdmoffice@diocese.ke",
+    password: "office123",
+    email_confirm: true,
+    user_metadata: { full_name: "CDM Office" },
+  });
 
   if (createError) {
     if (
@@ -46,17 +45,14 @@ async function main() {
     ) {
       // User exists — look them up
       console.log("User already exists, looking up existing account...");
-      const { data: list, error: listError } =
-        await supabase.auth.admin.listUsers({ perPage: 1000 });
+      const { data: list, error: listError } = await supabase.auth.admin.listUsers({
+        perPage: 1000,
+      });
       if (listError) throw listError;
 
-      const existing = list.users.find(
-        (u) => u.email === "cdmoffice@diocese.ke"
-      );
+      const existing = list.users.find((u) => u.email === "cdmoffice@diocese.ke");
       if (!existing) {
-        throw new Error(
-          "Could not find existing user — check your dashboard manually."
-        );
+        throw new Error("Could not find existing user — check your dashboard manually.");
       }
       uid = existing.id;
       console.log("Found existing user:", uid);
@@ -83,7 +79,7 @@ async function main() {
       full_name: "CDM Office",
       position: "Diocese Youth Coordinator",
     },
-    { onConflict: "id" }
+    { onConflict: "id" },
   );
   if (profileError) throw profileError;
   console.log("Profile saved");

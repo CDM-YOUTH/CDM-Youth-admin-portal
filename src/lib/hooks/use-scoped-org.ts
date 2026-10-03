@@ -13,7 +13,7 @@ import type { UserScope } from "@/lib/hooks/use-admin-scope";
  */
 export function resolveScoped(scopeId: string | null, initialId?: string) {
   const mismatched = !!(scopeId && initialId && initialId !== scopeId);
-  const value = mismatched ? initialId! : (scopeId || initialId || "");
+  const value = mismatched ? initialId! : scopeId || initialId || "";
   const locked = !!scopeId && !mismatched;
   return { value, locked };
 }

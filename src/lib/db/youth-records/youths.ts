@@ -94,7 +94,7 @@ export type YouthInput = {
   fullName: string;
   gender: Gender;
   age: number;
-  ageRange?: string | null;    // raw display value e.g. "18-25"; age holds the lower bound
+  ageRange?: string | null; // raw display value e.g. "18-25"; age holds the lower bound
   phone?: string | null;
   altPhone?: string | null;
   email?: string | null;
@@ -141,7 +141,11 @@ export async function createYouth(input: YouthInput) {
 
 export async function updateYouth(id: string, input: YouthInput) {
   const org = await fetchOrg();
-  const { data, error } = await youthsTable().update(toRow(input, org)).eq("id", id).select().single();
+  const { data, error } = await youthsTable()
+    .update(toRow(input, org))
+    .eq("id", id)
+    .select()
+    .single();
   if (error) throw error;
   return data;
 }

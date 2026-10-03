@@ -2,12 +2,29 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { titleCase, formatPhone } from "@/lib/utils";
 import { useEffect, useMemo, useState, type ComponentType } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, QrCode, Search, X, BadgeCheck, Loader2, UserCog, MoreVertical, Trash2, FileText, Sheet, Pencil, ChevronDown } from "lucide-react";
+import {
+  ArrowLeft,
+  QrCode,
+  Search,
+  X,
+  BadgeCheck,
+  Loader2,
+  UserCog,
+  MoreVertical,
+  Trash2,
+  FileText,
+  Sheet,
+  Pencil,
+  ChevronDown,
+} from "lucide-react";
 import { Icon } from "@iconify/react";
 import { toast } from "sonner";
 import { Topbar } from "@/components/admin/layout/topbar";
 import { Card, CardBody, Kpi } from "@/components/admin/composables/ui-bits";
-import { usePagination, TablePagination } from "@/components/admin/composables/tables/table-pagination";
+import {
+  usePagination,
+  TablePagination,
+} from "@/components/admin/composables/tables/table-pagination";
 import {
   ColumnFilter,
   ColumnHeader,
@@ -35,7 +52,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { getEventFull, registerForEvent, deleteRegistration, updateGuestRegistration } from "@/lib/db/activities/events";
+import {
+  getEventFull,
+  registerForEvent,
+  deleteRegistration,
+  updateGuestRegistration,
+} from "@/lib/db/activities/events";
 import { apiFetch } from "@/lib/api/fetch-api";
 import { listYouthsPaged, fetchYouthByCdmId, type YouthRow } from "@/lib/db/youth-records/youths";
 import { fetchOrg, type OrgTree } from "@/lib/db/org";
@@ -44,7 +66,12 @@ import { Input } from "@/components/ui/input";
 import { AddYouthDialog, type AddYouthResult } from "@/components/admin/youth/add-youth-dialog";
 import { useAdminScope } from "@/lib/hooks/use-admin-scope";
 import { useScopedOrgFields } from "@/lib/hooks/use-scoped-org";
-import { createPatronage, updatePatronage, getPatronage, type PatronageTeamInput } from "@/lib/db/patronage";
+import {
+  createPatronage,
+  updatePatronage,
+  getPatronage,
+  type PatronageTeamInput,
+} from "@/lib/db/patronage";
 
 export const Route = createFileRoute("/admin/event-checkin/$eventId")({
   head: () => ({
@@ -74,28 +101,29 @@ type AttendeeEntry = {
 
 // Guest roles — patronage is now its own first-class kind, not a guest sub-role
 const GUEST_ROLES = ["guest", "facilitator", "accompaniment"] as const;
-type GuestRole = typeof GUEST_ROLES[number];
+type GuestRole = (typeof GUEST_ROLES)[number];
 
 const KIND_TONE: Record<AttendeeKind, string> = {
   member: "bg-success-soft text-success",
   patron: "bg-violet-50 text-violet-600",
-  guest:  "bg-warn-soft text-gold",
+  guest: "bg-warn-soft text-gold",
 };
 
 const KIND_LABEL: Record<AttendeeKind, string> = {
   member: "Youth",
   patron: "Patron",
-  guest:  "Guest",
+  guest: "Guest",
 };
 
 const ROLE_TONE: Record<GuestRole, string> = {
-  guest:         "bg-warn-soft text-gold",
-  facilitator:   "bg-info-soft text-info",
+  guest: "bg-warn-soft text-gold",
+  facilitator: "bg-info-soft text-info",
   accompaniment: "bg-success-soft text-success",
 };
 
 function btnCls(variant: "primary" | "ghost" = "primary", extra = "") {
-  const base = "inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-[11px] font-bold transition";
+  const base =
+    "inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-[11px] font-bold transition";
   const vars = {
     primary: "bg-danger text-white hover:opacity-90",
     ghost: "border border-border bg-bg-2 text-text-2 hover:text-text-1",
@@ -129,9 +157,11 @@ function EventCheckinPage() {
     setSheetSyncing(true);
     try {
       const res = await apiFetch("/api/sheets/leadership");
-      const body = await res.json() as { ok?: boolean; synced?: number; error?: string };
+      const body = (await res.json()) as { ok?: boolean; synced?: number; error?: string };
       if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`);
-      toast.success(`Sheet synced — ${body.synced ?? 0} registration${body.synced !== 1 ? "s" : ""} written`);
+      toast.success(
+        `Sheet synced — ${body.synced ?? 0} registration${body.synced !== 1 ? "s" : ""} written`,
+      );
     } catch (e: unknown) {
       toast.error(`Sheet sync failed: ${e instanceof Error ? e.message : "unknown error"}`);
     } finally {
@@ -158,7 +188,9 @@ function EventCheckinPage() {
           .then(async (res) => {
             if (!res.ok) {
               const body = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-              toast.warning(`Registered but sheet sync failed: ${(body as { error?: string }).error ?? res.status}`);
+              toast.warning(
+                `Registered but sheet sync failed: ${(body as { error?: string }).error ?? res.status}`,
+              );
             }
           })
           .catch((err) => toast.warning(`Registered but sheet sync failed: ${err.message}`));
@@ -173,8 +205,13 @@ function EventCheckinPage() {
   });
 
   const editMut = useMutation({
-    mutationFn: ({ id, input }: { id: string; input: Parameters<typeof updateGuestRegistration>[1] }) =>
-      updateGuestRegistration(id, input),
+    mutationFn: ({
+      id,
+      input,
+    }: {
+      id: string;
+      input: Parameters<typeof updateGuestRegistration>[1];
+    }) => updateGuestRegistration(id, input),
     onSuccess: () => {
       toast.success("Guest details updated");
       qc.invalidateQueries({ queryKey: ["event-full", eventId] });
@@ -194,11 +231,7 @@ function EventCheckinPage() {
         // Detect patron by role OR by notes containing patronage_id (handles legacy rows
         // where guest_role was saved as null before the bug was fixed)
         const isPatron = role === "patronage" || notes.includes("patronage_id:");
-        const kind: AttendeeKind = reg.youth
-          ? "member"
-          : isPatron
-            ? "patron"
-            : "guest";
+        const kind: AttendeeKind = reg.youth ? "member" : isPatron ? "patron" : "guest";
 
         // Extract patron_number from notes ("patronage_id:xxx|patron_no:yyy")
         const patronNoMatch = notes.match(/patron_no:([^|]+)/);
@@ -213,7 +246,10 @@ function EventCheckinPage() {
           deanery: reg.youth?.deanery?.name ?? reg.guest_deanery ?? "",
           parish: reg.youth?.parish?.name ?? reg.guest_parish ?? "",
           outstation: reg.youth?.outstation?.name ?? reg.guest_outstation ?? "",
-          time: new Date(reg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          time: new Date(reg.created_at).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
           kind,
           role,
           notes,
@@ -257,7 +293,8 @@ function EventCheckinPage() {
   const outstationOptions = useMemo(() => {
     if (!org) return [];
     if (parishId) return org.outstations.filter((o) => o.parish_id === parishId);
-    if (deaneryId) return org.outstations.filter((o) => parishOptions.some((p) => p.id === o.parish_id));
+    if (deaneryId)
+      return org.outstations.filter((o) => parishOptions.some((p) => p.id === o.parish_id));
     return org.outstations;
   }, [org, deaneryId, parishId, parishOptions]);
 
@@ -273,7 +310,11 @@ function EventCheckinPage() {
         if (deaneryId && a.deanery !== selectedDeaneryName) return false;
         if (parishId && a.parish !== selectedParishName) return false;
         if (outstationId && a.outstation !== selectedOutstationName) return false;
-        if (term && ![a.name, a.cdmId, a.phone, a.parish, a.outstation].join(" ").toLowerCase().includes(term)) return false;
+        if (
+          term &&
+          ![a.name, a.cdmId, a.phone, a.parish, a.outstation].join(" ").toLowerCase().includes(term)
+        )
+          return false;
         if (!applyColumnFilter(a.cdmId, fCdm)) return false;
         if (!applyColumnFilter(a.name, fName)) return false;
         if (!applyColumnFilter(a.category, fCategory)) return false;
@@ -288,7 +329,24 @@ function EventCheckinPage() {
         const kindOrder: Record<AttendeeKind, number> = { member: 0, patron: 1, guest: 2 };
         return kindOrder[a.kind] - kindOrder[b.kind];
       });
-  }, [attendees, deaneryId, parishId, outstationId, selectedDeaneryName, selectedParishName, selectedOutstationName, q, fCdm, fName, fCategory, fPhone, fDeanery, fParish, fOutstation, fTime]);
+  }, [
+    attendees,
+    deaneryId,
+    parishId,
+    outstationId,
+    selectedDeaneryName,
+    selectedParishName,
+    selectedOutstationName,
+    q,
+    fCdm,
+    fName,
+    fCategory,
+    fPhone,
+    fDeanery,
+    fParish,
+    fOutstation,
+    fTime,
+  ]);
 
   const pagination = usePagination(filtered, 10);
 
@@ -309,7 +367,20 @@ function EventCheckinPage() {
   const filteredMemberCount = filtered.filter((a) => a.kind === "member").length;
   const filteredPatronCount = filtered.filter((a) => a.kind === "patron").length;
   const filteredGuestCount = filtered.filter((a) => a.kind === "guest").length;
-  const hasFilter = !!(deaneryId || parishId || outstationId || q || fCdm?.value || fName?.value || fCategory?.value || fPhone?.value || fDeanery?.value || fParish?.value || fOutstation?.value || fTime?.value);
+  const hasFilter = !!(
+    deaneryId ||
+    parishId ||
+    outstationId ||
+    q ||
+    fCdm?.value ||
+    fName?.value ||
+    fCategory?.value ||
+    fPhone?.value ||
+    fDeanery?.value ||
+    fParish?.value ||
+    fOutstation?.value ||
+    fTime?.value
+  );
 
   const exportPdf = async (rows: typeof filtered) => {
     const { default: jsPDF } = await import("jspdf");
@@ -326,17 +397,38 @@ function EventCheckinPage() {
     });
 
     const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-    const dateStr = new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+    const dateStr = new Date().toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
     doc.setFontSize(13);
     doc.setFont("helvetica", "bold");
     doc.text(event.name, 14, 14);
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
-    doc.text(`Registrations & Check-in · Exported ${dateStr} · ${sorted.length} attendee${sorted.length !== 1 ? "s" : ""}`, 14, 20);
+    doc.text(
+      `Registrations & Check-in · Exported ${dateStr} · ${sorted.length} attendee${sorted.length !== 1 ? "s" : ""}`,
+      14,
+      20,
+    );
     autoTable(doc, {
       startY: 26,
       theme: "grid",
-      head: [["#", "CDM No.", "Name", "Type", "Category", "Phone", "Deanery", "Parish", "Outstation", "Registered At"]],
+      head: [
+        [
+          "#",
+          "CDM No.",
+          "Name",
+          "Type",
+          "Category",
+          "Phone",
+          "Deanery",
+          "Parish",
+          "Outstation",
+          "Registered At",
+        ],
+      ],
       body: sorted.map((a, i) => [
         i + 1,
         a.cdmId === "—" ? "" : a.cdmId,
@@ -349,10 +441,28 @@ function EventCheckinPage() {
         a.outstation || "",
         a.time,
       ]),
-      styles: { fontSize: 8, cellPadding: 2, fillColor: [255, 255, 255], textColor: [0, 0, 0], lineColor: [210, 210, 210], lineWidth: 0.15 },
-      headStyles: { fillColor: [185, 28, 28], textColor: [255, 255, 255], fontStyle: "bold", lineColor: [185, 28, 28], lineWidth: 0.15 },
+      styles: {
+        fontSize: 8,
+        cellPadding: 2,
+        fillColor: [255, 255, 255],
+        textColor: [0, 0, 0],
+        lineColor: [210, 210, 210],
+        lineWidth: 0.15,
+      },
+      headStyles: {
+        fillColor: [185, 28, 28],
+        textColor: [255, 255, 255],
+        fontStyle: "bold",
+        lineColor: [185, 28, 28],
+        lineWidth: 0.15,
+      },
       alternateRowStyles: { fillColor: [255, 255, 255] },
-      columnStyles: { 0: { cellWidth: 12, halign: "center" }, 1: { cellWidth: 28 }, 2: { cellWidth: 40 }, 3: { cellWidth: 22 } },
+      columnStyles: {
+        0: { cellWidth: 12, halign: "center" },
+        1: { cellWidth: 28 },
+        2: { cellWidth: 40 },
+        3: { cellWidth: 22 },
+      },
     });
     doc.save(`${event.name.replace(/\s+/g, "-")}-registrations.pdf`);
     toast.success(`Exported ${sorted.length} registrations`);
@@ -364,11 +474,7 @@ function EventCheckinPage() {
         title={event.name}
         description="Registrations & Check-in"
         action={
-          <Link
-            to="/admin/event/$eventId"
-            params={{ eventId }}
-            className={btnCls("ghost")}
-          >
+          <Link to="/admin/event/$eventId" params={{ eventId }} className={btnCls("ghost")}>
             <ArrowLeft className="h-3.5 w-3.5" /> Back to event
           </Link>
         }
@@ -416,13 +522,20 @@ function EventCheckinPage() {
             <FilterSelect
               label="All Deaneries"
               value={deaneryId}
-              onChange={(v) => { setDeaneryId(v); setParishId(""); setOutstationId(""); }}
+              onChange={(v) => {
+                setDeaneryId(v);
+                setParishId("");
+                setOutstationId("");
+              }}
               options={(org?.deaneries ?? []).map((d) => ({ value: d.id, label: d.name }))}
             />
             <FilterSelect
               label="All Parishes"
               value={parishId}
-              onChange={(v) => { setParishId(v); setOutstationId(""); }}
+              onChange={(v) => {
+                setParishId(v);
+                setOutstationId("");
+              }}
               options={parishOptions.map((p) => ({ value: p.id, label: p.name }))}
               disabled={parishOptions.length === 0}
             />
@@ -435,10 +548,18 @@ function EventCheckinPage() {
             />
             <FilterClear
               onClick={() => {
-                setDeaneryId(""); setParishId(""); setOutstationId(""); setQ("");
-                setFCdm(undefined); setFName(undefined); setFCategory(undefined);
-                setFPhone(undefined); setFDeanery(undefined); setFParish(undefined);
-                setFOutstation(undefined); setFTime(undefined);
+                setDeaneryId("");
+                setParishId("");
+                setOutstationId("");
+                setQ("");
+                setFCdm(undefined);
+                setFName(undefined);
+                setFCategory(undefined);
+                setFPhone(undefined);
+                setFDeanery(undefined);
+                setFParish(undefined);
+                setFOutstation(undefined);
+                setFTime(undefined);
               }}
               visible={hasFilter}
             />
@@ -474,7 +595,11 @@ function EventCheckinPage() {
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-                <button onClick={() => exportPdf(filtered)} className={btnCls("primary")} title="Export current view as PDF">
+                <button
+                  onClick={() => exportPdf(filtered)}
+                  className={btnCls("primary")}
+                  title="Export current view as PDF"
+                >
                   <FileText className="h-3.5 w-3.5" /> Export PDF
                 </button>
                 {isLeadershipWorkshop && (
@@ -484,9 +609,11 @@ function EventCheckinPage() {
                     className={btnCls("primary")}
                     title="Sync all registrations to Google Sheet"
                   >
-                    {sheetSyncing
-                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      : <Sheet className="h-3.5 w-3.5" />}
+                    {sheetSyncing ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Sheet className="h-3.5 w-3.5" />
+                    )}
                     {sheetSyncing ? "Syncing…" : "Sync to Sheets"}
                   </button>
                 )}
@@ -542,7 +669,9 @@ function EventCheckinPage() {
                   <th className="label-eyebrow px-3.5 py-2.5 text-left">
                     <ColumnHeader
                       label="Deanery"
-                      filter={<ColumnFilter label="Deanery" value={fDeanery} onChange={setFDeanery} />}
+                      filter={
+                        <ColumnFilter label="Deanery" value={fDeanery} onChange={setFDeanery} />
+                      }
                     />
                   </th>
                   <th className="label-eyebrow px-3.5 py-2.5 text-left">
@@ -554,7 +683,13 @@ function EventCheckinPage() {
                   <th className="label-eyebrow px-3.5 py-2.5 text-left">
                     <ColumnHeader
                       label="Outstation"
-                      filter={<ColumnFilter label="Outstation" value={fOutstation} onChange={setFOutstation} />}
+                      filter={
+                        <ColumnFilter
+                          label="Outstation"
+                          value={fOutstation}
+                          onChange={setFOutstation}
+                        />
+                      }
                     />
                   </th>
                   <th className="label-eyebrow px-3.5 py-2.5 text-left">
@@ -578,7 +713,9 @@ function EventCheckinPage() {
                 )}
                 {pagination.pageRows.map((a) => (
                   <tr key={a.id} className="border-b border-border/30 last:border-0 hover:bg-bg-3">
-                    <td className="px-3.5 py-2.5 font-mono text-[10px] font-bold text-gold">{a.cdmId}</td>
+                    <td className="px-3.5 py-2.5 font-mono text-[10px] font-bold text-gold">
+                      {a.cdmId}
+                    </td>
                     <td className="px-3.5 py-2.5 text-[11px] font-semibold text-foreground">
                       {titleCase(a.name)}
                       {/* Guest sub-role badge (facilitator / accompaniment) */}
@@ -594,14 +731,16 @@ function EventCheckinPage() {
                     </td>
                     {/* Type column — Youth / Patron / Guest */}
                     <td className="px-3.5 py-2.5">
-                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wide ${KIND_TONE[a.kind]}`}>
+                      <span
+                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wide ${KIND_TONE[a.kind]}`}
+                      >
                         {KIND_LABEL[a.kind]}
                       </span>
                     </td>
-                    <td className="px-3.5 py-2.5 text-[11px] text-text-2">
-                      {a.category || "—"}
+                    <td className="px-3.5 py-2.5 text-[11px] text-text-2">{a.category || "—"}</td>
+                    <td className="px-3.5 py-2.5 text-[11px] text-text-3">
+                      {formatPhone(a.phone) || "—"}
                     </td>
-                    <td className="px-3.5 py-2.5 text-[11px] text-text-3">{formatPhone(a.phone) || "—"}</td>
                     <td className="px-3.5 py-2.5 text-[11px] text-text-2">{a.deanery || "—"}</td>
                     <td className="px-3.5 py-2.5 text-[11px] text-text-1">{a.parish || "—"}</td>
                     <td className="px-3.5 py-2.5 text-[11px] text-text-2">{a.outstation || "—"}</td>
@@ -625,7 +764,8 @@ function EventCheckinPage() {
                           )}
                           {a.kind === "patron" && (
                             <DropdownMenuItem onClick={() => setEditPatronageTarget(a)}>
-                              <Icon icon="mdi:account-tie" className="mr-2 h-3.5 w-3.5" /> Edit patronage
+                              <Icon icon="mdi:account-tie" className="mr-2 h-3.5 w-3.5" /> Edit
+                              patronage
                             </DropdownMenuItem>
                           )}
                           <DropdownMenuSeparator />
@@ -684,13 +824,13 @@ function EventCheckinPage() {
               setAddPatronageOpen(false);
               registerMut.mutate({
                 eventId,
-                guestName:       patron.name,
-                guestPhone:      patron.phone ?? undefined,
-                guestDeanery:    resolved.deaneryName,
-                guestParish:     resolved.parishName,
+                guestName: patron.name,
+                guestPhone: patron.phone ?? undefined,
+                guestDeanery: resolved.deaneryName,
+                guestParish: resolved.parishName,
                 guestOutstation: resolved.outstationName,
-                guestRole:       "patronage",
-                notes:           `patronage_id:${patron.id}${patron.patron_number ? `|patron_no:${patron.patron_number}` : ""}`,
+                guestRole: "patronage",
+                notes: `patronage_id:${patron.id}${patron.patron_number ? `|patron_no:${patron.patron_number}` : ""}`,
               });
             }}
           />
@@ -714,8 +854,8 @@ function EventCheckinPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Remove from event?</AlertDialogTitle>
             <AlertDialogDescription>
-              This removes <strong>{removeTarget?.name}</strong> from this event's registration list.
-              Their youth record and all other data remain unchanged.
+              This removes <strong>{removeTarget?.name}</strong> from this event's registration
+              list. Their youth record and all other data remain unchanged.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -750,10 +890,10 @@ function EventCheckinPage() {
             editMut.mutate({
               id: editPatronageTarget.id,
               input: {
-                guestName:       updated.name,
-                guestPhone:      updated.phone ?? null,
-                guestDeanery:    updated.deanery ?? null,
-                guestParish:     updated.parish ?? null,
+                guestName: updated.name,
+                guestPhone: updated.phone ?? null,
+                guestDeanery: updated.deanery ?? null,
+                guestParish: updated.parish ?? null,
                 guestOutstation: updated.outstation ?? null,
               },
             });
@@ -764,11 +904,18 @@ function EventCheckinPage() {
   );
 }
 
-const SEL_CLS = "h-8 flex-1 min-w-[120px] rounded-md border border-border bg-bg-2 px-2 text-[11px] font-medium text-text-1 outline-none transition hover:border-gold-3 focus:border-gold-3 disabled:opacity-40";
+const SEL_CLS =
+  "h-8 flex-1 min-w-[120px] rounded-md border border-border bg-bg-2 px-2 text-[11px] font-medium text-text-1 outline-none transition hover:border-gold-3 focus:border-gold-3 disabled:opacity-40";
 
 /* ─── Register dialog ─── */
 function RegisterDialog({
-  open, onClose, org, defaultDeaneryId, defaultParishId, defaultOutstationId, onAdd,
+  open,
+  onClose,
+  org,
+  defaultDeaneryId,
+  defaultParishId,
+  defaultOutstationId,
+  onAdd,
 }: {
   open: boolean;
   onClose: () => void;
@@ -793,17 +940,22 @@ function RegisterDialog({
   });
 
   const scope = useAdminScope();
-  const isOutsideScope = (y: { deanery_id: string | null; parish_id: string | null; outstation_id: string | null }) =>
+  const isOutsideScope = (y: {
+    deanery_id: string | null;
+    parish_id: string | null;
+    outstation_id: string | null;
+  }) =>
     (!!scope.outstationId && y.outstation_id !== scope.outstationId) ||
     (!!scope.parishId && y.parish_id !== scope.parishId) ||
     (!!scope.deaneryId && y.deanery_id !== scope.deaneryId);
   const previewOutsideScope = !!preview && isOutsideScope(preview);
 
-  const cdmError = lookupKey && !lookingUp && preview === null
-    ? `No youth found with CDM No. "${lookupKey}"`
-    : previewOutsideScope
-      ? `${preview!.full_name} is outside your assigned scope.`
-      : "";
+  const cdmError =
+    lookupKey && !lookingUp && preview === null
+      ? `No youth found with CDM No. "${lookupKey}"`
+      : previewOutsideScope
+        ? `${preview!.full_name} is outside your assigned scope.`
+        : "";
 
   /* ── Browse mode ── */
   const {
@@ -858,7 +1010,15 @@ function RegisterDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) { reset(); onClose(); } }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) {
+          reset();
+          onClose();
+        }
+      }}
+    >
       <DialogContent className="max-w-xl">
         <DialogHeader>
           <DialogTitle>Register Attendee</DialogTitle>
@@ -869,7 +1029,10 @@ function RegisterDialog({
           {(["cdm", "browse"] as const).map((m) => (
             <button
               key={m}
-              onClick={() => { setMode(m); reset(); }}
+              onClick={() => {
+                setMode(m);
+                reset();
+              }}
               className={`flex-1 rounded-md py-1.5 text-[11px] font-bold transition ${
                 mode === m ? "bg-danger text-white" : "text-text-2 hover:text-text-1"
               }`}
@@ -885,7 +1048,10 @@ function RegisterDialog({
             <div className="flex gap-2">
               <Input
                 value={cdmInput}
-                onChange={(e) => { setCdmInput(e.target.value); setLookupKey(""); }}
+                onChange={(e) => {
+                  setCdmInput(e.target.value);
+                  setLookupKey("");
+                }}
                 onKeyDown={(e) => e.key === "Enter" && setLookupKey(cdmInput.trim().toUpperCase())}
                 placeholder="CDM-2026-00001"
                 className="flex-1"
@@ -895,22 +1061,33 @@ function RegisterDialog({
                 disabled={!cdmInput.trim() || lookingUp}
                 className={btnCls("primary")}
               >
-                {lookingUp
-                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  : <Search className="h-3.5 w-3.5" />}
+                {lookingUp ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Search className="h-3.5 w-3.5" />
+                )}
                 Look up
               </button>
             </div>
             {cdmError && <p className="text-[11px] text-danger">{cdmError}</p>}
             {preview && !previewOutsideScope && (
               <div className="rounded-lg border border-border bg-bg-2 p-3 space-y-1">
-                <div className="font-bold text-[13px] text-text-1">{titleCase(preview.full_name)}</div>
-                <div className="text-[11px] text-text-3">
-                  {preview.cdm_id} · {preview.outstation?.name ?? preview.parish?.name ?? "—"} · {preview.category}
+                <div className="font-bold text-[13px] text-text-1">
+                  {titleCase(preview.full_name)}
                 </div>
-                {preview.phone && <div className="text-[11px] text-text-3">{formatPhone(preview.phone)}</div>}
+                <div className="text-[11px] text-text-3">
+                  {preview.cdm_id} · {preview.outstation?.name ?? preview.parish?.name ?? "—"} ·{" "}
+                  {preview.category}
+                </div>
+                {preview.phone && (
+                  <div className="text-[11px] text-text-3">{formatPhone(preview.phone)}</div>
+                )}
                 <button
-                  onClick={() => { onAdd(preview.cdm_id); reset(); onClose(); }}
+                  onClick={() => {
+                    onAdd(preview.cdm_id);
+                    reset();
+                    onClose();
+                  }}
                   className={btnCls("primary", "mt-2")}
                 >
                   <BadgeCheck className="h-3.5 w-3.5" /> Register
@@ -933,7 +1110,9 @@ function RegisterDialog({
                 >
                   <option value="">All Deaneries</option>
                   {org.deaneries.map((d) => (
-                    <option key={d.id} value={d.id}>{d.name}</option>
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
                   ))}
                 </select>
               )}
@@ -947,7 +1126,9 @@ function RegisterDialog({
                 >
                   <option value="">All Parishes</option>
                   {browseParishes.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
                   ))}
                 </select>
               )}
@@ -961,7 +1142,9 @@ function RegisterDialog({
                 >
                   <option value="">All Outstations</option>
                   {browseOutstations.map((o) => (
-                    <option key={o.id} value={o.id}>{o.name}</option>
+                    <option key={o.id} value={o.id}>
+                      {o.name}
+                    </option>
                   ))}
                 </select>
               )}
@@ -995,14 +1178,18 @@ function RegisterDialog({
                 browseResults.map((y) => (
                   <div key={y.id} className="flex items-center gap-2 px-3 py-2 hover:bg-bg-2">
                     <div className="min-w-0 flex-1">
-                      <div className="text-[12px] font-semibold text-text-1">{titleCase(y.full_name)}</div>
+                      <div className="text-[12px] font-semibold text-text-1">
+                        {titleCase(y.full_name)}
+                      </div>
                       <div className="text-[10px] text-text-3">
                         {y.cdm_id} · {y.outstation?.name ?? y.parish?.name ?? "—"}
                         {y.deanery?.name ? ` · ${y.deanery.name}` : ""}
                       </div>
                     </div>
                     <button
-                      onClick={() => { onAdd(y.cdm_id); }}
+                      onClick={() => {
+                        onAdd(y.cdm_id);
+                      }}
                       className={btnCls("primary", "shrink-0")}
                     >
                       Register
@@ -1028,7 +1215,10 @@ function RegisterDialog({
 
 /* ─── Walk-in dialog ─── */
 function WalkInDialog({
-  open, onClose, org, onAdd,
+  open,
+  onClose,
+  org,
+  onAdd,
 }: {
   open: boolean;
   onClose: () => void;
@@ -1062,29 +1252,41 @@ function WalkInDialog({
   } = useScopedOrgFields(org, scope, { resetKey: open });
 
   const reset = () => {
-    setName(""); setPhone("");
+    setName("");
+    setPhone("");
     setRole("guest");
   };
 
   const submit = () => {
-    if (!name.trim()) { toast.error("Name is required"); return; }
-    const deaneryName  = org?.deaneries.find((d) => d.id === deaneryId)?.name;
-    const parishName   = org?.parishes.find((p) => p.id === parishId)?.name;
-    const outstName    = org?.outstations.find((o) => o.id === outstationId)?.name;
+    if (!name.trim()) {
+      toast.error("Name is required");
+      return;
+    }
+    const deaneryName = org?.deaneries.find((d) => d.id === deaneryId)?.name;
+    const parishName = org?.parishes.find((p) => p.id === parishId)?.name;
+    const outstName = org?.outstations.find((o) => o.id === outstationId)?.name;
     onAdd({
-      guestName:      name.trim(),
-      guestPhone:     phone.trim() || undefined,
-      guestDeanery:   deaneryName  || undefined,
-      guestParish:    parishName   || undefined,
-      guestOutstation: outstName   || undefined,
-      guestRole:      role || undefined,
+      guestName: name.trim(),
+      guestPhone: phone.trim() || undefined,
+      guestDeanery: deaneryName || undefined,
+      guestParish: parishName || undefined,
+      guestOutstation: outstName || undefined,
+      guestRole: role || undefined,
     });
     reset();
     onClose();
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) { reset(); onClose(); } }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) {
+          reset();
+          onClose();
+        }
+      }}
+    >
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Add Walk-in Guest</DialogTitle>
@@ -1092,11 +1294,20 @@ function WalkInDialog({
         <div className="space-y-3">
           <div>
             <label className="mb-1 block text-[11px] font-bold text-text-3">Full name *</label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. John Kamau" />
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. John Kamau"
+            />
           </div>
           <div>
             <label className="mb-1 block text-[11px] font-bold text-text-3">Phone</label>
-            <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+254700000000" type="tel" />
+            <Input
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="+254700000000"
+              type="tel"
+            />
           </div>
 
           <div className="grid grid-cols-1 gap-2">
@@ -1111,7 +1322,9 @@ function WalkInDialog({
               >
                 <option value="">Select Deanery</option>
                 {(org?.deaneries ?? []).map((d) => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
                 ))}
               </select>
             )}
@@ -1124,7 +1337,9 @@ function WalkInDialog({
               >
                 <option value="">Select Parish</option>
                 {parishOptions.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
                 ))}
               </select>
             )}
@@ -1137,7 +1352,9 @@ function WalkInDialog({
               >
                 <option value="">Select Outstation</option>
                 {outstationOptions.map((o) => (
-                  <option key={o.id} value={o.id}>{o.name}</option>
+                  <option key={o.id} value={o.id}>
+                    {o.name}
+                  </option>
                 ))}
               </select>
             )}
@@ -1174,7 +1391,10 @@ function WalkInDialog({
 
 /* ─── QR code dialog — attendees scan this to self-register ─── */
 function ScanDialog({
-  open, onClose, eventId, eventName,
+  open,
+  onClose,
+  eventId,
+  eventName,
 }: {
   open: boolean;
   onClose: () => void;
@@ -1183,17 +1403,31 @@ function ScanDialog({
 }) {
   const [origin, setOrigin] = useState("");
   const [QRCodeSVG, setQRCodeSVG] = useState<ComponentType<{
-    id?: string; value: string; size?: number; bgColor?: string;
-    fgColor?: string; level?: string; includeMargin?: boolean;
+    id?: string;
+    value: string;
+    size?: number;
+    bgColor?: string;
+    fgColor?: string;
+    level?: string;
+    includeMargin?: boolean;
   }> | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setOrigin(window.location.origin);
-    import("qrcode.react").then((m) => setQRCodeSVG(m.QRCodeSVG as ComponentType<{
-      id?: string; value: string; size?: number; bgColor?: string;
-      fgColor?: string; level?: string; includeMargin?: boolean;
-    }>));
+    import("qrcode.react").then((m) =>
+      setQRCodeSVG(
+        m.QRCodeSVG as ComponentType<{
+          id?: string;
+          value: string;
+          size?: number;
+          bgColor?: string;
+          fgColor?: string;
+          level?: string;
+          includeMargin?: boolean;
+        }>,
+      ),
+    );
   }, [open]);
 
   const registrationUrl = `${origin}/checkin/${eventId}`;
@@ -1212,7 +1446,12 @@ function ScanDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) onClose();
+      }}
+    >
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -1261,7 +1500,11 @@ function ScanDialog({
 
 /* ─── Edit guest dialog ─── */
 function EditGuestDialog({
-  open, target, org, onClose, onSave,
+  open,
+  target,
+  org,
+  onClose,
+  onSave,
 }: {
   open: boolean;
   target: AttendeeEntry | null;
@@ -1302,20 +1545,28 @@ function EditGuestDialog({
   });
 
   const submit = () => {
-    if (!name.trim()) { toast.error("Name is required"); return; }
+    if (!name.trim()) {
+      toast.error("Name is required");
+      return;
+    }
     if (!target) return;
     onSave(target.id, {
-      guestName:        name.trim(),
-      guestPhone:       phone.trim() || null,
-      guestDeanery:     org?.deaneries.find((d) => d.id === deaneryId)?.name   ?? null,
-      guestParish:      org?.parishes.find((p)  => p.id === parishId)?.name    ?? null,
-      guestOutstation:  org?.outstations.find((o) => o.id === outstationId)?.name ?? null,
-      guestRole:        role || null,
+      guestName: name.trim(),
+      guestPhone: phone.trim() || null,
+      guestDeanery: org?.deaneries.find((d) => d.id === deaneryId)?.name ?? null,
+      guestParish: org?.parishes.find((p) => p.id === parishId)?.name ?? null,
+      guestOutstation: org?.outstations.find((o) => o.id === outstationId)?.name ?? null,
+      guestRole: role || null,
     });
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) onClose();
+      }}
+    >
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Edit Guest Details</DialogTitle>
@@ -1323,11 +1574,20 @@ function EditGuestDialog({
         <div className="space-y-3">
           <div>
             <label className="mb-1 block text-[11px] font-bold text-text-3">Full name *</label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. John Kamau" />
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. John Kamau"
+            />
           </div>
           <div>
             <label className="mb-1 block text-[11px] font-bold text-text-3">Phone</label>
-            <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+254700000000" type="tel" />
+            <Input
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="+254700000000"
+              type="tel"
+            />
           </div>
 
           <div className="grid grid-cols-1 gap-2">
@@ -1342,7 +1602,9 @@ function EditGuestDialog({
               >
                 <option value="">Select Deanery</option>
                 {(org?.deaneries ?? []).map((d) => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
                 ))}
               </select>
             )}
@@ -1355,7 +1617,9 @@ function EditGuestDialog({
               >
                 <option value="">Select Parish</option>
                 {parishOptions.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
                 ))}
               </select>
             )}
@@ -1368,7 +1632,9 @@ function EditGuestDialog({
               >
                 <option value="">Select Outstation</option>
                 {outstationOptions.map((o) => (
-                  <option key={o.id} value={o.id}>{o.name}</option>
+                  <option key={o.id} value={o.id}>
+                    {o.name}
+                  </option>
                 ))}
               </select>
             )}
@@ -1413,7 +1679,10 @@ function AddPatronageDialog({
   open: boolean;
   onClose: () => void;
   org: OrgTree | undefined;
-  onSuccess: (patron: import("@/lib/db/patronage").PatronageTeamRow, resolved: { deaneryName?: string; parishName?: string; outstationName?: string }) => void;
+  onSuccess: (
+    patron: import("@/lib/db/patronage").PatronageTeamRow,
+    resolved: { deaneryName?: string; parishName?: string; outstationName?: string },
+  ) => void;
 }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -1437,20 +1706,36 @@ function AddPatronageDialog({
   } = useScopedOrgFields(org, scope, { resetKey: open });
 
   const reset = () => {
-    setName(""); setPhone(""); setEmail(""); setGender("Female"); setSaving(false);
+    setName("");
+    setPhone("");
+    setEmail("");
+    setGender("Female");
+    setSaving(false);
   };
 
   const submit = async () => {
-    if (!name.trim()) { toast.error("Full name is required"); return; }
-    if (!deaneryId) { toast.error("Deanery is required"); return; }
-    if (!parishId) { toast.error("Parish is required"); return; }
-    if (!outstationId) { toast.error("Outstation is required"); return; }
+    if (!name.trim()) {
+      toast.error("Full name is required");
+      return;
+    }
+    if (!deaneryId) {
+      toast.error("Deanery is required");
+      return;
+    }
+    if (!parishId) {
+      toast.error("Parish is required");
+      return;
+    }
+    if (!outstationId) {
+      toast.error("Outstation is required");
+      return;
+    }
     setSaving(true);
     try {
       // Resolve names now while the IDs are in local state — don't rely on
       // the Supabase join on the insert response (it can come back null).
-      const deaneryName   = org?.deaneries.find((d) => d.id === deaneryId)?.name;
-      const parishName    = org?.parishes.find((p) => p.id === parishId)?.name;
+      const deaneryName = org?.deaneries.find((d) => d.id === deaneryId)?.name;
+      const parishName = org?.parishes.find((p) => p.id === parishId)?.name;
       const outstationName = org?.outstations.find((o) => o.id === outstationId)?.name;
 
       const patron = await createPatronage({
@@ -1471,19 +1756,32 @@ function AddPatronageDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) { reset(); onClose(); } }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) {
+          reset();
+          onClose();
+        }
+      }}
+    >
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Add Patronage & Register</DialogTitle>
         </DialogHeader>
         <p className="text-[11px] text-text-3">
-          Creates a patronage team record and registers the person for this event with role "patronage".
+          Creates a patronage team record and registers the person for this event with role
+          "patronage".
         </p>
         <div className="space-y-3">
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-[11px] font-bold text-text-3">Full name *</label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Mary Wanjiku" />
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Mary Wanjiku"
+              />
             </div>
             <div>
               <label className="mb-1 block text-[11px] font-bold text-text-3">Gender</label>
@@ -1506,21 +1804,37 @@ function AddPatronageDialog({
             </div>
             <div>
               <label className="mb-1 block text-[11px] font-bold text-text-3">Phone</label>
-              <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+254700000000" type="tel" />
+              <Input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+254700000000"
+                type="tel"
+              />
             </div>
             <div>
               <label className="mb-1 block text-[11px] font-bold text-text-3">Email</label>
-              <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="optional" type="email" />
+              <Input
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="optional"
+                type="email"
+              />
             </div>
           </div>
 
           <div className="space-y-2">
             <label className="block text-[11px] font-bold text-text-3">Location *</label>
             {!deaneryLocked && (
-              <select value={deaneryId} onChange={(e) => setDeaneryId(e.target.value)} className={SEL_CLS}>
+              <select
+                value={deaneryId}
+                onChange={(e) => setDeaneryId(e.target.value)}
+                className={SEL_CLS}
+              >
                 <option value="">Select Deanery</option>
                 {(org?.deaneries ?? []).map((d) => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
                 ))}
               </select>
             )}
@@ -1533,7 +1847,9 @@ function AddPatronageDialog({
               >
                 <option value="">Select Parish</option>
                 {parishOptions.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
                 ))}
               </select>
             )}
@@ -1546,7 +1862,9 @@ function AddPatronageDialog({
               >
                 <option value="">Select Outstation</option>
                 {outstationOptions.map((o) => (
-                  <option key={o.id} value={o.id}>{o.name}</option>
+                  <option key={o.id} value={o.id}>
+                    {o.name}
+                  </option>
                 ))}
               </select>
             )}
@@ -1557,7 +1875,11 @@ function AddPatronageDialog({
             disabled={saving}
             className={btnCls("primary", "w-full justify-center")}
           >
-            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Icon icon="mdi:account-tie" className="h-3.5 w-3.5" />}
+            {saving ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Icon icon="mdi:account-tie" className="h-3.5 w-3.5" />
+            )}
             {saving ? "Saving…" : "Save & Register"}
           </button>
         </div>
@@ -1578,7 +1900,13 @@ function EditPatronageDialog({
   target: AttendeeEntry | null;
   org: OrgTree | undefined;
   onClose: () => void;
-  onSaved: (updated: { name: string; phone: string | null; deanery: string | null; parish: string | null; outstation: string | null }) => void;
+  onSaved: (updated: {
+    name: string;
+    phone: string | null;
+    deanery: string | null;
+    parish: string | null;
+    outstation: string | null;
+  }) => void;
 }) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -1617,12 +1945,13 @@ function EditPatronageDialog({
     outstationLocked,
   } = useScopedOrgFields(org, scope, {
     // Prefer DB record IDs; fall back to resolving from attendee names
-    initialDeaneryId: patronRecord?.deanery_id
-      ?? org?.deaneries.find((d) => d.name === target?.deanery)?.id,
-    initialParishId: patronRecord?.parish_id
-      ?? org?.parishes.find((p) => p.name === target?.parish)?.id,
-    initialOutstationId: patronRecord?.outstation_id
-      ?? org?.outstations.find((o) => o.name === target?.outstation)?.id,
+    initialDeaneryId:
+      patronRecord?.deanery_id ?? org?.deaneries.find((d) => d.name === target?.deanery)?.id,
+    initialParishId:
+      patronRecord?.parish_id ?? org?.parishes.find((p) => p.name === target?.parish)?.id,
+    initialOutstationId:
+      patronRecord?.outstation_id ??
+      org?.outstations.find((o) => o.name === target?.outstation)?.id,
     resetKey: patronRecord?.id ?? target?.id,
   });
 
@@ -1644,7 +1973,10 @@ function EditPatronageDialog({
   }, [patronRecord, target]);
 
   const submit = async () => {
-    if (!name.trim()) { toast.error("Full name is required"); return; }
+    if (!name.trim()) {
+      toast.error("Full name is required");
+      return;
+    }
     setSaving(true);
     try {
       if (patronageId) {
@@ -1659,10 +1991,10 @@ function EditPatronageDialog({
         });
       }
       onSaved({
-        name:       name.trim(),
-        phone:      phone.trim() || null,
-        deanery:    org?.deaneries.find((d) => d.id === deaneryId)?.name  ?? null,
-        parish:     org?.parishes.find((p)  => p.id === parishId)?.name   ?? null,
+        name: name.trim(),
+        phone: phone.trim() || null,
+        deanery: org?.deaneries.find((d) => d.id === deaneryId)?.name ?? null,
+        parish: org?.parishes.find((p) => p.id === parishId)?.name ?? null,
         outstation: org?.outstations.find((o) => o.id === outstationId)?.name ?? null,
       });
     } catch (e: unknown) {
@@ -1672,7 +2004,12 @@ function EditPatronageDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) onClose();
+      }}
+    >
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Edit Patronage</DialogTitle>
@@ -1681,7 +2018,11 @@ function EditPatronageDialog({
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-[11px] font-bold text-text-3">Full name *</label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Mary Wanjiku" />
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Mary Wanjiku"
+              />
             </div>
             <div>
               <label className="mb-1 block text-[11px] font-bold text-text-3">Gender</label>
@@ -1704,21 +2045,37 @@ function EditPatronageDialog({
             </div>
             <div>
               <label className="mb-1 block text-[11px] font-bold text-text-3">Phone</label>
-              <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+254700000000" type="tel" />
+              <Input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+254700000000"
+                type="tel"
+              />
             </div>
             <div>
               <label className="mb-1 block text-[11px] font-bold text-text-3">Email</label>
-              <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="optional" type="email" />
+              <Input
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="optional"
+                type="email"
+              />
             </div>
           </div>
 
           <div className="space-y-2">
             <label className="block text-[11px] font-bold text-text-3">Location</label>
             {!deaneryLocked && (
-              <select value={deaneryId} onChange={(e) => setDeaneryId(e.target.value)} className={SEL_CLS}>
+              <select
+                value={deaneryId}
+                onChange={(e) => setDeaneryId(e.target.value)}
+                className={SEL_CLS}
+              >
                 <option value="">Select Deanery</option>
                 {(org?.deaneries ?? []).map((d) => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
                 ))}
               </select>
             )}
@@ -1731,7 +2088,9 @@ function EditPatronageDialog({
               >
                 <option value="">Select Parish</option>
                 {parishOptions.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
                 ))}
               </select>
             )}
@@ -1744,7 +2103,9 @@ function EditPatronageDialog({
               >
                 <option value="">Select Outstation</option>
                 {outstationOptions.map((o) => (
-                  <option key={o.id} value={o.id}>{o.name}</option>
+                  <option key={o.id} value={o.id}>
+                    {o.name}
+                  </option>
                 ))}
               </select>
             )}
@@ -1755,7 +2116,11 @@ function EditPatronageDialog({
             disabled={saving}
             className={btnCls("primary", "w-full justify-center")}
           >
-            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Pencil className="h-3.5 w-3.5" />}
+            {saving ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Pencil className="h-3.5 w-3.5" />
+            )}
             {saving ? "Saving…" : "Save changes"}
           </button>
         </div>

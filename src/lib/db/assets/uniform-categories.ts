@@ -11,10 +11,7 @@ export type UniformCategory = {
 };
 
 export async function listUniformCategories(includeInactive = false): Promise<UniformCategory[]> {
-  let query = supabase
-    .from("uniform_categories")
-    .select("*")
-    .order("sort_order");
+  let query = supabase.from("uniform_categories").select("*").order("sort_order");
 
   if (!includeInactive) {
     query = query.eq("is_active", true);
@@ -50,7 +47,7 @@ export async function updateUniformCategory(
     description?: string;
     isActive?: boolean;
     sortOrder?: number;
-  }
+  },
 ): Promise<UniformCategory> {
   const payload: Record<string, unknown> = {};
   if (input.name !== undefined) payload.name = input.name;

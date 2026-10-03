@@ -2,7 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { likePattern } from "@/lib/utils";
 
 export type WelfareUrgency = "low" | "medium" | "high";
-export type WelfareStatus  = "open" | "in_progress" | "resolved" | "closed";
+export type WelfareStatus = "open" | "in_progress" | "resolved" | "closed";
 
 export type WelfareCaseRow = {
   id: string;
@@ -92,7 +92,10 @@ export async function createWelfareCase(input: WelfareCaseInput): Promise<Welfar
   return data as WelfareCaseRow;
 }
 
-export async function updateWelfareCase(id: string, input: WelfareCaseUpdateInput): Promise<WelfareCaseRow> {
+export async function updateWelfareCase(
+  id: string,
+  input: WelfareCaseUpdateInput,
+): Promise<WelfareCaseRow> {
   let parishId: string | null = null;
   if (input.parishName) {
     const { data: p } = await supabase
@@ -146,14 +149,31 @@ export async function updateWelfareCaseStatus(id: string, status: WelfareStatus)
 }
 
 export async function getWelfareKpis(): Promise<{
-  open: number; urgent: number; inProgress: number; resolved30d: number;
+  open: number;
+  urgent: number;
+  inProgress: number;
+  resolved30d: number;
 }> {
   const thirtyDaysAgo = new Date(Date.now() - 30 * 86400_000).toISOString();
   const [openRes, urgentRes, inProgressRes, resolved30dRes] = await Promise.all([
-    db.from("welfare_cases").select("id", { count: "exact", head: true }).in("status", ["open", "in_progress"]),
-    db.from("welfare_cases").select("id", { count: "exact", head: true }).eq("urgency", "high").in("status", ["open", "in_progress"]),
-    db.from("welfare_cases").select("id", { count: "exact", head: true }).eq("status", "in_progress"),
-    db.from("welfare_cases").select("id", { count: "exact", head: true }).in("status", ["resolved", "closed"]).gte("resolved_at", thirtyDaysAgo),
+    db
+      .from("welfare_cases")
+      .select("id", { count: "exact", head: true })
+      .in("status", ["open", "in_progress"]),
+    db
+      .from("welfare_cases")
+      .select("id", { count: "exact", head: true })
+      .eq("urgency", "high")
+      .in("status", ["open", "in_progress"]),
+    db
+      .from("welfare_cases")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "in_progress"),
+    db
+      .from("welfare_cases")
+      .select("id", { count: "exact", head: true })
+      .in("status", ["resolved", "closed"])
+      .gte("resolved_at", thirtyDaysAgo),
   ]);
   return {
     open: openRes.count ?? 0,
@@ -181,11 +201,13 @@ export async function listWelfareCasesPaged(opts: {
     .range(page * size, page * size + size - 1);
 
   if (opts.parishId) query = query.eq("parish_id", opts.parishId);
-  if (opts.status)   query = query.eq("status",    opts.status);
-  if (opts.urgency)  query = query.eq("urgency",   opts.urgency);
+  if (opts.status) query = query.eq("status", opts.status);
+  if (opts.urgency) query = query.eq("urgency", opts.urgency);
   if (opts.q?.trim()) {
     const t = likePattern(opts.q);
-    query = query.or(`category.ilike.${t},assigned_to.ilike.${t},cdm_id.ilike.${t},parish_name.ilike.${t}`);
+    query = query.or(
+      `category.ilike.${t},assigned_to.ilike.${t},cdm_id.ilike.${t},parish_name.ilike.${t}`,
+    );
   }
 
   const { data, error, count } = await query;

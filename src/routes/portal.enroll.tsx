@@ -197,10 +197,18 @@ function CreateForm({ onDone }: { onDone: () => void }) {
         </Field>
       </div>
       <Field label="Phone (optional)">
-        <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="07XX XXX XXX" />
+        <Input
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          placeholder="07XX XXX XXX"
+        />
       </Field>
       <Field label="Category">
-        <Select value={category} onChange={(v) => setCategory(v as YouthCategory)} options={CATEGORIES} />
+        <Select
+          value={category}
+          onChange={(v) => setCategory(v as YouthCategory)}
+          options={CATEGORIES}
+        />
       </Field>
       <Field label="Deanery">
         <Select
@@ -249,9 +257,7 @@ function EnrollForm({ youthId, onDone }: { youthId: string; onDone: () => void }
   return (
     <div className="px-5 pt-6">
       <h1 className="text-display text-xl font-extrabold text-danger">Annual enrollment</h1>
-      <p className="mt-1 text-[12px] text-text-3">
-        Enroll for the {year} membership year.
-      </p>
+      <p className="mt-1 text-[12px] text-text-3">Enroll for the {year} membership year.</p>
 
       {alreadyThisYear ? (
         <div className="mt-5 rounded-2xl border border-success/30 bg-success-soft px-4 py-4 text-[13px] text-success">
@@ -305,9 +311,7 @@ function EnrollForm({ youthId, onDone }: { youthId: string; onDone: () => void }
             </div>
             <span
               className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
-                e.status === "paid"
-                  ? "bg-success-soft text-success"
-                  : "bg-warn-soft text-gold-3"
+                e.status === "paid" ? "bg-success-soft text-success" : "bg-warn-soft text-gold-3"
               }`}
             >
               {e.status}

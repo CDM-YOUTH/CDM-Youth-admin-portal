@@ -110,10 +110,7 @@ function AccountPage() {
               <h2 className="text-[11px] font-bold uppercase tracking-wider text-gold-3">
                 Enrollments
               </h2>
-              <Link
-                to="/portal/enroll"
-                className="text-[11px] font-bold text-danger"
-              >
+              <Link to="/portal/enroll" className="text-[11px] font-bold text-danger">
                 Enroll →
               </Link>
             </div>

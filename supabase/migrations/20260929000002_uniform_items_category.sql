@@ -14,8 +14,7 @@ CREATE INDEX IF NOT EXISTS uniform_items_category_idx ON public.uniform_items(ca
 CREATE OR REPLACE VIEW public.uniform_items_by_category AS
 SELECT
   category,
-  COUNT(*) as item_count,
-  SUM(CASE WHEN deleted_at IS NULL THEN 1 ELSE 0 END) as active_items
+  COUNT(*) as item_count
 FROM public.uniform_items
 GROUP BY category;
 

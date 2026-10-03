@@ -3,9 +3,9 @@
 declare module "@tanstack/react-start/api" {
   type APIHandler = (ctx: { request: Request }) => Response | Promise<Response>;
 
-  export function createAPIFileRoute(
-    path: string,
-  ): (handlers: Partial<Record<"GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS", APIHandler>>) => {
+  export function createAPIFileRoute(path: string): (
+    handlers: Partial<Record<"GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS", APIHandler>>,
+  ) => {
     methods: Record<string, APIHandler>;
   };
 }

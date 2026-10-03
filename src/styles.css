@@ -15,9 +15,7 @@
  */
 
 @theme inline {
-  --font-sans:
-    "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system,
-    "Segoe UI", sans-serif;
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-display: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
 
   --radius-sm: calc(var(--radius) - 4px);
@@ -105,8 +103,8 @@
   --bg-0: oklch(1 0 0);
   --bg-1: oklch(0.988 0.005 22);
   --bg-2: oklch(0.972 0.008 20);
-  --bg-3: oklch(0.948 0.010 18);
-  --bg-4: oklch(0.910 0.014 16);
+  --bg-3: oklch(0.948 0.01 18);
+  --bg-4: oklch(0.91 0.014 16);
 
   /* Text scale (deep clay → muted warm grey) */
   --text-0: oklch(0.22 0.03 40);

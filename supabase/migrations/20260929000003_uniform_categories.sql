@@ -22,8 +22,17 @@ CREATE INDEX IF NOT EXISTS uniform_categories_sort_order_idx ON public.uniform_c
 
 ALTER TABLE public.uniform_categories ENABLE ROW LEVEL SECURITY;
 CREATE POLICY uniform_categories_read ON public.uniform_categories FOR SELECT USING (is_active = true);
-CREATE POLICY uniform_categories_write ON public.uniform_categories FOR INSERT, UPDATE
+CREATE POLICY uniform_categories_insert ON public.uniform_categories FOR INSERT
+  WITH CHECK (auth.uid() IN (SELECT id FROM auth.users WHERE EXISTS (
+    SELECT 1 FROM public.user_roles ur
+    WHERE ur.user_id = auth.uid() AND ur.role = 'admin'
+  )));
+CREATE POLICY uniform_categories_update ON public.uniform_categories FOR UPDATE
   USING (auth.uid() IN (SELECT id FROM auth.users WHERE EXISTS (
+    SELECT 1 FROM public.user_roles ur
+    WHERE ur.user_id = auth.uid() AND ur.role = 'admin'
+  )))
+  WITH CHECK (auth.uid() IN (SELECT id FROM auth.users WHERE EXISTS (
     SELECT 1 FROM public.user_roles ur
     WHERE ur.user_id = auth.uid() AND ur.role = 'admin'
   )));

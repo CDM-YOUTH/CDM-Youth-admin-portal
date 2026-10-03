@@ -46,7 +46,11 @@ export type MissionPairing = {
 
 export async function getOrCreateMissionWeek(year?: number): Promise<MissionWeek> {
   const y = year ?? new Date().getFullYear();
-  const { data: existing } = await supabase.from("mission_weeks").select("*").eq("year", y).maybeSingle();
+  const { data: existing } = await supabase
+    .from("mission_weeks")
+    .select("*")
+    .eq("year", y)
+    .maybeSingle();
   if (existing) return existing as MissionWeek;
   const { data, error } = await supabase
     .from("mission_weeks")
@@ -56,11 +60,36 @@ export async function getOrCreateMissionWeek(year?: number): Promise<MissionWeek
   if (error) throw error;
   // Seed default phases on creation
   const phases = [
-    { name: "Nominations Open", phase_date: "01 Feb – 14 Feb", position: 1, status: "upcoming" as const },
-    { name: "Parish Review", phase_date: "15 Feb – 21 Feb", position: 2, status: "upcoming" as const },
-    { name: "Cross-Parish Reshuffle", phase_date: "22 Feb – 28 Feb", position: 3, status: "upcoming" as const },
-    { name: "Mission Week Execution", phase_date: "01 Mar – 07 Mar", position: 4, status: "upcoming" as const },
-    { name: "Reports & Debrief", phase_date: "08 Mar – 15 Mar", position: 5, status: "upcoming" as const },
+    {
+      name: "Nominations Open",
+      phase_date: "01 Feb – 14 Feb",
+      position: 1,
+      status: "upcoming" as const,
+    },
+    {
+      name: "Parish Review",
+      phase_date: "15 Feb – 21 Feb",
+      position: 2,
+      status: "upcoming" as const,
+    },
+    {
+      name: "Cross-Parish Reshuffle",
+      phase_date: "22 Feb – 28 Feb",
+      position: 3,
+      status: "upcoming" as const,
+    },
+    {
+      name: "Mission Week Execution",
+      phase_date: "01 Mar – 07 Mar",
+      position: 4,
+      status: "upcoming" as const,
+    },
+    {
+      name: "Reports & Debrief",
+      phase_date: "08 Mar – 15 Mar",
+      position: 5,
+      status: "upcoming" as const,
+    },
   ];
   await supabase
     .from("mission_phases")
@@ -100,7 +129,9 @@ export async function listMissionPairings(missionWeekId: string): Promise<Missio
     // Fallback without explicit fk hint (in case relationship name differs)
     const { data: data2 } = await supabase
       .from("mission_pairings")
-      .select("*, youth:youths(full_name, parish:parishes(name)), host_parish:parishes(name, deanery:deaneries(name))")
+      .select(
+        "*, youth:youths(full_name, parish:parishes(name)), host_parish:parishes(name, deanery:deaneries(name))",
+      )
       .eq("mission_week_id", missionWeekId)
       .limit(2000);
     return (data2 ?? []) as unknown as MissionPairing[];
@@ -181,9 +212,15 @@ export type MissionAnalytics = {
 
 export async function getMissionAnalytics(missionWeekId: string): Promise<MissionAnalytics> {
   const [n, p, par, r] = await Promise.all([
-    supabase.from("mission_nominees").select("id", { count: "exact", head: true }).eq("mission_week_id", missionWeekId),
+    supabase
+      .from("mission_nominees")
+      .select("id", { count: "exact", head: true })
+      .eq("mission_week_id", missionWeekId),
     supabase.from("parishes").select("id", { count: "exact", head: true }),
-    supabase.from("mission_pairings").select("id", { count: "exact", head: true }).eq("mission_week_id", missionWeekId),
+    supabase
+      .from("mission_pairings")
+      .select("id", { count: "exact", head: true })
+      .eq("mission_week_id", missionWeekId),
     supabase
       .from("mission_pairings")
       .select("id", { count: "exact", head: true })

@@ -24,7 +24,12 @@ export interface CategoryFormDialogProps {
     icon?: string;
     color?: string;
   };
-  onSubmit: (values: { name: string; description: string | null; icon: string | null; color: string | null }) => void;
+  onSubmit: (values: {
+    name: string;
+    description: string | null;
+    icon: string | null;
+    color: string | null;
+  }) => void;
   isLoading?: boolean;
 }
 

@@ -18,7 +18,7 @@ This has worked while there were two apps and a small feature set, but it create
 
 Move to a standard three-tier shape:
 
-- **One backend service** owns all business logic and is the *only* thing that ever opens a direct connection to the database.
+- **One backend service** owns all business logic and is the _only_ thing that ever opens a direct connection to the database.
 - **Frontend apps become pure HTTP clients** — admin portal, youth portal (mobile PWA), and any future app (public youth website, native app) — each living in its own independent repo, none of them importing a database driver or holding a DB credential.
 - The backend is built as a **modular monolith**: one deployable service, internally organized by domain, so any domain can be peeled out into its own microservice later if it actually needs to scale independently. No microservices on day one — that's operational cost with no payoff yet at this scale.
 
@@ -68,15 +68,15 @@ Splitting a domain into its own microservice later means extracting one `modules
 
 ## 4. Concrete technical choices
 
-| Decision | Recommendation | Rationale |
-|---|---|---|
-| **Database** | Keep Postgres. Hosting can stay on Supabase-managed Postgres, or move to Neon/RDS/etc. later — this is a separate, low-stakes decision. | No need to migrate data; only *who is allowed to connect* changes. |
-| **ORM / query layer** | Drizzle | TypeScript-first, stays close to raw SQL, lightweight migrations, no heavy runtime. |
-| **API style** | REST + OpenAPI spec, with a generated TypeScript client consumed by each frontend repo | All current frontends are TypeScript, but a future native app is plausible — OpenAPI keeps the contract language-agnostic while still giving typed clients today. (tRPC would have slightly less ceremony, but permanently ties every future client to TypeScript.) |
-| **Auth** | Keep Supabase Auth, but only the backend ever calls it. Frontends authenticate against the backend's own `/auth/*` endpoints and receive a backend-issued session/JWT. | The phone/OTP registration and login flows are already built and tested this session — rebuilding auth from scratch buys nothing. This satisfies "no direct DB/service access from frontends" without discarding working code. |
-| **File storage** | Keep Supabase Storage; backend issues signed upload/download URLs on request | Same reasoning as auth — proven, just re-gated behind the backend instead of being called straight from the browser. |
-| **Row Level Security (RLS)** | Turn off reliance on RLS for authorization once the backend is the sole DB client | With one trusted service holding the only DB connection, RLS becomes a second copy of authorization logic that's easy to forget to update — which is exactly the drift bug hit this session. Authorization moves into backend middleware/module code, where it's testable and in one place. |
-| **Backend hosting** | A persistent-connection host (Railway, Render, Fly.io, or similar) | Cloudflare Workers are edge isolates — a poor fit for a service holding a Postgres connection pool. Frontends can remain on Cloudflare Pages/Workers since they'll only be making outbound HTTP calls to the backend. |
+| Decision                     | Recommendation                                                                                                                                                         | Rationale                                                                                                                                                                                                                                                                                   |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Database**                 | Keep Postgres. Hosting can stay on Supabase-managed Postgres, or move to Neon/RDS/etc. later — this is a separate, low-stakes decision.                                | No need to migrate data; only _who is allowed to connect_ changes.                                                                                                                                                                                                                          |
+| **ORM / query layer**        | Drizzle                                                                                                                                                                | TypeScript-first, stays close to raw SQL, lightweight migrations, no heavy runtime.                                                                                                                                                                                                         |
+| **API style**                | REST + OpenAPI spec, with a generated TypeScript client consumed by each frontend repo                                                                                 | All current frontends are TypeScript, but a future native app is plausible — OpenAPI keeps the contract language-agnostic while still giving typed clients today. (tRPC would have slightly less ceremony, but permanently ties every future client to TypeScript.)                         |
+| **Auth**                     | Keep Supabase Auth, but only the backend ever calls it. Frontends authenticate against the backend's own `/auth/*` endpoints and receive a backend-issued session/JWT. | The phone/OTP registration and login flows are already built and tested this session — rebuilding auth from scratch buys nothing. This satisfies "no direct DB/service access from frontends" without discarding working code.                                                              |
+| **File storage**             | Keep Supabase Storage; backend issues signed upload/download URLs on request                                                                                           | Same reasoning as auth — proven, just re-gated behind the backend instead of being called straight from the browser.                                                                                                                                                                        |
+| **Row Level Security (RLS)** | Turn off reliance on RLS for authorization once the backend is the sole DB client                                                                                      | With one trusted service holding the only DB connection, RLS becomes a second copy of authorization logic that's easy to forget to update — which is exactly the drift bug hit this session. Authorization moves into backend middleware/module code, where it's testable and in one place. |
+| **Backend hosting**          | A persistent-connection host (Railway, Render, Fly.io, or similar)                                                                                                     | Cloudflare Workers are edge isolates — a poor fit for a service holding a Postgres connection pool. Frontends can remain on Cloudflare Pages/Workers since they'll only be making outbound HTTP calls to the backend.                                                                       |
 
 ## 5. Migration path — strangler fig, not a rewrite
 
@@ -88,7 +88,7 @@ The system is live and working; nothing here should be a big-bang cutover.
 4. **Once every domain is migrated off direct Supabase access**, split `apps/admin` and `apps/youth-portal` out into their own repos — by this point they carry no DB-shaped code, just an API client.
 5. **Only if a domain later outgrows the monolith** (throughput, dedicated team ownership, independent scaling needs) — peel it into its own service with its own datastore. Not a day-one concern.
 
-## 6. What does *not* change
+## 6. What does _not_ change
 
 - Postgres schema and existing data — untouched by this migration; only the access path changes.
 - Supabase Auth's phone/OTP flows and Storage buckets — reused, just re-gated behind the backend.
@@ -104,6 +104,6 @@ These are called out explicitly because they're genuinely judgment calls, not th
 
 ## 8. Non-goals (explicitly out of scope for this proposal)
 
-- Microservices — not being introduced now; the modular-monolith boundary is what makes it *possible* later.
+- Microservices — not being introduced now; the modular-monolith boundary is what makes it _possible_ later.
 - Rebuilding auth, storage, or the database engine — all reused as-is.
 - Any change to the mobile-web/PWA decision, or the phone-number-based identity model for the youth portal — both already decided and unaffected by this proposal.

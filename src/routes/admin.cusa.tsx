@@ -288,7 +288,9 @@ function CusaPage() {
       <Topbar
         title={
           <>
-            <span className="hidden sm:inline">Colleges & Universities Students Association (CUSA)</span>
+            <span className="hidden sm:inline">
+              Colleges & Universities Students Association (CUSA)
+            </span>
             <span className="sm:hidden">CUSA</span>
           </>
         }

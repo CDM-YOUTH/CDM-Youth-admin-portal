@@ -33,10 +33,10 @@ function colLetter(n: number): string {
 function toRangeName(name: string): string {
   return name
     .replace(/['‘’ʼ′]/g, "") // remove apostrophes
-    .replace(/[\s\-]+/g, "_")                     // spaces & hyphens → underscore
-    .replace(/[^a-zA-Z0-9_]/g, "_")              // anything else → underscore
-    .replace(/_+/g, "_")                          // collapse runs
-    .replace(/^_|_$/g, "");                       // trim edges
+    .replace(/[\s\-]+/g, "_") // spaces & hyphens → underscore
+    .replace(/[^a-zA-Z0-9_]/g, "_") // anything else → underscore
+    .replace(/_+/g, "_") // collapse runs
+    .replace(/^_|_$/g, ""); // trim edges
 }
 
 // The Excel formula that turns a cell value into the same identifier toRangeName() produces.
@@ -88,7 +88,9 @@ export async function downloadXlsx(
     cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: HEADER_BG } };
     cell.font = {
       bold: true,
-      color: { argb: options?.headerTextColor ?? (isDropdown ? HEADER_FG_DROPDOWN : HEADER_FG_DEFAULT) },
+      color: {
+        argb: options?.headerTextColor ?? (isDropdown ? HEADER_FG_DROPDOWN : HEADER_FG_DEFAULT),
+      },
       size: 10,
       name: "Calibri",
     };
@@ -130,9 +132,7 @@ export async function downloadXlsx(
     );
     const cascadeEntries = Object.entries(cascade).filter(
       ([childH, { parent, map }]) =>
-        headers.includes(childH) &&
-        headers.includes(parent) &&
-        Object.keys(map).length > 0,
+        headers.includes(childH) && headers.includes(parent) && Object.keys(map).length > 0,
     );
 
     if (flatEntries.length > 0 || cascadeEntries.length > 0) {
@@ -183,10 +183,7 @@ export async function downloadXlsx(
 
           const listCol = colLetter(listColIdx);
           const rangeName = toRangeName(parentVal);
-          wb.definedNames.add(
-            `Lookups!$${listCol}$1:$${listCol}$${childVals.length}`,
-            rangeName,
-          );
+          wb.definedNames.add(`Lookups!$${listCol}$1:$${listCol}$${childVals.length}`, rangeName);
         }
 
         // INDIRECT picks the named range matching the sanitized parent-cell value

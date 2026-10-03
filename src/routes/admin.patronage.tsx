@@ -88,18 +88,19 @@ const patronageSearchSchema = z.object({
 });
 type PatronageSearch = z.infer<typeof patronageSearchSchema>;
 
-
 export const Route = createFileRoute("/admin/patronage")({
   validateSearch: zodValidator(patronageSearchSchema),
   head: () => ({
     meta: [
       { title: "Patronage Team — CDM Youth Office" },
-      { name: "description", content: "Manage patrons and patronesses at all organizational levels." },
+      {
+        name: "description",
+        content: "Manage patrons and patronesses at all organizational levels.",
+      },
     ],
   }),
   component: PatronagePage,
 });
-
 
 function PatronagePage() {
   const [addOpen, setAddOpen] = useState(false);
@@ -110,7 +111,10 @@ function PatronagePage() {
   const search = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
   const setFilter = (patch: Partial<PatronageSearch>) => {
-    navigate({ search: (prev: PatronageSearch) => ({ ...prev, ...patch, page: 1 }), replace: true });
+    navigate({
+      search: (prev: PatronageSearch) => ({ ...prev, ...patch, page: 1 }),
+      replace: true,
+    });
   };
 
   const scope = useAdminScope();
@@ -253,15 +257,10 @@ function PatronagePage() {
                   <th className="label-eyebrow px-3.5 py-2.5 text-left">
                     <ColumnHeader
                       label="Gender"
-                      filter={fc(
-                        "f_gender",
-                        "Gender",
-                        "select",
-                        [
-                          { value: "Male", label: "Patron" },
-                          { value: "Female", label: "Patroness" },
-                        ],
-                      )}
+                      filter={fc("f_gender", "Gender", "select", [
+                        { value: "Male", label: "Patron" },
+                        { value: "Female", label: "Patroness" },
+                      ])}
                     />
                   </th>
                   <th className="label-eyebrow px-3.5 py-2.5 text-left">
@@ -294,7 +293,9 @@ function PatronagePage() {
                           mode="select"
                           options={parishOptions}
                           value={parishId ? { operator: "equals", value: parishId } : undefined}
-                          onChange={(v) => setFilter({ parish_id: v?.value ?? "", outstation_id: "" })}
+                          onChange={(v) =>
+                            setFilter({ parish_id: v?.value ?? "", outstation_id: "" })
+                          }
                           disabled={!!scope.parishId}
                         />
                       }
@@ -337,7 +338,10 @@ function PatronagePage() {
                   </tr>
                 ) : (
                   displayRows.map((patron) => (
-                    <tr key={patron.id} className="border-b border-border/30 last:border-0 hover:bg-bg-3">
+                    <tr
+                      key={patron.id}
+                      className="border-b border-border/30 last:border-0 hover:bg-bg-3"
+                    >
                       <td className="px-3.5 py-2.5 font-mono text-[10px] font-bold text-gold">
                         {patron.patron_number || "—"}
                       </td>
@@ -345,7 +349,9 @@ function PatronagePage() {
                         {patron.name}
                       </td>
                       <td className="px-3.5 py-2.5 text-[11px]">
-                        <span className={patron.gender === "Male" ? "text-blue-600" : "text-pink-600"}>
+                        <span
+                          className={patron.gender === "Male" ? "text-blue-600" : "text-pink-600"}
+                        >
                           {patron.gender === "Male" ? "Patron" : "Patroness"}
                         </span>
                       </td>
@@ -402,7 +408,10 @@ function PatronagePage() {
               total={total}
               totalPages={totalPages}
               onPageChange={(p) =>
-                navigate({ search: (prev: PatronageSearch) => ({ ...prev, page: p }), replace: true })
+                navigate({
+                  search: (prev: PatronageSearch) => ({ ...prev, page: p }),
+                  replace: true,
+                })
               }
               onPageSizeChange={(s) =>
                 navigate({
@@ -456,7 +465,6 @@ function PatronagePage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
     </>
   );
 }
@@ -491,7 +499,7 @@ function PatronageFormDialog({
       deaneryId: "",
       parishId: "",
       outstationId: "",
-    }
+    },
   );
 
   const handleSubmit = () => {
@@ -501,7 +509,6 @@ function PatronageFormDialog({
     }
     onSubmit(form);
   };
-
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -523,7 +530,10 @@ function PatronageFormDialog({
 
           <div>
             <label className="text-xs font-semibold">Gender *</label>
-            <Select value={form.gender} onValueChange={(v) => setForm({ ...form, gender: v as Gender })}>
+            <Select
+              value={form.gender}
+              onValueChange={(v) => setForm({ ...form, gender: v as Gender })}
+            >
               <SelectTrigger className="mt-1">
                 <SelectValue />
               </SelectTrigger>
@@ -570,7 +580,9 @@ function PatronageFormDialog({
               disabled={!form.deaneryId}
             >
               <SelectTrigger className="mt-1">
-                <SelectValue placeholder={form.deaneryId ? "Select parish" : "Select deanery first"} />
+                <SelectValue
+                  placeholder={form.deaneryId ? "Select parish" : "Select deanery first"}
+                />
               </SelectTrigger>
               <SelectContent>
                 {org?.parishes
@@ -593,7 +605,9 @@ function PatronageFormDialog({
               disabled={!form.parishId}
             >
               <SelectTrigger className="mt-1">
-                <SelectValue placeholder={form.parishId ? "Select outstation" : "Select parish first"} />
+                <SelectValue
+                  placeholder={form.parishId ? "Select outstation" : "Select parish first"}
+                />
               </SelectTrigger>
               <SelectContent>
                 {org?.outstations
