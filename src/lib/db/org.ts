@@ -39,7 +39,14 @@ export async function fetchOrg(): Promise<OrgTree> {
     arr.push(out);
     outstationsByParishName.set(par.name, arr);
   }
-  return { deaneries: d, parishes: p, outstations: o, byDeaneryName, parishesByDeaneryName, outstationsByParishName };
+  return {
+    deaneries: d,
+    parishes: p,
+    outstations: o,
+    byDeaneryName,
+    parishesByDeaneryName,
+    outstationsByParishName,
+  };
 }
 
 export function resolveOrgIds(

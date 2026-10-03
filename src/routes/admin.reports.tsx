@@ -6,18 +6,33 @@ export const Route = createFileRoute("/admin/reports")({
   head: () => ({
     meta: [
       { title: "Reports — CDM Youth Office" },
-      { name: "description", content: "Generate diocese, deanery, and parish-level reports across all youth modules." },
+      {
+        name: "description",
+        content: "Generate diocese, deanery, and parish-level reports across all youth modules.",
+      },
     ],
   }),
   component: ReportsPage,
 });
 
 const REPORTS = [
-  { title: "Annual Enrollment Summary", desc: "Year-on-year comparison across all parishes", kind: "PDF" },
+  {
+    title: "Annual Enrollment Summary",
+    desc: "Year-on-year comparison across all parishes",
+    kind: "PDF",
+  },
   { title: "Deanery Performance", desc: "KPIs grouped by the 8 deaneries", kind: "Excel" },
-  { title: "Mission Week Outcomes", desc: "Reshuffle pairings and post-execution survey", kind: "PDF" },
+  {
+    title: "Mission Week Outcomes",
+    desc: "Reshuffle pairings and post-execution survey",
+    kind: "PDF",
+  },
   { title: "Welfare Case Trends", desc: "Anonymised quarterly case-type analysis", kind: "PDF" },
-  { title: "Formation Engagement", desc: "Most-viewed content and reach by age group", kind: "Excel" },
+  {
+    title: "Formation Engagement",
+    desc: "Most-viewed content and reach by age group",
+    kind: "Excel",
+  },
   { title: "Uniform Reconciliation", desc: "Stock vs. distribution vs. payment", kind: "Excel" },
 ];
 
@@ -35,7 +50,9 @@ function ReportsPage() {
             <Card key={r.title}>
               <CardHead title={r.title} subtitle={r.desc} />
               <CardBody className="flex items-center justify-between">
-                <span className="rounded-md bg-bg-3 px-2 py-1 text-[10px] font-bold text-text-1">{r.kind}</span>
+                <span className="rounded-md bg-bg-3 px-2 py-1 text-[10px] font-bold text-text-1">
+                  {r.kind}
+                </span>
                 <button className="rounded-md bg-primary px-3 py-1.5 text-[11px] font-bold text-primary-foreground hover:opacity-90">
                   Generate
                 </button>

@@ -286,7 +286,10 @@ export function ColumnFilter({
           <select
             value={draft.operator}
             onChange={(event) =>
-              setDraft((prev) => ({ ...prev, operator: event.target.value as ColumnFilterOperator }))
+              setDraft((prev) => ({
+                ...prev,
+                operator: event.target.value as ColumnFilterOperator,
+              }))
             }
             className="mb-1.5 w-full rounded-md border border-black/20 bg-white px-2 py-1 text-[11px] text-black/70 outline-none transition-colors hover:border-gold-3/50 hover:text-black focus:border-gold-3 focus:text-black"
           >
@@ -344,13 +347,7 @@ export function ColumnFilter({
   );
 }
 
-export function ColumnHeader({
-  label,
-  filter,
-}: {
-  label: string;
-  filter?: ReactNode;
-}) {
+export function ColumnHeader({ label, filter }: { label: string; filter?: ReactNode }) {
   return (
     <span className="inline-flex items-center gap-0.5">
       <span>{label}</span>

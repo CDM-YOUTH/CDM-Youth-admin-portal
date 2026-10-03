@@ -68,8 +68,8 @@ export async function listCusaPaged(opts: {
   if (opts.institution) query = query.eq("institution", opts.institution);
 
   // Embedded table filters — use real table name "youths", not alias "youth"
-  if (opts.deaneryId)    query = query.eq("youths.deanery_id",    opts.deaneryId);
-  if (opts.parishId)     query = query.eq("youths.parish_id",     opts.parishId);
+  if (opts.deaneryId) query = query.eq("youths.deanery_id", opts.deaneryId);
+  if (opts.parishId) query = query.eq("youths.parish_id", opts.parishId);
   if (opts.outstationId) query = query.eq("youths.outstation_id", opts.outstationId);
 
   // Text search on youth's name and CDM ID
@@ -165,7 +165,9 @@ export async function syncTertiaryYouthsToCusa(): Promise<void> {
 
   if (error) throw error;
 
-  const rows = ((youths ?? []) as { id: string; institution: string | null; year_of_study: string | null }[])
+  const rows = (
+    (youths ?? []) as { id: string; institution: string | null; year_of_study: string | null }[]
+  )
     .filter((y) => y.institution?.trim())
     .map((y) => ({
       youth_id: y.id,

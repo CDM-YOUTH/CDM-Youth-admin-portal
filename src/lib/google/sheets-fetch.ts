@@ -14,9 +14,7 @@ export function getServiceAccountKey(): ServiceAccountKey {
   if (!b64) throw new Error("GOOGLE_SA_KEY_BASE64 not set");
   // atob is available everywhere; Buffer.from is a fallback for older Node
   const json =
-    typeof atob !== "undefined"
-      ? atob(b64)
-      : Buffer.from(b64, "base64").toString("utf-8");
+    typeof atob !== "undefined" ? atob(b64) : Buffer.from(b64, "base64").toString("utf-8");
   return JSON.parse(json) as ServiceAccountKey;
 }
 
@@ -151,10 +149,10 @@ export async function sheetsClearValues(
   spreadsheetId: string,
   range: string,
 ): Promise<void> {
-  const res = await fetch(
-    `${BASE}/${spreadsheetId}/values/${encodeURIComponent(range)}:clear`,
-    { method: "POST", headers: ah(token) },
-  );
+  const res = await fetch(`${BASE}/${spreadsheetId}/values/${encodeURIComponent(range)}:clear`, {
+    method: "POST",
+    headers: ah(token),
+  });
   if (!res.ok) throw new Error(`Sheets clear failed: ${await res.text()}`);
 }
 

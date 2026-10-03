@@ -376,7 +376,9 @@ function GeneralTab({ chartDisplay }: { chartDisplay: ChartDisplay }) {
   const upcomingCount = summary?.upcoming_events ?? 0;
   const maxYouthCount = Math.max(...youths_breakdown.map((r) => r.total_count), 1);
 
-  const topParishes = [...youths_breakdown].sort((a, b) => b.total_count - a.total_count).slice(0, 4);
+  const topParishes = [...youths_breakdown]
+    .sort((a, b) => b.total_count - a.total_count)
+    .slice(0, 4);
 
   const catTotals = youthBreakdown.reduce(
     (acc, r) => ({

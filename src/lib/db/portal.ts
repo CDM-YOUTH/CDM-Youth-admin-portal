@@ -116,7 +116,9 @@ export async function listUpcomingEvents() {
   const today = new Date().toISOString().slice(0, 10);
   const { data, error } = await supabase
     .from("events")
-    .select("id, name, event_date, venue, organization_level, deanery:deaneries(name), parish:parishes(name)")
+    .select(
+      "id, name, event_date, venue, organization_level, deanery:deaneries(name), parish:parishes(name)",
+    )
     .gte("event_date", today)
     .order("event_date", { ascending: true })
     .limit(50);

@@ -8,8 +8,20 @@ import type { EventFormState } from "@/components/admin/events/event-tabs-form";
 import { Topbar, TopbarButton } from "@/components/admin/layout/topbar";
 import { Card, CardBody, CardHead, Kpi, Pill } from "@/components/admin/composables/ui-bits";
 import { TablePagination } from "@/components/admin/composables/tables/table-pagination";
-import { FilterRow, FilterSearch, FilterSelect, FilterClear } from "@/components/admin/composables/tables/table-filters";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  FilterRow,
+  FilterSearch,
+  FilterSelect,
+  FilterClear,
+} from "@/components/admin/composables/tables/table-filters";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,7 +35,13 @@ import {
 import { Trash2 } from "lucide-react";
 import { Icon } from "@iconify/react";
 import { EventTabsForm } from "@/components/admin/events/event-tabs-form";
-import { createEvent, deleteEvent, getEventsAnalytics, listEventsPaged, type EventRow } from "@/lib/db/activities/events";
+import {
+  createEvent,
+  deleteEvent,
+  getEventsAnalytics,
+  listEventsPaged,
+  type EventRow,
+} from "@/lib/db/activities/events";
 import { fetchOrg } from "@/lib/db/org";
 import { useAdminScope } from "@/lib/hooks/use-admin-scope";
 
@@ -44,7 +62,7 @@ const eventSearchSchema = z.object({
   deanery_id: fallback(z.string(), "").default(""),
   parish_id: fallback(z.string(), "").default(""),
   upcoming_page: fallback(z.number().int().min(1), 1).default(1),
-  ongoing_page:  fallback(z.number().int().min(1), 1).default(1),
+  ongoing_page: fallback(z.number().int().min(1), 1).default(1),
   done_page: fallback(z.number().int().min(1), 1).default(1),
   size: fallback(z.number().int().min(1).max(50), 8).default(8),
 });
@@ -55,7 +73,10 @@ export const Route = createFileRoute("/admin/events")({
   head: () => ({
     meta: [
       { title: "Events — CDM Youth Office" },
-      { name: "description", content: "Diocese-wide event scheduling, RSVP tracking, and attendance recording." },
+      {
+        name: "description",
+        content: "Diocese-wide event scheduling, RSVP tracking, and attendance recording.",
+      },
     ],
   }),
   validateSearch: zodValidator(eventSearchSchema),
@@ -73,41 +94,90 @@ function EventsPage() {
 
   const scope = useAdminScope();
   const deaneryId = scope.deaneryId || search.deanery_id;
-  const parishId  = scope.parishId  || search.parish_id;
+  const parishId = scope.parishId || search.parish_id;
 
   // A scoped caller's own deanery/parish is a visibility *boundary* (diocese-wide events
   // plus their own scope — see `applyEventScopeFilter`), not a strict narrowing filter.
   // Only pass a manual filter choice through as strict once that level isn't already scoped.
-  const filterDeaneryId = scope.deaneryId ? null : (search.deanery_id || null);
-  const filterParishId  = scope.parishId  ? null : (search.parish_id  || null);
+  const filterDeaneryId = scope.deaneryId ? null : search.deanery_id || null;
+  const filterParishId = scope.parishId ? null : search.parish_id || null;
 
   const { data: org } = useQuery({ queryKey: ["org"], queryFn: fetchOrg });
-  const { data: analytics } = useQuery({ queryKey: ["events-analytics"], queryFn: getEventsAnalytics });
+  const { data: analytics } = useQuery({
+    queryKey: ["events-analytics"],
+    queryFn: getEventsAnalytics,
+  });
 
   const { data: upcomingResp } = useQuery({
-    queryKey: ["events", "upcoming", search.q, deaneryId, parishId, search.upcoming_page, search.size],
-    queryFn: () => listEventsPaged({ page: search.upcoming_page - 1, size: search.size, q: search.q, deaneryId: filterDeaneryId, parishId: filterParishId, scopeDeaneryId: scope.deaneryId, scopeParishId: scope.parishId, period: "upcoming" }),
+    queryKey: [
+      "events",
+      "upcoming",
+      search.q,
+      deaneryId,
+      parishId,
+      search.upcoming_page,
+      search.size,
+    ],
+    queryFn: () =>
+      listEventsPaged({
+        page: search.upcoming_page - 1,
+        size: search.size,
+        q: search.q,
+        deaneryId: filterDeaneryId,
+        parishId: filterParishId,
+        scopeDeaneryId: scope.deaneryId,
+        scopeParishId: scope.parishId,
+        period: "upcoming",
+      }),
     placeholderData: keepPreviousData,
   });
 
   const { data: ongoingResp } = useQuery({
-    queryKey: ["events", "ongoing", search.q, deaneryId, parishId, search.ongoing_page, search.size],
-    queryFn: () => listEventsPaged({ page: search.ongoing_page - 1, size: search.size, q: search.q, deaneryId: filterDeaneryId, parishId: filterParishId, scopeDeaneryId: scope.deaneryId, scopeParishId: scope.parishId, period: "ongoing" }),
+    queryKey: [
+      "events",
+      "ongoing",
+      search.q,
+      deaneryId,
+      parishId,
+      search.ongoing_page,
+      search.size,
+    ],
+    queryFn: () =>
+      listEventsPaged({
+        page: search.ongoing_page - 1,
+        size: search.size,
+        q: search.q,
+        deaneryId: filterDeaneryId,
+        parishId: filterParishId,
+        scopeDeaneryId: scope.deaneryId,
+        scopeParishId: scope.parishId,
+        period: "ongoing",
+      }),
     placeholderData: keepPreviousData,
   });
 
   const { data: doneResp } = useQuery({
     queryKey: ["events", "done", search.q, deaneryId, parishId, search.done_page, search.size],
-    queryFn: () => listEventsPaged({ page: search.done_page - 1, size: search.size, q: search.q, deaneryId: filterDeaneryId, parishId: filterParishId, scopeDeaneryId: scope.deaneryId, scopeParishId: scope.parishId, period: "done" }),
+    queryFn: () =>
+      listEventsPaged({
+        page: search.done_page - 1,
+        size: search.size,
+        q: search.q,
+        deaneryId: filterDeaneryId,
+        parishId: filterParishId,
+        scopeDeaneryId: scope.deaneryId,
+        scopeParishId: scope.parishId,
+        period: "done",
+      }),
     placeholderData: keepPreviousData,
   });
 
   const upcomingEvents = upcomingResp?.data ?? [];
-  const ongoingEvents  = ongoingResp?.data  ?? [];
-  const doneEvents     = doneResp?.data     ?? [];
-  const upcomingTotal  = upcomingResp?.total ?? 0;
-  const ongoingTotal   = ongoingResp?.total  ?? 0;
-  const doneTotal      = doneResp?.total     ?? 0;
+  const ongoingEvents = ongoingResp?.data ?? [];
+  const doneEvents = doneResp?.data ?? [];
+  const upcomingTotal = upcomingResp?.total ?? 0;
+  const ongoingTotal = ongoingResp?.total ?? 0;
+  const doneTotal = doneResp?.total ?? 0;
 
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
 
@@ -155,29 +225,68 @@ function EventsPage() {
           <FilterSelect
             label="Deanery"
             value={deaneryId}
-            onChange={(v) => setFilter({ deanery_id: v, parish_id: "", upcoming_page: 1, ongoing_page: 1, done_page: 1 })}
+            onChange={(v) =>
+              setFilter({
+                deanery_id: v,
+                parish_id: "",
+                upcoming_page: 1,
+                ongoing_page: 1,
+                done_page: 1,
+              })
+            }
             options={deaneryOptions}
             disabled={!!scope.deaneryId}
           />
           <FilterSelect
             label="Parish"
             value={parishId}
-            onChange={(v) => setFilter({ parish_id: v, upcoming_page: 1, ongoing_page: 1, done_page: 1 })}
+            onChange={(v) =>
+              setFilter({ parish_id: v, upcoming_page: 1, ongoing_page: 1, done_page: 1 })
+            }
             options={parishOptions}
             disabled={!!scope.parishId || (!deaneryId && parishOptions.length === 0)}
           />
           <FilterClear
             visible={hasFilter}
-            onClick={() => setFilter({ q: "", deanery_id: "", parish_id: "", upcoming_page: 1, ongoing_page: 1, done_page: 1 })}
+            onClick={() =>
+              setFilter({
+                q: "",
+                deanery_id: "",
+                parish_id: "",
+                upcoming_page: 1,
+                ongoing_page: 1,
+                done_page: 1,
+              })
+            }
           />
         </FilterRow>
 
         <div className="px-5 py-4">
           <div className="mb-4 grid grid-cols-1 gap-2.5 sm:grid-cols-4">
-            <Kpi label="Upcoming" value={String(analytics?.upcoming ?? upcomingTotal)} trend="future events" tone="info" />
-            <Kpi label="Ongoing" value={String(analytics?.ongoing ?? ongoingTotal)} trend="in progress" tone="warn" />
-            <Kpi label="Done" value={String(analytics?.done ?? doneTotal)} trend="completed" tone="up" />
-            <Kpi label="Registered" value={(analytics?.registered ?? 0).toLocaleString()} trend="all events" tone="up" />
+            <Kpi
+              label="Upcoming"
+              value={String(analytics?.upcoming ?? upcomingTotal)}
+              trend="future events"
+              tone="info"
+            />
+            <Kpi
+              label="Ongoing"
+              value={String(analytics?.ongoing ?? ongoingTotal)}
+              trend="in progress"
+              tone="warn"
+            />
+            <Kpi
+              label="Done"
+              value={String(analytics?.done ?? doneTotal)}
+              trend="completed"
+              tone="up"
+            />
+            <Kpi
+              label="Registered"
+              value={(analytics?.registered ?? 0).toLocaleString()}
+              trend="all events"
+              tone="up"
+            />
           </div>
 
           <div className="space-y-3">
@@ -219,7 +328,12 @@ function EventsPage() {
         </div>
       </div>
 
-      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => { if (!o) setDeleteTarget(null); }}>
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(o) => {
+          if (!o) setDeleteTarget(null);
+        }}
+      >
         <AlertDialogContent className="border-border bg-white">
           <AlertDialogHeader>
             <AlertDialogTitle>Delete "{deleteTarget?.name}"?</AlertDialogTitle>
@@ -243,7 +357,7 @@ function EventsPage() {
   );
 }
 
-const MONTHS = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 
 function EventList({
   title,
@@ -279,22 +393,52 @@ function EventList({
           const endDay = endD ? String(endD.getDate()).padStart(2, "0") : null;
           const endMonth = endD ? MONTHS[endD.getMonth()] : null;
           return (
-          <div key={event.id} className="rounded-lg border border-border bg-bg-2 p-3">
-            <div className="flex items-center gap-3">
-              <div className="min-w-[52px] shrink-0 rounded-lg bg-bg-4 px-2.5 py-2 text-center">
-                <div className="text-[8px] font-bold uppercase tracking-wide text-gold">{month}</div>
-                <div className="text-display text-[22px] font-black leading-none text-foreground">{day}</div>
-                {endDay && endMonth && (
-                  <div className="mt-0.5 text-[7px] font-semibold uppercase tracking-wide text-text-3">→ {endDay} {endMonth}</div>
-                )}
+            <div key={event.id} className="rounded-lg border border-border bg-bg-2 p-3">
+              <div className="flex items-center gap-3">
+                <div className="min-w-[52px] shrink-0 rounded-lg bg-bg-4 px-2.5 py-2 text-center">
+                  <div className="text-[8px] font-bold uppercase tracking-wide text-gold">
+                    {month}
+                  </div>
+                  <div className="text-display text-[22px] font-black leading-none text-foreground">
+                    {day}
+                  </div>
+                  {endDay && endMonth && (
+                    <div className="mt-0.5 text-[7px] font-semibold uppercase tracking-wide text-text-3">
+                      → {endDay} {endMonth}
+                    </div>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1 leading-tight">
+                  <div className="truncate text-[12px] font-semibold text-text-1">{event.name}</div>
+                  <div className="truncate text-[10px] text-text-3">
+                    {event.venue ?? "—"} ·{" "}
+                    {event.parish?.name ?? event.deanery?.name ?? "Diocese-wide"}
+                  </div>
+                </div>
+                <div className="hidden shrink-0 items-center gap-2 sm:flex">
+                  <Pill tone={pillTone}>{period}</Pill>
+                  <Link
+                    to="/admin/event/$eventId"
+                    params={{ eventId: event.id }}
+                    className="rounded-md border border-border bg-bg-3 px-3 py-1.5 text-[10px] font-semibold text-text-1 hover:border-gold-3 hover:text-gold"
+                  >
+                    View / Edit
+                  </Link>
+                  <button
+                    onClick={() => onDelete(event.id, event.name)}
+                    className="rounded border border-border p-1.5 text-text-3 hover:border-danger/50 hover:text-danger"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
               </div>
-              <div className="min-w-0 flex-1 leading-tight">
-                <div className="truncate text-[12px] font-semibold text-text-1">{event.name}</div>
-                <div className="truncate text-[10px] text-text-3">{event.venue ?? "—"} · {event.parish?.name ?? event.deanery?.name ?? "Diocese-wide"}</div>
-              </div>
-              <div className="hidden shrink-0 items-center gap-2 sm:flex">
+              <div className="mt-2 flex items-center justify-end gap-2 sm:hidden">
                 <Pill tone={pillTone}>{period}</Pill>
-                <Link to="/admin/event/$eventId" params={{ eventId: event.id }} className="rounded-md border border-border bg-bg-3 px-3 py-1.5 text-[10px] font-semibold text-text-1 hover:border-gold-3 hover:text-gold">
+                <Link
+                  to="/admin/event/$eventId"
+                  params={{ eventId: event.id }}
+                  className="rounded-md border border-border bg-bg-3 px-3 py-1.5 text-[10px] font-semibold text-text-1 hover:border-gold-3 hover:text-gold"
+                >
                   View / Edit
                 </Link>
                 <button
@@ -305,19 +449,6 @@ function EventList({
                 </button>
               </div>
             </div>
-            <div className="mt-2 flex items-center justify-end gap-2 sm:hidden">
-              <Pill tone={pillTone}>{period}</Pill>
-              <Link to="/admin/event/$eventId" params={{ eventId: event.id }} className="rounded-md border border-border bg-bg-3 px-3 py-1.5 text-[10px] font-semibold text-text-1 hover:border-gold-3 hover:text-gold">
-                View / Edit
-              </Link>
-              <button
-                onClick={() => onDelete(event.id, event.name)}
-                className="rounded border border-border p-1.5 text-text-3 hover:border-danger/50 hover:text-danger"
-              >
-                <Trash2 className="h-3 w-3" />
-              </button>
-            </div>
-          </div>
           );
         })}
       </CardBody>
@@ -336,7 +467,21 @@ function EventList({
   );
 }
 
-function CreateEventDialog({ onCreate }: { onCreate: (data: { name: string; eventDate?: string | null; endDate?: string | null; venue?: string | null; description?: string | null; deaneryName?: string | null; parishName?: string | null; organizationLevel?: "Diocese"|"Deanery"|"Parish"|"Outstation"|null; openToAll?: boolean }) => void }) {
+function CreateEventDialog({
+  onCreate,
+}: {
+  onCreate: (data: {
+    name: string;
+    eventDate?: string | null;
+    endDate?: string | null;
+    venue?: string | null;
+    description?: string | null;
+    deaneryName?: string | null;
+    parishName?: string | null;
+    organizationLevel?: "Diocese" | "Deanery" | "Parish" | "Outstation" | null;
+    openToAll?: boolean;
+  }) => void;
+}) {
   const [open, setOpen] = useState(false);
   const qc = useQueryClient();
 
@@ -355,7 +500,8 @@ function CreateEventDialog({ onCreate }: { onCreate: (data: { name: string; even
         description: state.details.description || null,
         deaneryName: state.details.deanery || null,
         parishName: state.details.parish || null,
-        organizationLevel: (state.details.level || null) as "Diocese"|"Deanery"|"Parish"|"Outstation"|null,
+        organizationLevel: (state.details.level || null) as
+          "Diocese" | "Deanery" | "Parish" | "Outstation" | null,
         openToAll: state.details.openToAll,
       });
     }
@@ -369,7 +515,9 @@ function CreateEventDialog({ onCreate }: { onCreate: (data: { name: string; even
       </DialogTrigger>
       <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto border-border bg-white text-foreground">
         <DialogHeader>
-          <DialogTitle className="text-display text-xl font-black text-gold">Create Event</DialogTitle>
+          <DialogTitle className="text-display text-xl font-black text-gold">
+            Create Event
+          </DialogTitle>
           <DialogDescription className="text-[12px] text-text-3">
             Save each step independently — your progress is kept even if you close the dialog.
           </DialogDescription>
@@ -413,7 +561,9 @@ export function RepeatingRows({
       {rows.map((row, index) => (
         <div key={index} className="rounded-lg border border-border bg-bg-3 p-3">
           <div className="mb-2 flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wide text-text-3">#{index + 1}</span>
+            <span className="text-[10px] font-bold uppercase tracking-wide text-text-3">
+              #{index + 1}
+            </span>
             <button
               type="button"
               onClick={() => remove(index)}

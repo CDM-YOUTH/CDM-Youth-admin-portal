@@ -24,7 +24,12 @@ export interface CurriculumFormDialogProps {
     icon?: string;
     color?: string;
   };
-  onSubmit: (values: { title: string; description: string | null; icon: string | null; color: string | null }) => void;
+  onSubmit: (values: {
+    title: string;
+    description: string | null;
+    icon: string | null;
+    color: string | null;
+  }) => void;
   isLoading?: boolean;
 }
 

@@ -73,7 +73,10 @@ export async function createUniformItem(input: UniformItemInput): Promise<Unifor
   };
 }
 
-export async function updateUniformItem(id: string, input: UniformItemUpdateInput): Promise<UniformItem> {
+export async function updateUniformItem(
+  id: string,
+  input: UniformItemUpdateInput,
+): Promise<UniformItem> {
   const payload: Record<string, unknown> = {};
   if (input.name !== undefined) payload.name = input.name;
   if (input.swatch !== undefined) payload.swatch = input.swatch;

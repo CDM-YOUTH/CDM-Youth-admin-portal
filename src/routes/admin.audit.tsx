@@ -4,14 +4,20 @@ import { createFileRoute } from "@tanstack/react-router";
 import { RefreshCw, Search, X } from "lucide-react";
 import { Topbar } from "@/components/admin/layout/topbar";
 import { Card, CardBody, CardHead, Pill } from "@/components/admin/composables/ui-bits";
-import { TablePagination, usePagination } from "@/components/admin/composables/tables/table-pagination";
+import {
+  TablePagination,
+  usePagination,
+} from "@/components/admin/composables/tables/table-pagination";
 import { listEnrollmentAudit } from "@/lib/db/audit";
 
 export const Route = createFileRoute("/admin/audit")({
   head: () => ({
     meta: [
       { title: "Audit Log — CDM Youth Office" },
-      { name: "description", content: "Full enrollment change history with actor, timestamps, and before/after data." },
+      {
+        name: "description",
+        content: "Full enrollment change history with actor, timestamps, and before/after data.",
+      },
     ],
   }),
   component: AuditPage,
@@ -33,7 +39,11 @@ const ACTION_OPTIONS = [
   { value: "delete", label: "Delete" },
 ];
 
-function extractSummary(row: { action: string; before: Record<string, unknown> | null; after: Record<string, unknown> | null }) {
+function extractSummary(row: {
+  action: string;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+}) {
   const data = row.after ?? row.before ?? {};
   const parts: string[] = [];
   if (data.cdm_id) parts.push(String(data.cdm_id));
@@ -47,7 +57,13 @@ function AuditPage() {
   const [search, setSearch] = useState("");
   const [actionFilter, setActionFilter] = useState("");
 
-  const { data: entries = [], isLoading, dataUpdatedAt, refetch, isFetching } = useQuery({
+  const {
+    data: entries = [],
+    isLoading,
+    dataUpdatedAt,
+    refetch,
+    isFetching,
+  } = useQuery({
     queryKey: ["enrollment-audit"],
     queryFn: () => listEnrollmentAudit(200),
     refetchInterval: 15_000,
@@ -65,7 +81,9 @@ function AuditPage() {
           a.youth_id ?? "",
           JSON.stringify(a.after ?? {}),
           JSON.stringify(a.before ?? {}),
-        ].join(" ").toLowerCase();
+        ]
+          .join(" ")
+          .toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -75,7 +93,11 @@ function AuditPage() {
   const pagination = usePagination(filtered, 20);
 
   const lastRefreshed = dataUpdatedAt
-    ? new Date(dataUpdatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+    ? new Date(dataUpdatedAt).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      })
     : null;
 
   return (
@@ -131,14 +153,18 @@ function AuditPage() {
             >
               <option value="">All actions</option>
               {ACTION_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>{o.label}</option>
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
               ))}
             </select>
           </div>
 
           <CardBody className="p-0">
             {isLoading ? (
-              <div className="px-3.5 py-8 text-center text-[11px] text-text-3">Loading audit log…</div>
+              <div className="px-3.5 py-8 text-center text-[11px] text-text-3">
+                Loading audit log…
+              </div>
             ) : (
               <table className="w-full">
                 <thead>
@@ -152,7 +178,10 @@ function AuditPage() {
                 </thead>
                 <tbody>
                   {pagination.pageRows.map((a) => (
-                    <tr key={a.id} className="border-b border-border/30 last:border-0 hover:bg-bg-3">
+                    <tr
+                      key={a.id}
+                      className="border-b border-border/30 last:border-0 hover:bg-bg-3"
+                    >
                       <td className="whitespace-nowrap px-3.5 py-2.5 text-[10px] text-text-3">
                         {new Date(a.created_at).toLocaleString([], {
                           year: "numeric",

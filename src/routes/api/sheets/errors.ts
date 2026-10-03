@@ -15,20 +15,36 @@ import {
 const TAB = "Import Errors";
 
 const HEADERS = [
-  "Row #", "Full Name", "Gender", "Age", "Phone", "Alt Phone", "Email",
-  "Deanery", "Parish", "Outstation", "Category", "Institution",
-  "Year of Study", "Course", "Notes",
-  "Diocese (Role)", "Deanery (Role)", "Parish (Role)", "Outstation (Role)",
-  "Error Message", "Conflict Holder",
+  "Row #",
+  "Full Name",
+  "Gender",
+  "Age",
+  "Phone",
+  "Alt Phone",
+  "Email",
+  "Deanery",
+  "Parish",
+  "Outstation",
+  "Category",
+  "Institution",
+  "Year of Study",
+  "Course",
+  "Notes",
+  "Diocese (Role)",
+  "Deanery (Role)",
+  "Parish (Role)",
+  "Outstation (Role)",
+  "Error Message",
+  "Conflict Holder",
 ];
 
 async function ensureTab(token: string, spreadsheetId: string): Promise<void> {
   const meta = await sheetsGetMetadata(token, spreadsheetId);
-  const exists = meta.sheets?.some((s: { properties?: { title?: string } }) => s.properties?.title === TAB);
+  const exists = meta.sheets?.some(
+    (s: { properties?: { title?: string } }) => s.properties?.title === TAB,
+  );
   if (!exists) {
-    await sheetsBatchUpdate(token, spreadsheetId, [
-      { addSheet: { properties: { title: TAB } } },
-    ]);
+    await sheetsBatchUpdate(token, spreadsheetId, [{ addSheet: { properties: { title: TAB } } }]);
   }
 }
 

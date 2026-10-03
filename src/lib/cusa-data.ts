@@ -12,8 +12,36 @@ export const CUSA_INSTITUTIONS = [
   "Catholic University",
 ];
 
-const firstNames = ["Grace", "Peter", "Mary", "John", "Faith", "Brian", "Mercy", "Samuel", "Joy", "David", "Linda", "James", "Esther", "Anne"];
-const lastNames = ["Wanjiku", "Kamau", "Njeri", "Mwangi", "Wairimu", "Otieno", "Akinyi", "Kariuki", "Wambui", "Njoroge", "Muthoni", "Maina"];
+const firstNames = [
+  "Grace",
+  "Peter",
+  "Mary",
+  "John",
+  "Faith",
+  "Brian",
+  "Mercy",
+  "Samuel",
+  "Joy",
+  "David",
+  "Linda",
+  "James",
+  "Esther",
+  "Anne",
+];
+const lastNames = [
+  "Wanjiku",
+  "Kamau",
+  "Njeri",
+  "Mwangi",
+  "Wairimu",
+  "Otieno",
+  "Akinyi",
+  "Kariuki",
+  "Wambui",
+  "Njoroge",
+  "Muthoni",
+  "Maina",
+];
 
 function unitSeed(unit: AnalyticsUnit) {
   return [...unit.id].reduce((sum, char) => sum + char.charCodeAt(0), 0);
@@ -43,7 +71,11 @@ export function cusaInstitutionRows(units: AnalyticsUnit[]) {
 
 export function cusaGenderRows(units: AnalyticsUnit[], institution = "") {
   const total = units.reduce((sum, unit) => sum + cusaMembersFor(unit, institution), 0);
-  const female = units.reduce((sum, unit) => sum + Math.round(cusaMembersFor(unit, institution) * (0.47 + (unitSeed(unit) % 9) / 100)), 0);
+  const female = units.reduce(
+    (sum, unit) =>
+      sum + Math.round(cusaMembersFor(unit, institution) * (0.47 + (unitSeed(unit) % 9) / 100)),
+    0,
+  );
   return [
     { label: "Female", value: Math.min(female, total), color: "var(--color-pink)" },
     { label: "Male", value: Math.max(0, total - female), color: "var(--color-info)" },
@@ -86,7 +118,9 @@ export function buildCusaMembers(units: AnalyticsUnit[], institution = ""): Cusa
         parishName: unit.parishName,
         churchId: unit.id,
         churchName: unit.name,
-        course: ["Education", "Commerce", "Nursing", "Engineering", "Arts", "ICT"][(unitSeed(unit) + index) % 6],
+        course: ["Education", "Commerce", "Nursing", "Engineering", "Arts", "ICT"][
+          (unitSeed(unit) + index) % 6
+        ],
         year: `Year ${1 + ((unitSeed(unit) + index) % 4)}`,
         status: index < unit.cusaActive ? "active" : "reporting",
       } satisfies CusaMember;

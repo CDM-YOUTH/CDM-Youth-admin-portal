@@ -2,14 +2,52 @@ import { ANALYTICS_UNITS, type AnalyticsUnit } from "@/lib/mock-data";
 import { CUSA_INSTITUTIONS } from "@/lib/cusa-data";
 
 const firstNames = [
-  "Grace", "Peter", "Mary", "John", "Faith", "Brian", "Mercy", "Samuel",
-  "Joy", "David", "Linda", "James", "Esther", "Anne", "Kevin", "Lucy",
-  "Daniel", "Ruth", "Paul", "Naomi", "Stephen", "Rose", "Joseph", "Hannah",
+  "Grace",
+  "Peter",
+  "Mary",
+  "John",
+  "Faith",
+  "Brian",
+  "Mercy",
+  "Samuel",
+  "Joy",
+  "David",
+  "Linda",
+  "James",
+  "Esther",
+  "Anne",
+  "Kevin",
+  "Lucy",
+  "Daniel",
+  "Ruth",
+  "Paul",
+  "Naomi",
+  "Stephen",
+  "Rose",
+  "Joseph",
+  "Hannah",
 ];
 const lastNames = [
-  "Wanjiku", "Kamau", "Njeri", "Mwangi", "Wairimu", "Otieno", "Akinyi",
-  "Kariuki", "Wambui", "Njoroge", "Muthoni", "Maina", "Kimani", "Wangari",
-  "Macharia", "Gathoni", "Kuria", "Nduta", "Karanja", "Wanjiru",
+  "Wanjiku",
+  "Kamau",
+  "Njeri",
+  "Mwangi",
+  "Wairimu",
+  "Otieno",
+  "Akinyi",
+  "Kariuki",
+  "Wambui",
+  "Njoroge",
+  "Muthoni",
+  "Maina",
+  "Kimani",
+  "Wangari",
+  "Macharia",
+  "Gathoni",
+  "Kuria",
+  "Nduta",
+  "Karanja",
+  "Wanjiru",
 ];
 
 const CATEGORIES = ["Primary", "Secondary", "Tertiary", "Working"] as const;
@@ -55,7 +93,8 @@ function institutionFor(unit: AnalyticsUnit, index: number, category: YouthCateg
 }
 
 function ageFor(category: YouthCategory, seed: number): number {
-  const base = category === "Primary" ? 10 : category === "Secondary" ? 14 : category === "Tertiary" ? 19 : 24;
+  const base =
+    category === "Primary" ? 10 : category === "Secondary" ? 14 : category === "Tertiary" ? 19 : 24;
   return base + (seed % 6);
 }
 

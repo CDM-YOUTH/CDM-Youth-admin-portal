@@ -16,7 +16,7 @@ export function titleCase(str: string | null | undefined): string {
   if (!str) return "";
   return str
     .trim()
-    .normalize("NFKC")   // 𝐅𝐞𝐥𝐢𝐬𝐭𝐚 → Felista, 𝑴𝒖𝒓𝒊𝒊𝒕𝒉𝒊 → Muriithi
+    .normalize("NFKC") // 𝐅𝐞𝐥𝐢𝐬𝐭𝐚 → Felista, 𝑴𝒖𝒓𝒊𝒊𝒕𝒉𝒊 → Muriithi
     .toLowerCase()
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
@@ -29,17 +29,17 @@ export function formatPhone(phone: string | null | undefined): string {
   if (!phone) return "";
   const s = phone.trim();
   if (!s) return "";
-  if (s.startsWith("+")) return s;          // already international
+  if (s.startsWith("+")) return s; // already international
   if (s.startsWith("254")) return `+${s}`; // missing leading +
   if (s.startsWith("0")) return `+254${s.slice(1)}`; // local format
-  return `+254${s}`;                        // bare 9-digit
+  return `+254${s}`; // bare 9-digit
 }
 
 export function likePattern(raw: string): string {
   const clean = raw
     .trim()
-    .replace(/[\\%_]/g, "\\$&")  // escape LIKE special chars
-    .replace(/[,()]/g, " ")       // neutralise PostgREST filter separators
+    .replace(/[\\%_]/g, "\\$&") // escape LIKE special chars
+    .replace(/[,()]/g, " ") // neutralise PostgREST filter separators
     .trim();
   return `%${clean}%`;
 }

@@ -96,11 +96,19 @@ async function resolveOrgIds(deaneryName?: string | null, parishName?: string | 
   let deanery_id: string | null = null;
   let parish_id: string | null = null;
   if (deaneryName) {
-    const { data } = await supabase.from("deaneries").select("id").eq("name", deaneryName).maybeSingle();
+    const { data } = await supabase
+      .from("deaneries")
+      .select("id")
+      .eq("name", deaneryName)
+      .maybeSingle();
     deanery_id = data?.id ?? null;
   }
   if (parishName) {
-    const { data } = await supabase.from("parishes").select("id").eq("name", parishName).maybeSingle();
+    const { data } = await supabase
+      .from("parishes")
+      .select("id")
+      .eq("name", parishName)
+      .maybeSingle();
     parish_id = data?.id ?? null;
   }
   return { deanery_id, parish_id };
@@ -163,8 +171,14 @@ export async function updateEvent(id: string, input: EventInput): Promise<EventR
 
 type ProgramSlotInput = { startTime: string; endTime: string; activities: { name: string }[] };
 
-export async function saveEventProgram(eventId: string, program: ProgramSlotInput[]): Promise<void> {
-  const { error: delErr } = await supabase.from("event_program_items").delete().eq("event_id", eventId);
+export async function saveEventProgram(
+  eventId: string,
+  program: ProgramSlotInput[],
+): Promise<void> {
+  const { error: delErr } = await supabase
+    .from("event_program_items")
+    .delete()
+    .eq("event_id", eventId);
   if (delErr) throw delErr;
   const items = program.flatMap((slot, si) =>
     slot.activities
@@ -182,7 +196,12 @@ export async function saveEventProgram(eventId: string, program: ProgramSlotInpu
   if (error) throw error;
 }
 
-type DutyAssignmentInput = { deanery: string; parish: string; name: string; youthId?: string | null };
+type DutyAssignmentInput = {
+  deanery: string;
+  parish: string;
+  name: string;
+  youthId?: string | null;
+};
 type DutyItemInput = { label: string; assignments: DutyAssignmentInput[] };
 type DutyCategoryInput = { name: string; duties: DutyItemInput[] };
 
@@ -196,9 +215,13 @@ async function resolveOrgIdsBulk(deaneryNames: string[], parishNames: string[]) 
       : Promise.resolve({ data: [] as { id: string; name: string }[] }),
   ]);
   const deaneryMap: Record<string, string> = {};
-  (deaRes.data ?? []).forEach((d) => { deaneryMap[d.name] = d.id; });
+  (deaRes.data ?? []).forEach((d) => {
+    deaneryMap[d.name] = d.id;
+  });
   const parishMap: Record<string, string> = {};
-  (parRes.data ?? []).forEach((p) => { parishMap[p.name] = p.id; });
+  (parRes.data ?? []).forEach((p) => {
+    parishMap[p.name] = p.id;
+  });
   return { deaneryMap, parishMap };
 }
 
@@ -224,12 +247,20 @@ export async function saveEventDuties(eventId: string, duties: DutyCategoryInput
 
   if (duties.length === 0) return;
 
-  const allDeaneries = [...new Set(
-    duties.flatMap((c) => c.duties.flatMap((d) => d.assignments.map((a) => a.deanery).filter(Boolean))),
-  )];
-  const allParishes = [...new Set(
-    duties.flatMap((c) => c.duties.flatMap((d) => d.assignments.map((a) => a.parish).filter(Boolean))),
-  )];
+  const allDeaneries = [
+    ...new Set(
+      duties.flatMap((c) =>
+        c.duties.flatMap((d) => d.assignments.map((a) => a.deanery).filter(Boolean)),
+      ),
+    ),
+  ];
+  const allParishes = [
+    ...new Set(
+      duties.flatMap((c) =>
+        c.duties.flatMap((d) => d.assignments.map((a) => a.parish).filter(Boolean)),
+      ),
+    ),
+  ];
   const { deaneryMap, parishMap } =
     allDeaneries.length || allParishes.length
       ? await resolveOrgIdsBulk(allDeaneries, allParishes)
@@ -274,11 +305,7 @@ export async function saveEventDuties(eventId: string, duties: DutyCategoryInput
 
 export async function getEventFull(eventId: string): Promise<EventFull> {
   const [eventRes, programRes, categoriesRes, registrationsRes, checkinRes] = await Promise.all([
-    supabase
-      .from("events")
-      .select(EVENT_ROW_SELECT)
-      .eq("id", eventId)
-      .single(),
+    supabase.from("events").select(EVENT_ROW_SELECT).eq("id", eventId).single(),
     supabase
       .from("event_program_items")
       .select("id, activity, start_time, end_time, position")
@@ -286,12 +313,16 @@ export async function getEventFull(eventId: string): Promise<EventFull> {
       .order("position"),
     supabase
       .from("event_duty_categories")
-      .select(`id, name, position, duties:event_duties(id, title, position, assignees:event_duty_assignees(id, name, youth_id, deanery:deaneries(name), parish:parishes(name)))`)
+      .select(
+        `id, name, position, duties:event_duties(id, title, position, assignees:event_duty_assignees(id, name, youth_id, deanery:deaneries(name), parish:parishes(name)))`,
+      )
       .eq("event_id", eventId)
       .order("position"),
     supabase
       .from("event_registrations")
-      .select("id, guest_name, guest_phone, guest_email, guest_deanery, guest_parish, guest_outstation, guest_role, notes, created_at, youth:youths(cdm_id, full_name, phone, category, deanery:deaneries(name), parish:parishes(name), outstation:outstations(name))")
+      .select(
+        "id, guest_name, guest_phone, guest_email, guest_deanery, guest_parish, guest_outstation, guest_role, notes, created_at, youth:youths(cdm_id, full_name, phone, category, deanery:deaneries(name), parish:parishes(name), outstation:outstations(name))",
+      )
       .eq("event_id", eventId)
       .order("created_at", { ascending: false })
       .limit(500),
@@ -316,12 +347,21 @@ export async function deleteEvent(id: string) {
   // Notify everyone registered before the cascade wipes event_registrations.
   const [{ data: event }, { data: registrants }] = await Promise.all([
     supabase.from("events").select("name").eq("id", id).maybeSingle(),
-    supabase.from("event_registrations").select("youth_id").eq("event_id", id).not("youth_id", "is", null),
+    supabase
+      .from("event_registrations")
+      .select("youth_id")
+      .eq("event_id", id)
+      .not("youth_id", "is", null),
   ]);
 
-  const youthIds = [...new Set((registrants ?? []).map((r) => r.youth_id).filter((v): v is string => !!v))];
+  const youthIds = [
+    ...new Set((registrants ?? []).map((r) => r.youth_id).filter((v): v is string => !!v)),
+  ];
   if (youthIds.length > 0 && event?.name) {
-    const { data: authLinked } = await supabase.from("youths").select("id, auth_user_id").in("id", youthIds);
+    const { data: authLinked } = await supabase
+      .from("youths")
+      .select("id, auth_user_id")
+      .in("id", youthIds);
     const notifications = (authLinked ?? [])
       .filter((y) => y.auth_user_id)
       .map((y) => ({
@@ -343,8 +383,14 @@ export type EventCounts = { registered: number; checkedIn: number };
 
 export async function getEventCounts(eventId: string): Promise<EventCounts> {
   const [reg, ci] = await Promise.all([
-    supabase.from("event_registrations").select("id", { count: "exact", head: true }).eq("event_id", eventId),
-    supabase.from("event_checkins").select("id", { count: "exact", head: true }).eq("event_id", eventId),
+    supabase
+      .from("event_registrations")
+      .select("id", { count: "exact", head: true })
+      .eq("event_id", eventId),
+    supabase
+      .from("event_checkins")
+      .select("id", { count: "exact", head: true })
+      .eq("event_id", eventId),
   ]);
   return { registered: reg.count ?? 0, checkedIn: ci.count ?? 0 };
 }
@@ -409,12 +455,12 @@ export async function updateGuestRegistration(
   const { error } = await (supabase as any)
     .from("event_registrations")
     .update({
-      guest_name:        input.guestName       ?? null,
-      guest_phone:       input.guestPhone      ?? null,
-      guest_deanery:     input.guestDeanery    ?? null,
-      guest_parish:      input.guestParish     ?? null,
-      guest_outstation:  input.guestOutstation ?? null,
-      guest_role:        input.guestRole       ?? null,
+      guest_name: input.guestName ?? null,
+      guest_phone: input.guestPhone ?? null,
+      guest_deanery: input.guestDeanery ?? null,
+      guest_parish: input.guestParish ?? null,
+      guest_outstation: input.guestOutstation ?? null,
+      guest_role: input.guestRole ?? null,
     })
     .eq("id", id);
   if (error) throw error;
@@ -428,7 +474,9 @@ export async function deleteRegistration(registrationId: string) {
 export async function listRegistrations(eventId: string) {
   const { data, error } = await supabase
     .from("event_registrations")
-    .select("id, guest_name, guest_phone, guest_email, guest_deanery, guest_parish, guest_outstation, guest_role, notes, created_at, youth:youths(cdm_id, full_name, parish:parishes(name))")
+    .select(
+      "id, guest_name, guest_phone, guest_email, guest_deanery, guest_parish, guest_outstation, guest_role, notes, created_at, youth:youths(cdm_id, full_name, parish:parishes(name))",
+    )
     .eq("event_id", eventId)
     .order("created_at", { ascending: false })
     .limit(2000);
@@ -446,7 +494,11 @@ export async function listRegistrations(eventId: string) {
  * cover their parish too.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function applyEventScopeFilter(query: any, scopeDeaneryId?: string | null, scopeParishId?: string | null) {
+function applyEventScopeFilter(
+  query: any,
+  scopeDeaneryId?: string | null,
+  scopeParishId?: string | null,
+) {
   if (scopeParishId) {
     return query.or(
       `open_to_all.eq.true,parish_id.eq.${scopeParishId},and(deanery_id.eq.${scopeDeaneryId},parish_id.is.null)`,
@@ -477,22 +529,23 @@ export async function listEventsPaged(opts: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let query = (supabase as any)
     .from("events")
-    .select(
-      EVENT_ROW_SELECT,
-      { count: "exact" },
-    )
+    .select(EVENT_ROW_SELECT, { count: "exact" })
     .order("event_date", { ascending: opts.period === "upcoming" })
     .range(page * size, page * size + size - 1);
 
   query = applyEventScopeFilter(query, opts.scopeDeaneryId, opts.scopeParishId);
   if (opts.deaneryId) query = query.eq("deanery_id", opts.deaneryId);
-  if (opts.parishId)  query = query.eq("parish_id",  opts.parishId);
+  if (opts.parishId) query = query.eq("parish_id", opts.parishId);
   // upcoming: starts strictly in the future
   if (opts.period === "upcoming") query = query.gt("event_date", today);
   // ongoing: started on or before today AND (end_date >= today OR single-day event happening today)
-  if (opts.period === "ongoing")  query = query.lte("event_date", today).or(`end_date.gte.${today},and(end_date.is.null,event_date.eq.${today})`);
+  if (opts.period === "ongoing")
+    query = query
+      .lte("event_date", today)
+      .or(`end_date.gte.${today},and(end_date.is.null,event_date.eq.${today})`);
   // done: started before today AND end_date is past or unset
-  if (opts.period === "done")     query = query.lt("event_date", today).or(`end_date.lt.${today},end_date.is.null`);
+  if (opts.period === "done")
+    query = query.lt("event_date", today).or(`end_date.lt.${today},end_date.is.null`);
   if (opts.q?.trim()) {
     const t = likePattern(opts.q);
     query = query.or(`name.ilike.${t},venue.ilike.${t}`);
@@ -514,7 +567,9 @@ export async function listDashboardEvents(
 
   const [ongoingRes, upcomingRes] = await Promise.all([
     applyEventScopeFilter(
-      db.from("events").select(sel)
+      db
+        .from("events")
+        .select(sel)
         .lte("event_date", today)
         .or(`end_date.gte.${today},and(end_date.is.null,event_date.eq.${today})`)
         .order("event_date", { ascending: true })
@@ -523,7 +578,9 @@ export async function listDashboardEvents(
       scope?.parishId,
     ),
     applyEventScopeFilter(
-      db.from("events").select(sel)
+      db
+        .from("events")
+        .select(sel)
         .gt("event_date", today)
         .order("event_date", { ascending: true })
         .limit(limit),
@@ -542,10 +599,14 @@ export async function getEventsAnalytics() {
   const db = supabase as any;
   const [up, ongoing, done, regCount] = await Promise.all([
     db.from("events").select("id", { count: "exact", head: true }).gt("event_date", today),
-    db.from("events").select("id", { count: "exact", head: true })
+    db
+      .from("events")
+      .select("id", { count: "exact", head: true })
       .lte("event_date", today)
       .or(`end_date.gte.${today},and(end_date.is.null,event_date.eq.${today})`),
-    db.from("events").select("id", { count: "exact", head: true })
+    db
+      .from("events")
+      .select("id", { count: "exact", head: true })
       .lt("event_date", today)
       .or(`end_date.lt.${today},end_date.is.null`),
     supabase.from("event_registrations").select("id", { count: "exact", head: true }),

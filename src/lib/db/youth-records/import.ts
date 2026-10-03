@@ -19,7 +19,7 @@ import { listRoleTypes, type RoleTypeRow } from "./leaders";
 export type ImportRowData = {
   fullName: string;
   gender: string;
-  age: string;        // display value — range string or plain number
+  age: string; // display value — range string or plain number
   phone: string;
   altPhone: string;
   email: string;
@@ -37,7 +37,12 @@ export type ImportRowData = {
   Outstation: string;
 };
 
-export type ImportRowError = { row: number; reason: string; data?: ImportRowData; conflictHolder?: string };
+export type ImportRowError = {
+  row: number;
+  reason: string;
+  data?: ImportRowData;
+  conflictHolder?: string;
+};
 
 export type ImportResult = {
   inserted: number;
@@ -84,7 +89,7 @@ type ParsedRow = {
  *   range   — the original trimmed string if it was a range, null if it was plain
  */
 function ageToRange(n: number): string {
-  if (n < 18)  return "Below 18";
+  if (n < 18) return "Below 18";
   if (n <= 24) return "18-24";
   return "25-30";
 }
@@ -95,7 +100,7 @@ function parseAge(val: string): { numeric: number; range: string | null } {
   const isRange = /[-–—]/.test(s);
   const match = s.match(/\d+/);
   const numeric = match ? parseInt(match[0], 10) : 0;
-  const range = isRange ? s : (numeric > 0 ? ageToRange(numeric) : null);
+  const range = isRange ? s : numeric > 0 ? ageToRange(numeric) : null;
   return { numeric, range };
 }
 
@@ -142,25 +147,28 @@ async function parseXlsx(file: File): Promise<ParsedRow[]> {
     rows.push({
       rowNum,
       fullName,
-      gender:      get("gender")        || get("GENDER"),
-      ...(() => { const a = parseAge(get("age") || get("AGE")); return { age: a.numeric, ageRange: a.range }; })(),
-      phone:       get("phone")         || get("PHONE"),
-      altPhone:    get("alt_phone")     || get("Alt Phone")     || get("ALT PHONE"),
-      email:       get("email")         || get("EMAIL"),
+      gender: get("gender") || get("GENDER"),
+      ...(() => {
+        const a = parseAge(get("age") || get("AGE"));
+        return { age: a.numeric, ageRange: a.range };
+      })(),
+      phone: get("phone") || get("PHONE"),
+      altPhone: get("alt_phone") || get("Alt Phone") || get("ALT PHONE"),
+      email: get("email") || get("EMAIL"),
       // Org columns: lowercase or UPPERCASE only — never Title Case (reserved for leadership)
-      deanery:     get("deanery")       || get("DEANERY"),
-      parish:      get("parish")        || get("PARISH"),
-      outstation:  get("outstation")    || get("OUTSTATION"),
-      category:    get("category")      || get("CATEGORY"),
-      institution: get("institution")   || get("INSTITUTION"),
+      deanery: get("deanery") || get("DEANERY"),
+      parish: get("parish") || get("PARISH"),
+      outstation: get("outstation") || get("OUTSTATION"),
+      category: get("category") || get("CATEGORY"),
+      institution: get("institution") || get("INSTITUTION"),
       yearOfStudy: get("year_of_study") || get("Year of Study") || get("YEAR OF STUDY"),
-      course:      get("course")        || get("COURSE"),
-      notes:       get("notes")         || get("NOTES"),
+      course: get("course") || get("COURSE"),
+      notes: get("notes") || get("NOTES"),
       // Leadership columns: Title Case header — distinct from lowercase org column names
-      Diocese:     get("Diocese"),
-      Deanery:     get("Deanery"),
-      Parish:      get("Parish"),
-      Outstation:  get("Outstation"),
+      Diocese: get("Diocese"),
+      Deanery: get("Deanery"),
+      Parish: get("Parish"),
+      Outstation: get("Outstation"),
     });
   });
 
@@ -170,9 +178,9 @@ async function parseXlsx(file: File): Promise<ParsedRow[]> {
 // ── Org lookups (case-insensitive, mutated as new entries are created) ────────
 
 type OrgMaps = {
-  deaneryByName: Map<string, string>;             // name_lower → id
-  parishByKey: Map<string, string>;               // deanery_id:name_lower → id
-  outstationByKey: Map<string, string>;           // parish_id:name_lower → id
+  deaneryByName: Map<string, string>; // name_lower → id
+  parishByKey: Map<string, string>; // deanery_id:name_lower → id
+  outstationByKey: Map<string, string>; // parish_id:name_lower → id
   parishRows: ParishRow[];
   outstationRows: OutstationRow[];
 };
@@ -249,9 +257,7 @@ async function ensureOutstation(
 
 // ── Role type lookups ─────────────────────────────────────────────────────────
 
-async function buildRoleMap(
-  roleTypes: RoleTypeRow[],
-): Promise<Map<string, string>> {
+async function buildRoleMap(roleTypes: RoleTypeRow[]): Promise<Map<string, string>> {
   const map = new Map<string, string>();
   for (const rt of roleTypes) {
     map.set(rt.name.trim().toLowerCase(), rt.id);
@@ -285,24 +291,24 @@ async function ensureRoleType(
 
 function rowData(row: ParsedRow): ImportRowData {
   return {
-    fullName:    row.fullName,
-    gender:      row.gender,
-    age:         row.ageRange ?? String(row.age),
-    phone:       row.phone,
-    altPhone:    row.altPhone,
-    email:       row.email,
-    deanery:     row.deanery,
-    parish:      row.parish,
-    outstation:  row.outstation,
-    category:    row.category,
+    fullName: row.fullName,
+    gender: row.gender,
+    age: row.ageRange ?? String(row.age),
+    phone: row.phone,
+    altPhone: row.altPhone,
+    email: row.email,
+    deanery: row.deanery,
+    parish: row.parish,
+    outstation: row.outstation,
+    category: row.category,
     institution: row.institution,
     yearOfStudy: row.yearOfStudy,
-    course:      row.course,
-    notes:       row.notes,
-    Diocese:     row.Diocese,
-    Deanery:     row.Deanery,
-    Parish:      row.Parish,
-    Outstation:  row.Outstation,
+    course: row.course,
+    notes: row.notes,
+    Diocese: row.Diocese,
+    Deanery: row.Deanery,
+    Parish: row.Parish,
+    Outstation: row.Outstation,
   };
 }
 
@@ -356,12 +362,11 @@ function leaderOrgFks(
   parishId: string | null,
   outstationId: string | null,
 ) {
-  if (level === "diocese")    return { deanery_id: null, parish_id: null, outstation_id: null };
-  if (level === "deanery")    return { deanery_id: deaneryId, parish_id: null, outstation_id: null };
-  if (level === "parish")     return { deanery_id: null, parish_id: parishId, outstation_id: null };
-  /* outstation */            return { deanery_id: null, parish_id: null, outstation_id: outstationId };
+  if (level === "diocese") return { deanery_id: null, parish_id: null, outstation_id: null };
+  if (level === "deanery") return { deanery_id: deaneryId, parish_id: null, outstation_id: null };
+  if (level === "parish") return { deanery_id: null, parish_id: parishId, outstation_id: null };
+  /* outstation */ return { deanery_id: null, parish_id: null, outstation_id: outstationId };
 }
-
 
 // ── Role conflict holder lookup ─────────────────────────────────────────────
 
@@ -376,9 +381,12 @@ async function findRoleHolder(
     .select("youth:youths(full_name)")
     .eq("role_id", roleId)
     .eq("level", levelValue);
-  if (fks.deanery_id !== null)    q = q.eq("deanery_id", fks.deanery_id);    else q = q.is("deanery_id", null);
-  if (fks.parish_id !== null)     q = q.eq("parish_id", fks.parish_id);      else q = q.is("parish_id", null);
-  if (fks.outstation_id !== null) q = q.eq("outstation_id", fks.outstation_id); else q = q.is("outstation_id", null);
+  if (fks.deanery_id !== null) q = q.eq("deanery_id", fks.deanery_id);
+  else q = q.is("deanery_id", null);
+  if (fks.parish_id !== null) q = q.eq("parish_id", fks.parish_id);
+  else q = q.is("parish_id", null);
+  if (fks.outstation_id !== null) q = q.eq("outstation_id", fks.outstation_id);
+  else q = q.is("outstation_id", null);
   const { data } = await q.maybeSingle();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (data as any)?.youth?.full_name ?? undefined;
@@ -427,17 +435,29 @@ export async function importYouths(
       continue;
     }
     if (!row.deanery) {
-      result.errors.push({ row: row.rowNum, reason: `${row.fullName}: missing deanery`, data: rowData(row) });
+      result.errors.push({
+        row: row.rowNum,
+        reason: `${row.fullName}: missing deanery`,
+        data: rowData(row),
+      });
       continue;
     }
     if (!row.parish) {
-      result.errors.push({ row: row.rowNum, reason: `${row.fullName}: missing parish`, data: rowData(row) });
+      result.errors.push({
+        row: row.rowNum,
+        reason: `${row.fullName}: missing parish`,
+        data: rowData(row),
+      });
       continue;
     }
     const age = row.age;
     const displayAge = row.ageRange ?? String(row.age);
     if (!age || age < 5 || age > 80) {
-      result.errors.push({ row: row.rowNum, reason: `${row.fullName}: invalid age (${displayAge})`, data: rowData(row) });
+      result.errors.push({
+        row: row.rowNum,
+        reason: `${row.fullName}: invalid age (${displayAge})`,
+        data: rowData(row),
+      });
       continue;
     }
 
@@ -460,14 +480,23 @@ export async function importYouths(
     try {
       parishId = await ensureParish(maps, deaneryId, row.parish, result.createdParishes);
     } catch (e) {
-      result.errors.push({ row: row.rowNum, reason: `${row.fullName}: ${(e as Error).message}`, data: rowData(row) });
+      result.errors.push({
+        row: row.rowNum,
+        reason: `${row.fullName}: ${(e as Error).message}`,
+        data: rowData(row),
+      });
       continue;
     }
 
     let outstationId: string | null = null;
     if (row.outstation) {
       try {
-        outstationId = await ensureOutstation(maps, parishId, row.outstation, result.createdOutstations);
+        outstationId = await ensureOutstation(
+          maps,
+          parishId,
+          row.outstation,
+          result.createdOutstations,
+        );
       } catch (e) {
         result.errors.push({
           row: row.rowNum,
@@ -479,7 +508,11 @@ export async function importYouths(
 
     // ── Check for existing youth (per-row DB lookup — no snapshot limit) ────────
     const existingId = await findExistingYouth(
-      row.fullName, deaneryId, parishId, outstationId, row.phone || null,
+      row.fullName,
+      deaneryId,
+      parishId,
+      outstationId,
+      row.phone || null,
     );
 
     let youthId: string;
@@ -487,16 +520,16 @@ export async function importYouths(
     if (existingId) {
       // ── Update existing youth — fill in any new/missing details ─────────────
       const patch: Record<string, unknown> = {};
-      if (row.phone)       patch.phone         = row.phone.trim();
-      if (row.altPhone)    patch.alt_phone      = row.altPhone;
-      if (row.email)       patch.email          = row.email;
-      if (age > 0)         patch.age            = age;
-      if (row.ageRange)    patch.age_range      = row.ageRange;
-      if (VALID_GENDERS.has(row.gender))     patch.gender    = row.gender;
-      if (VALID_CATEGORIES.has(row.category)) patch.category  = row.category;
-      if (row.institution) patch.institution    = row.institution;
-      if (row.yearOfStudy) patch.year_of_study  = row.yearOfStudy;
-      if (row.notes)       patch.notes          = row.notes;
+      if (row.phone) patch.phone = row.phone.trim();
+      if (row.altPhone) patch.alt_phone = row.altPhone;
+      if (row.email) patch.email = row.email;
+      if (age > 0) patch.age = age;
+      if (row.ageRange) patch.age_range = row.ageRange;
+      if (VALID_GENDERS.has(row.gender)) patch.gender = row.gender;
+      if (VALID_CATEGORIES.has(row.category)) patch.category = row.category;
+      if (row.institution) patch.institution = row.institution;
+      if (row.yearOfStudy) patch.year_of_study = row.yearOfStudy;
+      if (row.notes) patch.notes = row.notes;
 
       if (Object.keys(patch).length > 0) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -512,26 +545,30 @@ export async function importYouths(
         const { data: youth, error: yErr } = await (supabase as any)
           .from("youths")
           .insert({
-            full_name:     row.fullName.trim(),
-            gender:        gender as "Female" | "Male",
+            full_name: row.fullName.trim(),
+            gender: gender as "Female" | "Male",
             age,
-            age_range:     row.ageRange || null,
-            phone:         row.phone.trim() || null,
-            alt_phone:     row.altPhone || null,
-            email:         row.email || null,
-            deanery_id:    deaneryId,
-            parish_id:     parishId,
+            age_range: row.ageRange || null,
+            phone: row.phone.trim() || null,
+            alt_phone: row.altPhone || null,
+            email: row.email || null,
+            deanery_id: deaneryId,
+            parish_id: parishId,
             outstation_id: outstationId,
-            category:      category as "Primary" | "Secondary" | "Tertiary" | "Working",
-            institution:   row.institution || null,
+            category: category as "Primary" | "Secondary" | "Tertiary" | "Working",
+            institution: row.institution || null,
             year_of_study: row.yearOfStudy || null,
-            notes:         row.notes || null,
+            notes: row.notes || null,
           })
           .select("id, cdm_id")
           .single();
 
         if (yErr) {
-          result.errors.push({ row: row.rowNum, reason: `${row.fullName}: ${yErr.message}`, data: rowData(row) });
+          result.errors.push({
+            row: row.rowNum,
+            reason: `${row.fullName}: ${yErr.message}`,
+            data: rowData(row),
+          });
           continue;
         }
 
@@ -542,9 +579,9 @@ export async function importYouths(
         if (category === "Tertiary" && row.institution.trim()) {
           try {
             await supabase.from("cusa_members").insert({
-              youth_id:      youthId,
-              institution:   row.institution.trim(),
-              course:        row.course || null,
+              youth_id: youthId,
+              institution: row.institution.trim(),
+              course: row.course || null,
               year_of_study: row.yearOfStudy || null,
             });
           } catch {
@@ -552,7 +589,11 @@ export async function importYouths(
           }
         }
       } catch (e) {
-        result.errors.push({ row: row.rowNum, reason: `${row.fullName}: ${(e as Error).message}`, data: rowData(row) });
+        result.errors.push({
+          row: row.rowNum,
+          reason: `${row.fullName}: ${(e as Error).message}`,
+          data: rowData(row),
+        });
         continue;
       }
     }
@@ -562,8 +603,8 @@ export async function importYouths(
       const roleName = (row as unknown as Record<string, string>)[colLabel]?.trim();
       if (!roleName || roleName === "-" || roleName === "—") continue;
       if (levelValue === "outstation" && !outstationId) continue;
-      if (levelValue === "deanery"    && !deaneryId)    continue;
-      if (levelValue === "parish"     && !parishId)     continue;
+      if (levelValue === "deanery" && !deaneryId) continue;
+      if (levelValue === "parish" && !parishId) continue;
 
       try {
         const roleId = await ensureRoleType(roleMap, roleName, result.createdRoleTypes);

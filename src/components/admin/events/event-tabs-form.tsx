@@ -5,7 +5,13 @@ import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -13,7 +19,12 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ORGANIZATION } from "@/lib/mock-data";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
-import { createEvent, updateEvent, saveEventProgram, saveEventDuties } from "@/lib/db/activities/events";
+import {
+  createEvent,
+  updateEvent,
+  saveEventProgram,
+  saveEventDuties,
+} from "@/lib/db/activities/events";
 import { fetchOrg } from "@/lib/db/org";
 import { useAdminScope } from "@/lib/hooks/use-admin-scope";
 import { YouthPicker } from "@/components/admin/composables/pickers/youth-picker";
@@ -89,11 +100,13 @@ export const MASS_DUTIES: DutyCategory[] = [
   {
     id: uid(),
     name: "Prayers of the Faithful",
-    duties: ["Church", "Country", "Families", "Youth & Vocations", "Sick", "Other needs"].map((label) => ({
-      id: uid(),
-      label,
-      assignments: [{ id: uid(), deanery: "", parish: "", name: "" }],
-    })),
+    duties: ["Church", "Country", "Families", "Youth & Vocations", "Sick", "Other needs"].map(
+      (label) => ({
+        id: uid(),
+        label,
+        assignments: [{ id: uid(), deanery: "", parish: "", name: "" }],
+      }),
+    ),
   },
   {
     id: uid(),
@@ -126,14 +139,14 @@ export function emptyEventState(): EventFormState {
       hasDuties: false,
       isMass: false,
     },
-    program: [
-      { id: uid(), startTime: "", endTime: "", activities: [{ id: uid(), name: "" }] },
-    ],
+    program: [{ id: uid(), startTime: "", endTime: "", activities: [{ id: uid(), name: "" }] }],
     duties: [
       {
         id: uid(),
         name: "",
-        duties: [{ id: uid(), label: "", assignments: [{ id: uid(), deanery: "", parish: "", name: "" }] }],
+        duties: [
+          { id: uid(), label: "", assignments: [{ id: uid(), deanery: "", parish: "", name: "" }] },
+        ],
       },
     ],
   };
@@ -143,7 +156,9 @@ function emptyCustomCategory(): DutyCategory {
   return {
     id: uid(),
     name: "",
-    duties: [{ id: uid(), label: "", assignments: [{ id: uid(), deanery: "", parish: "", name: "" }] }],
+    duties: [
+      { id: uid(), label: "", assignments: [{ id: uid(), deanery: "", parish: "", name: "" }] },
+    ],
   };
 }
 
@@ -210,7 +225,8 @@ export function EventTabsForm({
     venue: state.details.venue || null,
     description: state.details.description || null,
     posterUrl: state.details.posterUrl || null,
-    organizationLevel: (state.details.level || null) as "Diocese" | "Deanery" | "Parish" | "Outstation" | null,
+    organizationLevel: (state.details.level || null) as
+      "Diocese" | "Deanery" | "Parish" | "Outstation" | null,
     deaneryName: state.details.deanery || null,
     parishName: state.details.parish || null,
     openToAll: state.details.openToAll,
@@ -420,16 +436,34 @@ function DetailsTab({
   const scope = useAdminScope();
 
   const parishes =
-    details.deanery && org ? (org.parishesByDeaneryName.get(details.deanery) ?? []).map((p) => p.name) : [];
+    details.deanery && org
+      ? (org.parishesByDeaneryName.get(details.deanery) ?? []).map((p) => p.name)
+      : [];
   const dateValue = details.date ? new Date(details.date) : undefined;
 
   /* ── scope lock: hide deanery/parish once the caller's scope determines them ── */
-  const scopeDeaneryName = scope.deaneryId ? org?.deaneries.find((d) => d.id === scope.deaneryId)?.name : undefined;
-  const scopeParishName = scope.parishId ? org?.parishes.find((p) => p.id === scope.parishId)?.name : undefined;
-  const currentDeaneryId = details.deanery ? org?.byDeaneryName.get(details.deanery)?.id : undefined;
-  const currentParishId = details.parish ? org?.parishes.find((p) => p.name === details.parish)?.id : undefined;
-  const deaneryMismatched = !!(scope.deaneryId && currentDeaneryId && currentDeaneryId !== scope.deaneryId);
-  const parishMismatched = !!(scope.parishId && currentParishId && currentParishId !== scope.parishId);
+  const scopeDeaneryName = scope.deaneryId
+    ? org?.deaneries.find((d) => d.id === scope.deaneryId)?.name
+    : undefined;
+  const scopeParishName = scope.parishId
+    ? org?.parishes.find((p) => p.id === scope.parishId)?.name
+    : undefined;
+  const currentDeaneryId = details.deanery
+    ? org?.byDeaneryName.get(details.deanery)?.id
+    : undefined;
+  const currentParishId = details.parish
+    ? org?.parishes.find((p) => p.name === details.parish)?.id
+    : undefined;
+  const deaneryMismatched = !!(
+    scope.deaneryId &&
+    currentDeaneryId &&
+    currentDeaneryId !== scope.deaneryId
+  );
+  const parishMismatched = !!(
+    scope.parishId &&
+    currentParishId &&
+    currentParishId !== scope.parishId
+  );
   const deaneryLocked = !!scope.deaneryId && !deaneryMismatched;
   const parishLocked = !!scope.parishId && !parishMismatched;
 
@@ -443,7 +477,14 @@ function DetailsTab({
     }
     if (Object.keys(patch).length) onChange(patch);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deaneryLocked, parishLocked, scopeDeaneryName, scopeParishName, details.deanery, details.parish]);
+  }, [
+    deaneryLocked,
+    parishLocked,
+    scopeDeaneryName,
+    scopeParishName,
+    details.deanery,
+    details.parish,
+  ]);
 
   /* Level options — a scoped user can't create/edit an event above their own org tier */
   const baseLevels = scope.outstationId
@@ -454,7 +495,9 @@ function DetailsTab({
         ? ["Deanery", "Parish", "Outstation"]
         : ["Diocese", "Deanery", "Parish", "Outstation"];
   const levelOptions =
-    details.level && !baseLevels.includes(details.level) ? [details.level, ...baseLevels] : baseLevels;
+    details.level && !baseLevels.includes(details.level)
+      ? [details.level, ...baseLevels]
+      : baseLevels;
 
   return (
     <div className="grid gap-3 md:grid-cols-2">
@@ -616,7 +659,9 @@ function DetailsTab({
             className="mt-0.5 h-4 w-4 accent-danger"
           />
           <span>
-            <span className="block text-[11px] font-bold text-text-1">Open to all deaneries/parishes</span>
+            <span className="block text-[11px] font-bold text-text-1">
+              Open to all deaneries/parishes
+            </span>
             <span className="block text-[10px] text-text-3">
               Visible and open for registration to every scope, even outside its own deanery/parish
               — use this for a diocesan event hosted by one office that other reps still need to
@@ -637,7 +682,10 @@ function DetailsTab({
       </div>
       <div className="md:col-span-2">
         <FieldLabel label="Poster (shown on the Youth Portal)">
-          <PosterUpload value={details.posterUrl} onChange={(url) => onChange({ posterUrl: url })} />
+          <PosterUpload
+            value={details.posterUrl}
+            onChange={(url) => onChange({ posterUrl: url })}
+          />
         </FieldLabel>
       </div>
       <div className="md:col-span-2">
@@ -734,8 +782,8 @@ function ProgramTab({
   return (
     <div className="space-y-3">
       <p className="text-[11px] text-text-3">
-        Add a time (or time range) and one or more activities for that slot. Repeat for each
-        block of the program.
+        Add a time (or time range) and one or more activities for that slot. Repeat for each block
+        of the program.
       </p>
       {program.map((slot, idx) => (
         <div key={slot.id} className="rounded-lg border border-border bg-white p-3">
@@ -1078,7 +1126,8 @@ function DutiesTab({
                 <div className="space-y-1">
                   {duty.assignments.map((a) => {
                     const parishOpts =
-                      ORGANIZATION.find((d) => d.name === a.deanery)?.parishes.map((p) => p.name) ?? [];
+                      ORGANIZATION.find((d) => d.name === a.deanery)?.parishes.map((p) => p.name) ??
+                      [];
                     return (
                       <div key={a.id} className="flex items-center gap-1">
                         <Select
@@ -1092,7 +1141,9 @@ function DutiesTab({
                           </SelectTrigger>
                           <SelectContent>
                             {ORGANIZATION.map((d) => (
-                              <SelectItem key={d.code} value={d.name}>{d.name}</SelectItem>
+                              <SelectItem key={d.code} value={d.name}>
+                                {d.name}
+                              </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -1108,7 +1159,9 @@ function DutiesTab({
                           </SelectTrigger>
                           <SelectContent>
                             {parishOpts.map((p) => (
-                              <SelectItem key={p} value={p}>{p}</SelectItem>
+                              <SelectItem key={p} value={p}>
+                                {p}
+                              </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -1209,7 +1262,11 @@ function PosterUpload({ value, onChange }: { value: string; onChange: (url: stri
   return (
     <div className="flex items-center gap-3 rounded-lg border border-border bg-bg-2 p-2 normal-case tracking-normal">
       {value ? (
-        <img src={value} alt="Event poster" className="h-16 w-24 rounded-md border border-border object-cover" />
+        <img
+          src={value}
+          alt="Event poster"
+          className="h-16 w-24 rounded-md border border-border object-cover"
+        />
       ) : (
         <div className="flex h-16 w-24 items-center justify-center rounded-md border border-dashed border-border bg-bg-3 text-text-4">
           <Upload className="h-5 w-5" />
@@ -1217,9 +1274,19 @@ function PosterUpload({ value, onChange }: { value: string; onChange: (url: stri
       )}
       <div className="flex flex-1 flex-col gap-1.5">
         <label className="inline-flex w-fit cursor-pointer items-center gap-1.5 rounded-md border border-border bg-bg-3 px-2.5 py-1.5 text-[11px] font-bold text-text-1 hover:bg-bg-4">
-          {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+          {uploading ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Upload className="h-3.5 w-3.5" />
+          )}
           {uploading ? "Uploading…" : value ? "Replace poster" : "Upload poster"}
-          <input type="file" accept="image/*" className="hidden" onChange={handleUpload} disabled={uploading} />
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleUpload}
+            disabled={uploading}
+          />
         </label>
         {value && (
           <button

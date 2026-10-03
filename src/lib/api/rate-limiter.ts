@@ -19,9 +19,7 @@ const maybePrune = (now: number) => {
   }
 };
 
-export type RateLimitResult =
-  | { allowed: true }
-  | { allowed: false; retryAfter: number };
+export type RateLimitResult = { allowed: true } | { allowed: false; retryAfter: number };
 
 export function checkRateLimit(userId: string): RateLimitResult {
   const now = Date.now();

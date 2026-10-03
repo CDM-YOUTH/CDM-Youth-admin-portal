@@ -13,7 +13,10 @@ import {
   applyColumnFilter,
   type ColumnFilterValue,
 } from "@/components/admin/composables/tables/table-filters";
-import { YouthSearchInput, type PickedYouth } from "@/components/admin/composables/pickers/youth-search-input";
+import {
+  YouthSearchInput,
+  type PickedYouth,
+} from "@/components/admin/composables/pickers/youth-search-input";
 import { fetchOrg, type OrgTree } from "@/lib/db/org";
 import {
   Dialog,
@@ -23,7 +26,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { usePagination, TablePagination } from "@/components/admin/composables/tables/table-pagination";
+import {
+  usePagination,
+  TablePagination,
+} from "@/components/admin/composables/tables/table-pagination";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -63,7 +69,11 @@ export const Route = createFileRoute("/admin/mission")({
   head: () => ({
     meta: [
       { title: "Mission Week — CDM Youth Office" },
-      { name: "description", content: "Annual cross-parish youth reshuffle: nominations, automated pairing, and execution tracking." },
+      {
+        name: "description",
+        content:
+          "Annual cross-parish youth reshuffle: nominations, automated pairing, and execution tracking.",
+      },
     ],
   }),
   validateSearch: zodValidator(missionSearchSchema),
@@ -74,10 +84,12 @@ function MissionPage() {
   const qc = useQueryClient();
   const { year } = Route.useSearch();
   const navigate = useNavigate({ from: Route.fullPath });
-  const setYear = (y: number) =>
-    navigate({ search: () => ({ year: y }), replace: true });
+  const setYear = (y: number) => navigate({ search: () => ({ year: y }), replace: true });
   const { data: org } = useQuery({ queryKey: ["org"], queryFn: fetchOrg });
-  const { data: week } = useQuery({ queryKey: ["mission-week", year], queryFn: () => getOrCreateMissionWeek(year) });
+  const { data: week } = useQuery({
+    queryKey: ["mission-week", year],
+    queryFn: () => getOrCreateMissionWeek(year),
+  });
   const weekId = week?.id;
   const { data: nominees = [] } = useQuery({
     queryKey: ["mission-nominees", weekId],
@@ -113,17 +125,30 @@ function MissionPage() {
   const [fStatus, setFStatus] = useState<ColumnFilterValue | undefined>();
   const nominateMut = useMutation({
     mutationFn: (cdmId: string) => nominateYouth(weekId!, cdmId),
-    onSuccess: () => { toast.success("Nominee added"); setNominateOpen(false); invalidate(); },
-    onError: (e: Error) => { toast.error(e.message); },
+    onSuccess: () => {
+      toast.success("Nominee added");
+      setNominateOpen(false);
+      invalidate();
+    },
+    onError: (e: Error) => {
+      toast.error(e.message);
+    },
   });
   const removeMut = useMutation({
     mutationFn: removeNominee,
-    onSuccess: () => { toast.success("Nominee removed"); invalidate(); },
+    onSuccess: () => {
+      toast.success("Nominee removed");
+      invalidate();
+    },
     onError: (e: Error) => toast.error(e.message),
   });
   const reshuffleMut = useMutation({
     mutationFn: () => generatePairings(weekId!),
-    onSuccess: (n) => { toast.success(`Generated ${n} pairings`); setReshuffleOpen(false); invalidate(); },
+    onSuccess: (n) => {
+      toast.success(`Generated ${n} pairings`);
+      setReshuffleOpen(false);
+      invalidate();
+    },
     onError: (e: Error) => toast.error(e.message),
   });
   const importMut = useMutation({
@@ -131,19 +156,27 @@ function MissionPage() {
       let ok = 0;
       const errors: string[] = [];
       for (const cdm of cdmIds) {
-        try { await nominateYouth(weekId!, cdm); ok++; } catch (e) { errors.push(`${cdm}: ${(e as Error).message}`); }
+        try {
+          await nominateYouth(weekId!, cdm);
+          ok++;
+        } catch (e) {
+          errors.push(`${cdm}: ${(e as Error).message}`);
+        }
       }
       return { ok, errors };
     },
     onSuccess: ({ ok, errors }) => {
       if (ok) toast.success(`Imported ${ok} nominee${ok === 1 ? "" : "s"}`);
-      if (errors.length) toast.error(`${errors.length} failed: ${errors.slice(0, 3).join("; ")}${errors.length > 3 ? "…" : ""}`);
+      if (errors.length)
+        toast.error(
+          `${errors.length} failed: ${errors.slice(0, 3).join("; ")}${errors.length > 3 ? "…" : ""}`,
+        );
       invalidate();
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
-const pairingByYouth = useMemo(() => {
+  const pairingByYouth = useMemo(() => {
     const m = new Map<string, (typeof pairings)[number]>();
     pairings.forEach((p) => m.set(p.youth_id, p));
     return m;
@@ -173,7 +206,8 @@ const pairingByYouth = useMemo(() => {
           !r.cdmId.toLowerCase().includes(q) &&
           !r.sourceParish.toLowerCase().includes(q) &&
           !r.hostParish.toLowerCase().includes(q)
-        ) return false;
+        )
+          return false;
       }
       if (!applyColumnFilter(r.name, fName)) return false;
       if (!applyColumnFilter(r.sourceParish, fSourceParish)) return false;
@@ -187,10 +221,24 @@ const pairingByYouth = useMemo(() => {
   const rowPagination = usePagination(filteredRows, 10);
 
   const handleExport = () => {
-    const headers = ["CDM No.", "Name", "Source Parish", "Source Deanery", "Sent To Parish", "Sent To Deanery", "Status"];
+    const headers = [
+      "CDM No.",
+      "Name",
+      "Source Parish",
+      "Source Deanery",
+      "Sent To Parish",
+      "Sent To Deanery",
+      "Status",
+    ];
     const escape = (v: string) => `"${v.replace(/"/g, '""')}"`;
     const csv = [headers.join(",")]
-      .concat(rows.map((r) => [r.cdmId, r.name, r.sourceParish, r.sourceDeanery, r.hostParish, r.hostDeanery, r.status].map(escape).join(",")))
+      .concat(
+        rows.map((r) =>
+          [r.cdmId, r.name, r.sourceParish, r.sourceDeanery, r.hostParish, r.hostDeanery, r.status]
+            .map(escape)
+            .join(","),
+        ),
+      )
       .join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -204,13 +252,28 @@ const pairingByYouth = useMemo(() => {
 
   const handleImportFile = async (file: File) => {
     const text = await file.text();
-    const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-    if (!lines.length) { toast.error("Empty file"); return; }
+    const lines = text
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+    if (!lines.length) {
+      toast.error("Empty file");
+      return;
+    }
     const header = lines[0].split(",").map((h) => h.trim().replace(/^"|"$/g, "").toLowerCase());
     const cdmIdx = header.findIndex((h) => /cdm/.test(h));
-    if (cdmIdx === -1) { toast.error("CSV must include a 'CDM No.' column"); return; }
-    const cdmIds = lines.slice(1).map((l) => (l.split(",")[cdmIdx] ?? "").trim().replace(/^"|"$/g, "")).filter(Boolean);
-    if (!cdmIds.length) { toast.error("No CDM numbers found"); return; }
+    if (cdmIdx === -1) {
+      toast.error("CSV must include a 'CDM No.' column");
+      return;
+    }
+    const cdmIds = lines
+      .slice(1)
+      .map((l) => (l.split(",")[cdmIdx] ?? "").trim().replace(/^"|"$/g, ""))
+      .filter(Boolean);
+    if (!cdmIds.length) {
+      toast.error("No CDM numbers found");
+      return;
+    }
     importMut.mutate(cdmIds);
   };
 
@@ -218,7 +281,10 @@ const pairingByYouth = useMemo(() => {
     <>
       <Topbar
         title={`Mission Week ${week?.year ?? year}`}
-        description={week?.theme ?? "Annual cross-parish youth exchange. Add nominees, then run the reshuffle to auto-pair them with host parishes."}
+        description={
+          week?.theme ??
+          "Annual cross-parish youth exchange. Add nominees, then run the reshuffle to auto-pair them with host parishes."
+        }
         action={
           <>
             <select
@@ -228,7 +294,9 @@ const pairingByYouth = useMemo(() => {
               className="h-8 rounded-md border border-border bg-bg-2 px-2.5 text-[11px] font-semibold text-text-1 outline-none transition hover:border-gold-3 focus:border-gold-3"
             >
               {AVAILABLE_YEARS.map((y) => (
-                <option key={y} value={y}>{y}</option>
+                <option key={y} value={y}>
+                  {y}
+                </option>
               ))}
             </select>
             <button
@@ -243,18 +311,38 @@ const pairingByYouth = useMemo(() => {
               disabled={reshuffleMut.isPending}
               className="inline-flex h-8 items-center gap-1.5 rounded-md bg-danger px-3 text-[11px] font-bold text-white transition hover:opacity-90 disabled:opacity-50"
             >
-              <Shuffle className="h-3.5 w-3.5" /> {reshuffleMut.isPending ? "Reshuffling…" : "Run Reshuffle"}
+              <Shuffle className="h-3.5 w-3.5" />{" "}
+              {reshuffleMut.isPending ? "Reshuffling…" : "Run Reshuffle"}
             </button>
           </>
         }
       />
       <div className="flex-1 overflow-y-auto px-5 py-4">
-
         <div className="mb-4 grid grid-cols-1 gap-2.5 sm:grid-cols-4">
-          <Kpi label="Nominees" value={String(analytics?.nominees ?? 0)} trend={`${nominees.length} loaded`} tone="up" />
-          <Kpi label="Parishes" value={String(analytics?.parishes ?? 0)} trend="diocese-wide" tone="up" />
-          <Kpi label="Reshuffle Pairs" value={String(analytics?.pairs ?? 0)} trend={pairings.length ? "generated" : "run reshuffle"} tone="info" />
-          <Kpi label="Reports In" value={String(analytics?.reports ?? 0)} trend={`of ${pairings.length} pairs`} tone="warn" />
+          <Kpi
+            label="Nominees"
+            value={String(analytics?.nominees ?? 0)}
+            trend={`${nominees.length} loaded`}
+            tone="up"
+          />
+          <Kpi
+            label="Parishes"
+            value={String(analytics?.parishes ?? 0)}
+            trend="diocese-wide"
+            tone="up"
+          />
+          <Kpi
+            label="Reshuffle Pairs"
+            value={String(analytics?.pairs ?? 0)}
+            trend={pairings.length ? "generated" : "run reshuffle"}
+            tone="info"
+          />
+          <Kpi
+            label="Reports In"
+            value={String(analytics?.reports ?? 0)}
+            trend={`of ${pairings.length} pairs`}
+            tone="warn"
+          />
         </div>
 
         <Card>
@@ -321,20 +409,53 @@ const pairingByYouth = useMemo(() => {
                 <tr className="border-b border-border">
                   <th className="label-eyebrow px-3.5 py-2.5 text-left">CDM No.</th>
                   <th className="label-eyebrow px-3.5 py-2.5 text-left">
-                    <ColumnHeader label="Name" filter={<ColumnFilter label="Name" value={fName} onChange={setFName} />} />
+                    <ColumnHeader
+                      label="Name"
+                      filter={<ColumnFilter label="Name" value={fName} onChange={setFName} />}
+                    />
                   </th>
                   <th className="label-eyebrow px-3.5 py-2.5 text-left">
-                    <ColumnHeader label="Source Parish" filter={<ColumnFilter label="Source Parish" value={fSourceParish} onChange={setFSourceParish} />} />
+                    <ColumnHeader
+                      label="Source Parish"
+                      filter={
+                        <ColumnFilter
+                          label="Source Parish"
+                          value={fSourceParish}
+                          onChange={setFSourceParish}
+                        />
+                      }
+                    />
                   </th>
                   <th className="label-eyebrow px-3.5 py-2.5 text-left">
-                    <ColumnHeader label="Source Deanery" filter={<ColumnFilter label="Source Deanery" value={fSourceDeanery} onChange={setFSourceDeanery} />} />
+                    <ColumnHeader
+                      label="Source Deanery"
+                      filter={
+                        <ColumnFilter
+                          label="Source Deanery"
+                          value={fSourceDeanery}
+                          onChange={setFSourceDeanery}
+                        />
+                      }
+                    />
                   </th>
                   <th className="label-eyebrow px-3.5 py-2.5 text-left">
-                    <ColumnHeader label="Sent To Parish" filter={<ColumnFilter label="Sent To Parish" value={fHostParish} onChange={setFHostParish} />} />
+                    <ColumnHeader
+                      label="Sent To Parish"
+                      filter={
+                        <ColumnFilter
+                          label="Sent To Parish"
+                          value={fHostParish}
+                          onChange={setFHostParish}
+                        />
+                      }
+                    />
                   </th>
                   <th className="label-eyebrow px-3.5 py-2.5 text-left">Sent To Deanery</th>
                   <th className="label-eyebrow px-3.5 py-2.5 text-left">
-                    <ColumnHeader label="Status" filter={<ColumnFilter label="Status" value={fStatus} onChange={setFStatus} />} />
+                    <ColumnHeader
+                      label="Status"
+                      filter={<ColumnFilter label="Status" value={fStatus} onChange={setFStatus} />}
+                    />
                   </th>
                   <th className="label-eyebrow px-3.5 py-2.5 text-right">Actions</th>
                 </tr>
@@ -342,8 +463,12 @@ const pairingByYouth = useMemo(() => {
               <tbody>
                 {rowPagination.pageRows.map((r) => (
                   <tr key={r.id} className="border-b border-border/30 last:border-0 hover:bg-bg-3">
-                    <td className="px-3.5 py-2.5 font-mono text-[10px] font-bold text-gold">{r.cdmId}</td>
-                    <td className="px-3.5 py-2.5 text-[11px] font-semibold text-foreground">{titleCase(r.name)}</td>
+                    <td className="px-3.5 py-2.5 font-mono text-[10px] font-bold text-gold">
+                      {r.cdmId}
+                    </td>
+                    <td className="px-3.5 py-2.5 text-[11px] font-semibold text-foreground">
+                      {titleCase(r.name)}
+                    </td>
                     <td className="px-3.5 py-2.5 text-[11px] text-text-1">{r.sourceParish}</td>
                     <td className="px-3.5 py-2.5 text-[11px] text-text-2">{r.sourceDeanery}</td>
                     <td className="px-3.5 py-2.5 text-[11px] text-text-1">{r.hostParish}</td>
@@ -410,7 +535,8 @@ const pairingByYouth = useMemo(() => {
           <AlertDialogHeader>
             <AlertDialogTitle>Remove nominee?</AlertDialogTitle>
             <AlertDialogDescription>
-              <strong>{removeTarget?.name}</strong> will be removed from Mission Week. Their pairing (if any) is also cleared.
+              <strong>{removeTarget?.name}</strong> will be removed from Mission Week. Their pairing
+              (if any) is also cleared.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -431,7 +557,9 @@ const pairingByYouth = useMemo(() => {
           <AlertDialogHeader>
             <AlertDialogTitle>Run reshuffle?</AlertDialogTitle>
             <AlertDialogDescription>
-              This clears any existing pairings for Mission Week {week?.year ?? year} and randomly assigns each of the {nominees.length} nominee{nominees.length === 1 ? "" : "s"} to a host parish outside their own. Are you sure?
+              This clears any existing pairings for Mission Week {week?.year ?? year} and randomly
+              assigns each of the {nominees.length} nominee{nominees.length === 1 ? "" : "s"} to a
+              host parish outside their own. Are you sure?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -483,7 +611,8 @@ function NominateDialog({
             Nominate Missionary
           </DialogTitle>
           <DialogDescription className="text-[12px] text-text-3">
-            Find by CDM No. or browse by location. Name, phone, parish and deanery are filled automatically.
+            Find by CDM No. or browse by location. Name, phone, parish and deanery are filled
+            automatically.
           </DialogDescription>
         </DialogHeader>
 
@@ -503,7 +632,10 @@ function NominateDialog({
           <button
             type="button"
             onClick={() => {
-              if (!youth) { toast.error("Select a youth first"); return; }
+              if (!youth) {
+                toast.error("Select a youth first");
+                return;
+              }
               onSubmit(youth.cdm_id);
             }}
             disabled={isPending}

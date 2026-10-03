@@ -3,7 +3,14 @@ import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Topbar, TopbarButton } from "@/components/admin/layout/topbar";
-import { Card, CardBody, CardHead, Kpi, PageHeader, Pill } from "@/components/admin/composables/ui-bits";
+import {
+  Card,
+  CardBody,
+  CardHead,
+  Kpi,
+  PageHeader,
+  Pill,
+} from "@/components/admin/composables/ui-bits";
 import {
   EventTabsForm,
   emptyEventState,
@@ -115,7 +122,11 @@ function EventDetailPage() {
   const { eventId } = Route.useParams();
   const qc = useQueryClient();
 
-  const { data: event, isLoading, error } = useQuery({
+  const {
+    data: event,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ["event-full", eventId],
     queryFn: () => getEventFull(eventId),
   });
@@ -179,16 +190,30 @@ function EventDetailPage() {
       <div className="flex-1 overflow-y-auto px-5 py-4">
         <PageHeader
           title={event.name}
-          description={[event.event_date, event.venue, event.parish?.name ?? event.deanery?.name ?? "Diocese-wide"]
+          description={[
+            event.event_date,
+            event.venue,
+            event.parish?.name ?? event.deanery?.name ?? "Diocese-wide",
+          ]
             .filter(Boolean)
             .join(" · ")}
         />
 
         <div className="mb-4 grid grid-cols-1 gap-2.5 sm:grid-cols-4">
-          <Kpi label="Registrations" value={String(registrationCount)} trend="total registered" tone="info" />
+          <Kpi
+            label="Registrations"
+            value={String(registrationCount)}
+            trend="total registered"
+            tone="info"
+          />
           <Kpi label="Members" value={String(memberCount)} trend="CDM youth" tone="up" />
           <Kpi label="Guests" value={String(guestCount)} trend="walk-in / external" tone="warn" />
-          <Kpi label="Check-ins" value={String(event.checkin_count)} trend="confirmed on day" tone="up" />
+          <Kpi
+            label="Check-ins"
+            value={String(event.checkin_count)}
+            trend="confirmed on day"
+            tone="up"
+          />
         </div>
 
         {mode === "edit" ? (
@@ -230,9 +255,10 @@ function EventDetailPage() {
                   {event.organization_level !== "Diocese" && (
                     <ReadField label="Deanery" value={event.deanery?.name ?? "—"} />
                   )}
-                  {event.organization_level !== "Diocese" && event.organization_level !== "Deanery" && (
-                    <ReadField label="Parish" value={event.parish?.name ?? "—"} />
-                  )}
+                  {event.organization_level !== "Diocese" &&
+                    event.organization_level !== "Deanery" && (
+                      <ReadField label="Parish" value={event.parish?.name ?? "—"} />
+                    )}
                   {event.open_to_all && (
                     <ReadField label="Visibility" value="Open to all deaneries/parishes" />
                   )}
@@ -246,7 +272,10 @@ function EventDetailPage() {
 
               {/* Program — image if poster uploaded, otherwise structured slots */}
               <Card>
-                <CardHead title="Program" subtitle={event.poster_url ? "Event program" : "Time slots and activities"} />
+                <CardHead
+                  title="Program"
+                  subtitle={event.poster_url ? "Event program" : "Time slots and activities"}
+                />
                 {event.poster_url ? (
                   <CardBody className="p-2">
                     <img
@@ -294,14 +323,20 @@ function EventDetailPage() {
                           {[...cat.duties]
                             .sort((a, b) => a.position - b.position)
                             .map((duty) => (
-                              <div key={duty.id} className="rounded-md border border-border bg-bg-2 px-2.5 py-1.5">
-                                <div className="text-[10px] font-semibold text-danger">{duty.title}</div>
+                              <div
+                                key={duty.id}
+                                className="rounded-md border border-border bg-bg-2 px-2.5 py-1.5"
+                              >
+                                <div className="text-[10px] font-semibold text-danger">
+                                  {duty.title}
+                                </div>
                                 {duty.assignees.map((a) => (
                                   <div key={a.id} className="mt-0.5 text-[10px] text-text-2">
                                     {a.name}
                                     {(a.parish?.name || a.deanery?.name) && (
                                       <span className="text-text-4">
-                                        {" "}· {a.parish?.name ?? a.deanery?.name}
+                                        {" "}
+                                        · {a.parish?.name ?? a.deanery?.name}
                                       </span>
                                     )}
                                   </div>
@@ -314,7 +349,6 @@ function EventDetailPage() {
                 </CardBody>
               </Card>
             )}
-
           </>
         )}
       </div>

@@ -45,7 +45,11 @@ function PortalLayout() {
         <Link to="/portal" className="flex items-center gap-2">
           <span className="text-[16px] font-extrabold text-danger">Diocese of Murang'a</span>
         </Link>
-        <img src={cdmLogo} alt="CDM" className="h-9 w-9 rounded-full object-cover ring-2 ring-gold/40" />
+        <img
+          src={cdmLogo}
+          alt="CDM"
+          className="h-9 w-9 rounded-full object-cover ring-2 ring-gold/40"
+        />
       </header>
 
       {/* Page content */}
@@ -58,7 +62,11 @@ function PortalLayout() {
         <nav className="fixed inset-x-0 bottom-0 z-20 mx-auto flex max-w-md items-stretch justify-around border-t border-border bg-white/95 px-3 py-2 backdrop-blur">
           <NavItem to="/portal" exact icon={<Home className="h-5 w-5" />} label="Home" />
           <NavItem to="/portal/events" icon={<Calendar className="h-5 w-5" />} label="Events" />
-          <NavItem to="/portal/formation" icon={<GraduationCap className="h-5 w-5" />} label="Formation" />
+          <NavItem
+            to="/portal/formation"
+            icon={<GraduationCap className="h-5 w-5" />}
+            label="Formation"
+          />
           <NavItem
             to={signedIn ? "/portal/account" : "/portal/auth"}
             icon={<User className="h-5 w-5" />}

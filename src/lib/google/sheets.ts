@@ -1,8 +1,15 @@
 import { google } from "googleapis";
 
 const HEADERS = [
-  "CDM No.", "Full Name", "Gender", "Age", "Phone",
-  "Deanery", "Parish", "Category", "Check-in Time",
+  "CDM No.",
+  "Full Name",
+  "Gender",
+  "Age",
+  "Phone",
+  "Deanery",
+  "Parish",
+  "Category",
+  "Check-in Time",
 ];
 
 export type LeadershipSheetRow = {
@@ -61,17 +68,19 @@ export async function appendLeadershipWorkshopRow(row: LeadershipSheetRow): Prom
     range: "Sheet1!A:I",
     valueInputOption: "USER_ENTERED",
     requestBody: {
-      values: [[
-        row.cdmId ?? "—",
-        row.fullName,
-        row.gender ?? "",
-        row.age ?? "",
-        row.phone ?? "",
-        row.deanery ?? "",
-        row.parish ?? "",
-        row.category ?? "",
-        row.checkinTime,
-      ]],
+      values: [
+        [
+          row.cdmId ?? "—",
+          row.fullName,
+          row.gender ?? "",
+          row.age ?? "",
+          row.phone ?? "",
+          row.deanery ?? "",
+          row.parish ?? "",
+          row.category ?? "",
+          row.checkinTime,
+        ],
+      ],
     },
   });
 }

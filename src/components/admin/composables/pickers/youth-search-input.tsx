@@ -25,16 +25,16 @@ const SEL =
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function map(y: any): PickedYouth {
   return {
-    id:              y.id,
-    full_name:       y.full_name,
-    cdm_id:          y.cdm_id,
-    phone:           y.phone           ?? null,
-    email:           y.email           ?? null,
-    deanery_id:      y.deanery_id      ?? null,
-    parish_id:       y.parish_id       ?? null,
-    outstation_id:   y.outstation_id   ?? null,
-    deanery_name:    y.deanery?.name   ?? "",
-    parish_name:     y.parish?.name    ?? "",
+    id: y.id,
+    full_name: y.full_name,
+    cdm_id: y.cdm_id,
+    phone: y.phone ?? null,
+    email: y.email ?? null,
+    deanery_id: y.deanery_id ?? null,
+    parish_id: y.parish_id ?? null,
+    outstation_id: y.outstation_id ?? null,
+    deanery_name: y.deanery?.name ?? "",
+    parish_name: y.parish?.name ?? "",
     outstation_name: y.outstation?.name ?? "",
   };
 }
@@ -43,13 +43,7 @@ const selCls =
   "h-8 flex-1 min-w-[110px] rounded-md border border-border bg-bg-2 px-2 text-[11px] font-semibold text-text-1 outline-none focus:border-gold-3 disabled:opacity-50";
 
 /** Selected-youth card — reused in both picked state and CDM preview */
-function YouthCard({
-  youth,
-  action,
-}: {
-  youth: PickedYouth;
-  action: React.ReactNode;
-}) {
+function YouthCard({ youth, action }: { youth: PickedYouth; action: React.ReactNode }) {
   return (
     <div className="space-y-1 rounded-lg border border-border bg-bg-2 p-3">
       <div className="text-[12px] font-bold text-text-1">{youth.full_name}</div>
@@ -57,7 +51,9 @@ function YouthCard({
       {youth.phone && <div className="font-mono text-[10px] text-text-3">{youth.phone}</div>}
       {(youth.parish_name || youth.deanery_name) && (
         <div className="text-[10px] text-text-3">
-          {[youth.outstation_name, youth.parish_name, youth.deanery_name].filter(Boolean).join(" · ")}
+          {[youth.outstation_name, youth.parish_name, youth.deanery_name]
+            .filter(Boolean)
+            .join(" · ")}
         </div>
       )}
       <div className="pt-0.5">{action}</div>
@@ -96,21 +92,21 @@ export function YouthSearchInput({
     (!!scope.deaneryId && y.deanery_id !== scope.deaneryId);
 
   // CDM mode
-  const [cdmInput,   setCdmInput]   = useState("");
+  const [cdmInput, setCdmInput] = useState("");
   const [cdmPreview, setCdmPreview] = useState<PickedYouth | null>(null);
-  const [cdmError,   setCdmError]   = useState("");
-  const [cdmBusy,    setCdmBusy]    = useState(false);
+  const [cdmError, setCdmError] = useState("");
+  const [cdmBusy, setCdmBusy] = useState(false);
 
   // Browse mode
-  const [bDeanery,    setBDeanery]    = useState("");
-  const [bParish,     setBParish]     = useState("");
+  const [bDeanery, setBDeanery] = useState("");
+  const [bParish, setBParish] = useState("");
   const [bOutstation, setBOutstation] = useState("");
-  const [bSearch,     setBSearch]     = useState("");
-  const [bResults,    setBResults]    = useState<PickedYouth[]>([]);
+  const [bSearch, setBSearch] = useState("");
+  const [bResults, setBResults] = useState<PickedYouth[]>([]);
 
   // Derived location options from org tree
   const deaneries = org?.deaneries ?? [];
-  const parishes  = useMemo(() => {
+  const parishes = useMemo(() => {
     if (!org) return [];
     return bDeanery ? (org.parishesByDeaneryName.get(bDeanery) ?? []) : org.parishes;
   }, [org, bDeanery]);
@@ -144,9 +140,16 @@ export function YouthSearchInput({
     setCdmPreview(null);
     setCdmError("");
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data } = await (supabase as any).from("youths").select(SEL).eq("cdm_id", cdm).maybeSingle();
+    const { data } = await (supabase as any)
+      .from("youths")
+      .select(SEL)
+      .eq("cdm_id", cdm)
+      .maybeSingle();
     setCdmBusy(false);
-    if (!data) { setCdmError(`No youth found with CDM No. "${cdm}"`); return; }
+    if (!data) {
+      setCdmError(`No youth found with CDM No. "${cdm}"`);
+      return;
+    }
     const picked = map(data);
     if (isOutsideScope(picked)) {
       setCdmError(`${picked.full_name} is outside your assigned scope.`);
@@ -158,7 +161,10 @@ export function YouthSearchInput({
   // Browse search — debounced, filtered by org unit IDs
   useEffect(() => {
     const term = bSearch.trim();
-    if (term.length < 2) { setBResults([]); return; }
+    if (term.length < 2) {
+      setBResults([]);
+      return;
+    }
     let cancelled = false;
     const handle = setTimeout(async () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -182,12 +188,21 @@ export function YouthSearchInput({
       const { data } = await q;
       if (!cancelled) setBResults((data ?? []).map(map));
     }, 300);
-    return () => { cancelled = true; clearTimeout(handle); };
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
   }, [bSearch, bDeanery, bParish, bOutstation, org]);
 
   const reset = () => {
-    setCdmInput(""); setCdmPreview(null); setCdmError("");
-    setBDeanery(""); setBParish(""); setBOutstation(""); setBSearch(""); setBResults([]);
+    setCdmInput("");
+    setCdmPreview(null);
+    setCdmError("");
+    setBDeanery("");
+    setBParish("");
+    setBOutstation("");
+    setBSearch("");
+    setBResults([]);
   };
 
   // Selected state — show read-only card
@@ -200,13 +215,18 @@ export function YouthSearchInput({
           {value.phone && <div className="font-mono text-[10px] text-text-3">{value.phone}</div>}
           {(value.deanery_name || value.parish_name || value.outstation_name) && (
             <div className="text-[10px] text-text-3">
-              {[value.deanery_name, value.parish_name, value.outstation_name].filter(Boolean).join(" · ")}
+              {[value.deanery_name, value.parish_name, value.outstation_name]
+                .filter(Boolean)
+                .join(" · ")}
             </div>
           )}
         </div>
         <button
           type="button"
-          onClick={() => { onChange(null); reset(); }}
+          onClick={() => {
+            onChange(null);
+            reset();
+          }}
           className="ml-2 text-text-3 hover:text-danger"
         >
           <X className="h-3.5 w-3.5" />
@@ -223,11 +243,12 @@ export function YouthSearchInput({
           <button
             key={m}
             type="button"
-            onClick={() => { setMode(m); reset(); }}
+            onClick={() => {
+              setMode(m);
+              reset();
+            }}
             className={`flex-1 rounded-md py-1.5 text-[11px] font-bold transition ${
-              mode === m
-                ? "bg-white text-text-1 shadow-sm"
-                : "text-text-3 hover:text-text-2"
+              mode === m ? "bg-white text-text-1 shadow-sm" : "text-text-3 hover:text-text-2"
             }`}
           >
             {m === "cdm" ? "By CDM No." : "Browse by location"}
@@ -241,7 +262,11 @@ export function YouthSearchInput({
           <div className="flex gap-2">
             <Input
               value={cdmInput}
-              onChange={(e) => { setCdmInput(e.target.value); setCdmPreview(null); setCdmError(""); }}
+              onChange={(e) => {
+                setCdmInput(e.target.value);
+                setCdmPreview(null);
+                setCdmError("");
+              }}
               onKeyDown={(e) => e.key === "Enter" && lookupCdm()}
               placeholder="CDM-2026-00001"
               className="flex-1 font-mono"
@@ -276,7 +301,10 @@ export function YouthSearchInput({
               action={
                 <button
                   type="button"
-                  onClick={() => { onChange(cdmPreview); reset(); }}
+                  onClick={() => {
+                    onChange(cdmPreview);
+                    reset();
+                  }}
                   className="inline-flex h-7 items-center gap-1.5 rounded-md bg-primary px-3 text-[11px] font-bold text-primary-foreground hover:opacity-90"
                 >
                   Select
@@ -294,22 +322,37 @@ export function YouthSearchInput({
             {!deaneryLocked && (
               <select
                 value={bDeanery}
-                onChange={(e) => { setBDeanery(e.target.value); setBParish(""); setBOutstation(""); }}
+                onChange={(e) => {
+                  setBDeanery(e.target.value);
+                  setBParish("");
+                  setBOutstation("");
+                }}
                 className={selCls}
               >
                 <option value="">All Deaneries</option>
-                {deaneries.map((d) => <option key={d.id} value={d.name}>{d.name}</option>)}
+                {deaneries.map((d) => (
+                  <option key={d.id} value={d.name}>
+                    {d.name}
+                  </option>
+                ))}
               </select>
             )}
             {!parishLocked && (
               <select
                 value={bParish}
-                onChange={(e) => { setBParish(e.target.value); setBOutstation(""); }}
+                onChange={(e) => {
+                  setBParish(e.target.value);
+                  setBOutstation("");
+                }}
                 className={selCls}
                 disabled={parishes.length === 0}
               >
                 <option value="">All Parishes</option>
-                {parishes.map((p) => <option key={p.id} value={p.name}>{p.name}</option>)}
+                {parishes.map((p) => (
+                  <option key={p.id} value={p.name}>
+                    {p.name}
+                  </option>
+                ))}
               </select>
             )}
             {!outstationLocked && (
@@ -320,7 +363,11 @@ export function YouthSearchInput({
                 disabled={outstations.length === 0}
               >
                 <option value="">All Outstations</option>
-                {outstations.map((o) => <option key={o.id} value={o.name}>{o.name}</option>)}
+                {outstations.map((o) => (
+                  <option key={o.id} value={o.name}>
+                    {o.name}
+                  </option>
+                ))}
               </select>
             )}
           </div>
@@ -339,7 +386,7 @@ export function YouthSearchInput({
             {bSearch.trim().length < 2 ? (
               <p className="p-3 text-center text-[11px] text-text-3">
                 Type a name or CDM No. to search
-                {(bDeanery || bParish) ? " within the selected location" : ""}.
+                {bDeanery || bParish ? " within the selected location" : ""}.
               </p>
             ) : bResults.length === 0 ? (
               <div className="space-y-1.5 p-3 text-center">
@@ -370,8 +417,13 @@ export function YouthSearchInput({
                   </div>
                   <div className="flex gap-2 text-[10px] text-text-3">
                     {y.phone && <span className="font-mono">{y.phone}</span>}
-                    {[y.outstation_name, y.parish_name, y.deanery_name].filter(Boolean).length > 0 && (
-                      <span>{[y.outstation_name, y.parish_name, y.deanery_name].filter(Boolean).join(" · ")}</span>
+                    {[y.outstation_name, y.parish_name, y.deanery_name].filter(Boolean).length >
+                      0 && (
+                      <span>
+                        {[y.outstation_name, y.parish_name, y.deanery_name]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </span>
                     )}
                   </div>
                 </button>

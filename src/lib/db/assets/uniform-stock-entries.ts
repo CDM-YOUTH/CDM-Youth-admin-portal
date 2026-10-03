@@ -3,93 +3,123 @@ import { supabase } from "@/integrations/supabase/client";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const db = supabase as any;
 
-export type ProductionActivity = "sewing" | "logo" | "branding";
+export type UniformActivity = {
+  id: string;
+  name: string;
+  description: string | null;
+  activity_type: "in" | "out";
+  created_at: string;
+};
 
 export type StockEntry = {
   id: string;
-  sku_id: string | null;
+  item_id: string | null;
   item_name: string;
+  activity_id: string | null;
+  activity_name: string;
   quantity: number;
-  notes: string | null;
-  activity: ProductionActivity;
-  entered_at: string;
+  description: string | null;
   created_at: string;
 };
 
 export type StockEntryInput = {
   itemName: string;
+  activityName: string;
   quantity: number;
-  activity?: ProductionActivity;
-  notes?: string | null;
-  enteredAt?: string | null;
+  description?: string | null;
 };
+
+export async function listUniformActivities(): Promise<UniformActivity[]> {
+  const { data, error } = await db.from("uniform_activities").select("*").order("name");
+  if (error) throw error;
+  return (data ?? []) as UniformActivity[];
+}
 
 export async function listStockEntries(limit = 300): Promise<StockEntry[]> {
   const { data, error } = await db
     .from("uniform_stock_entries")
-    .select("*")
-    .order("entered_at", { ascending: false })
+    .select(
+      `
+      id,
+      item_id,
+      quantity,
+      description,
+      created_at,
+      item:uniform_items(name),
+      activity:uniform_activities(name)
+    `,
+    )
+    .order("created_at", { ascending: false })
     .limit(limit);
   if (error) throw error;
-  return (data ?? []) as StockEntry[];
+  return (data ?? []).map((e: any) => ({
+    id: e.id,
+    item_id: e.item_id,
+    item_name: e.item?.name ?? "Unknown",
+    activity_id: null,
+    activity_name: e.activity?.name ?? "Unknown",
+    quantity: e.quantity,
+    description: e.description,
+    created_at: e.created_at,
+  }));
 }
 
 export async function createStockEntry(input: StockEntryInput): Promise<StockEntry> {
-  const activity = input.activity ?? "sewing";
-  let skuId: string | null = null;
+  let itemId: string | null = null;
   if (input.itemName) {
-    const { data: sku } = await db
-      .from("uniform_skus")
-      .select("id, in_stock")
+    const { data: item } = await db
+      .from("uniform_items")
+      .select("id")
       .eq("name", input.itemName)
       .maybeSingle();
-    if (sku) {
-      skuId = (sku as { id: string; in_stock: number }).id;
-      // Only a sewing entry represents newly produced stock — logo/branding
-      // are finishing steps applied to units already counted, so they must
-      // not add to in_stock again (that would double-count the same units).
-      if (activity === "sewing") {
-        await db
-          .from("uniform_skus")
-          .update({ in_stock: (sku as { id: string; in_stock: number }).in_stock + input.quantity })
-          .eq("id", skuId);
-      }
-    }
+    itemId = (item as { id: string } | null)?.id ?? null;
+  }
+
+  let activityId: string | null = null;
+  if (input.activityName) {
+    const { data: activity } = await db
+      .from("uniform_activities")
+      .select("id")
+      .eq("name", input.activityName)
+      .maybeSingle();
+    activityId = (activity as { id: string } | null)?.id ?? null;
   }
 
   const { data, error } = await db
     .from("uniform_stock_entries")
     .insert({
-      sku_id:     skuId,
-      item_name:  input.itemName,
-      quantity:   input.quantity,
-      activity,
-      notes:      input.notes     ?? null,
-      entered_at: input.enteredAt ?? new Date().toISOString(),
+      item_id: itemId,
+      activity_id: activityId,
+      quantity: input.quantity,
+      description: input.description ?? null,
     })
-    .select()
+    .select(
+      `
+      id,
+      item_id,
+      quantity,
+      description,
+      created_at,
+      item:uniform_items(name),
+      activity:uniform_activities(name)
+    `,
+    )
     .single();
   if (error) throw error;
-  return data as StockEntry;
+  const entry = data as any;
+  return {
+    id: entry.id,
+    item_id: entry.item_id,
+    item_name: entry.item?.name ?? input.itemName,
+    activity_id: activityId,
+    activity_name: entry.activity?.name ?? input.activityName,
+    quantity: entry.quantity,
+    description: entry.description,
+    created_at: entry.created_at,
+  };
 }
 
 export async function deleteStockEntry(id: string): Promise<void> {
-  // Reverse the stock bump a sewing entry applied — otherwise in_stock keeps
-  // counting units whose log entry no longer exists.
-  const { data: entry } = await db
-    .from("uniform_stock_entries")
-    .select("sku_id, quantity, activity")
-    .eq("id", id)
-    .maybeSingle();
-
-  if (entry?.sku_id && entry.activity === "sewing") {
-    const { data: sku } = await db.from("uniform_skus").select("in_stock").eq("id", entry.sku_id).maybeSingle();
-    if (sku) {
-      const nextStock = Math.max(0, Number(sku.in_stock) - Number(entry.quantity));
-      await db.from("uniform_skus").update({ in_stock: nextStock }).eq("id", entry.sku_id);
-    }
-  }
-
   const { error } = await db.from("uniform_stock_entries").delete().eq("id", id);
   if (error) throw error;
 }

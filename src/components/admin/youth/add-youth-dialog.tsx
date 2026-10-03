@@ -103,9 +103,11 @@ export function AddYouthDialog({
 }: Props) {
   const isEdit = !!youthId;
   const dialogTitle = title ?? (isEdit ? "Edit Youth" : "Register Youth");
-  const dialogDesc = description ?? (isEdit
-    ? "Update youth details. CDM No. cannot be changed."
-    : "A unique CDM No. is assigned automatically on save.");
+  const dialogDesc =
+    description ??
+    (isEdit
+      ? "Update youth details. CDM No. cannot be changed."
+      : "A unique CDM No. is assigned automatically on save.");
 
   /* ── form state ── */
   const [fullName, setFullName] = useState(initial?.fullName ?? "");
@@ -145,7 +147,9 @@ export function AddYouthDialog({
   const [selectedLevels, setSelectedLevels] = useState<Set<LeadershipLevel>>(new Set());
   const [levelPositions, setLevelPositions] = useState<LevelPositions>({});
   /* tracks roles that existed in DB when dialog opened (edit mode) */
-  const [existingRoles, setExistingRoles] = useState<Map<LeadershipLevel, { id: string; roleId: string }>>(new Map());
+  const [existingRoles, setExistingRoles] = useState<
+    Map<LeadershipLevel, { id: string; roleId: string }>
+  >(new Map());
 
   /* role types for leadership position selects */
   const { data: roleTypes = [] } = useQuery({
@@ -255,9 +259,9 @@ export function AddYouthDialog({
                 youthId: youth.id,
                 roleId: levelPositions[level]!,
                 level,
-                deaneryId: level !== "diocese" ? (deaneryId || null) : null,
-                parishId: level === "parish" || level === "outstation" ? (parishId || null) : null,
-                outstationId: level === "outstation" ? (outstationId || null) : null,
+                deaneryId: level !== "diocese" ? deaneryId || null : null,
+                parishId: level === "parish" || level === "outstation" ? parishId || null : null,
+                outstationId: level === "outstation" ? outstationId || null : null,
               });
             }
           }
@@ -272,9 +276,9 @@ export function AddYouthDialog({
                 youthId: youth.id,
                 roleId: levelPositions[level]!,
                 level,
-                deaneryId: level !== "diocese" ? (deaneryId || null) : null,
-                parishId: level === "parish" || level === "outstation" ? (parishId || null) : null,
-                outstationId: level === "outstation" ? (outstationId || null) : null,
+                deaneryId: level !== "diocese" ? deaneryId || null : null,
+                parishId: level === "parish" || level === "outstation" ? parishId || null : null,
+                outstationId: level === "outstation" ? outstationId || null : null,
               }),
             ),
         );
@@ -283,21 +287,36 @@ export function AddYouthDialog({
       return youth;
     },
     onSuccess: (youth) => {
-      toast.success(isEdit ? `Youth updated · ${youth.cdm_id}` : `Youth registered · ${youth.cdm_id}`);
+      toast.success(
+        isEdit ? `Youth updated · ${youth.cdm_id}` : `Youth registered · ${youth.cdm_id}`,
+      );
       onSuccess(youth);
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const handleSubmit = () => {
-    if (!fullName.trim()) { toast.error("Full name is required"); return; }
+    if (!fullName.trim()) {
+      toast.error("Full name is required");
+      return;
+    }
     const parsedAge = parseInt(age, 10);
     if (!age || isNaN(parsedAge) || parsedAge < 5 || parsedAge > 60) {
-      toast.error("Enter a valid age (5–60)"); return;
+      toast.error("Enter a valid age (5–60)");
+      return;
     }
-    if (!phone.trim()) { toast.error("Phone number is required"); return; }
-    if (!deaneryId) { toast.error("Deanery is required"); return; }
-    if (!parishId) { toast.error("Parish is required"); return; }
+    if (!phone.trim()) {
+      toast.error("Phone number is required");
+      return;
+    }
+    if (!deaneryId) {
+      toast.error("Deanery is required");
+      return;
+    }
+    if (!parishId) {
+      toast.error("Parish is required");
+      return;
+    }
     mut.mutate();
   };
 
@@ -306,7 +325,11 @@ export function AddYouthDialog({
       const next = new Set(prev);
       if (next.has(level)) {
         next.delete(level);
-        setLevelPositions((p) => { const n = { ...p }; delete n[level]; return n; });
+        setLevelPositions((p) => {
+          const n = { ...p };
+          delete n[level];
+          return n;
+        });
       } else {
         next.add(level);
       }
@@ -315,19 +338,21 @@ export function AddYouthDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) onClose();
+      }}
+    >
       <DialogContent className="max-h-[88vh] max-w-2xl overflow-y-auto border-border bg-white text-foreground">
         <DialogHeader>
           <DialogTitle className="text-display text-xl font-black text-gold">
             {dialogTitle}
           </DialogTitle>
-          <DialogDescription className="text-[12px] text-text-3">
-            {dialogDesc}
-          </DialogDescription>
+          <DialogDescription className="text-[12px] text-text-3">{dialogDesc}</DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-3 sm:grid-cols-2">
-
           {/* ── full name ── */}
           <label className={`${LBL} sm:col-span-2`}>
             <span>Full name *</span>
@@ -342,9 +367,15 @@ export function AddYouthDialog({
           <label className={LBL}>
             <span>Gender *</span>
             <Select value={gender} onValueChange={(v) => setGender(v as Gender)}>
-              <SelectTrigger><SelectValue placeholder="Select gender" /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder="Select gender" />
+              </SelectTrigger>
               <SelectContent>
-                {GENDERS.map((g) => <SelectItem key={g} value={g}>{g}</SelectItem>)}
+                {GENDERS.map((g) => (
+                  <SelectItem key={g} value={g}>
+                    {g}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </label>
@@ -366,9 +397,15 @@ export function AddYouthDialog({
           <label className={LBL}>
             <span>Category *</span>
             <Select value={category} onValueChange={(v) => setCategory(v as YouthCategory)}>
-              <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder="Select category" />
+              </SelectTrigger>
               <SelectContent>
-                {CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                {CATEGORIES.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {c}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </label>
@@ -411,9 +448,15 @@ export function AddYouthDialog({
             <label className={LBL}>
               <span>Deanery *</span>
               <Select value={deaneryId} onValueChange={setDeaneryId}>
-                <SelectTrigger><SelectValue placeholder="Select Deanery" /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Deanery" />
+                </SelectTrigger>
                 <SelectContent>
-                  {org.deaneries.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+                  {org.deaneries.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>
+                      {d.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </label>
@@ -424,9 +467,15 @@ export function AddYouthDialog({
             <label className={LBL}>
               <span>Parish *</span>
               <Select value={parishId} onValueChange={setParishId} disabled={!deaneryId}>
-                <SelectTrigger><SelectValue placeholder={deaneryId ? "Select Parish" : "Choose deanery first"} /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue placeholder={deaneryId ? "Select Parish" : "Choose deanery first"} />
+                </SelectTrigger>
                 <SelectContent>
-                  {parishOptions.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                  {parishOptions.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </label>
@@ -437,9 +486,17 @@ export function AddYouthDialog({
             <label className={LBL}>
               <span>Outstation</span>
               <Select value={outstationId} onValueChange={setOutstationId} disabled={!parishId}>
-                <SelectTrigger><SelectValue placeholder={parishId ? "Select Outstation" : "Choose parish first"} /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue
+                    placeholder={parishId ? "Select Outstation" : "Choose parish first"}
+                  />
+                </SelectTrigger>
                 <SelectContent>
-                  {outstationOptions.map((o) => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}
+                  {outstationOptions.map((o) => (
+                    <SelectItem key={o.id} value={o.id}>
+                      {o.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </label>
@@ -553,14 +610,18 @@ export function AddYouthDialog({
                       </span>
                       <Select
                         value={levelPositions[level] ?? ""}
-                        onValueChange={(v) => setLevelPositions((prev) => ({ ...prev, [level]: v }))}
+                        onValueChange={(v) =>
+                          setLevelPositions((prev) => ({ ...prev, [level]: v }))
+                        }
                       >
                         <SelectTrigger className="flex-1">
                           <SelectValue placeholder="Select position…" />
                         </SelectTrigger>
                         <SelectContent>
                           {roleTypes.map((rt) => (
-                            <SelectItem key={rt.id} value={rt.id}>{rt.name}</SelectItem>
+                            <SelectItem key={rt.id} value={rt.id}>
+                              {rt.name}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -576,7 +637,6 @@ export function AddYouthDialog({
               </div>
             )}
           </div>
-
         </div>
 
         <DialogFooter>

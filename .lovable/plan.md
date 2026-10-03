@@ -9,11 +9,13 @@ Provision the backend (Postgres + auth + storage). All schema changes go through
 ## 2. Database schema (migrations)
 
 Reference tables (seeded once from existing `ORGANIZATION` mock):
+
 - `deaneries` (id, code, name)
 - `parishes` (id, deanery_id, name)
 - `outstations` (id, parish_id, name)
 
 Core tables:
+
 - `youths` — cdm_id (unique, auto), full_name, gender, age, phone, alt_phone, email, deanery_id, parish_id, outstation_id, category, institution, year_of_study, notes, status, created_at
 - `enrollments` — youth_id, year (2026), payment_ref, amount, status, created_at
 - `cusa_members` — youth_id, institution, course, year_of_study, leadership_role, created_at
@@ -42,6 +44,7 @@ All use `supabaseAdmin` (single-admin app); switch to `requireSupabaseAuth` once
 ## 4. Frontend wiring
 
 Replace mock-data imports with `useQuery` calls to server fns:
+
 - `admin.index.tsx` — dashboard tiles & charts from `analytics.functions`
 - `admin.youths.tsx` — table + Register/Edit/Delete/Enroll all hit DB; CSV import parses with PapaParse and calls `bulkInsert`
 - `admin.enrollment.tsx` — same pattern; bulk-payer CSV applies one ref to many cdm_ids

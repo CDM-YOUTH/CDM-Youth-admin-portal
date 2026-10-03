@@ -18,10 +18,7 @@ envContent.split("\n").forEach((line) => {
   }
 });
 
-const supabase = createClient(
-  envVars.SUPABASE_URL,
-  envVars.SUPABASE_SERVICE_ROLE_KEY
-);
+const supabase = createClient(envVars.SUPABASE_URL, envVars.SUPABASE_SERVICE_ROLE_KEY);
 
 async function seedFormation() {
   console.log("🌱 Seeding Formation data...\n");
