@@ -106,9 +106,9 @@ function YFPWeeklyArticles() {
   }, [articles, filterStatus]);
 
   return (
-    <div className="space-y-6 p-6">
-      {/* Header with Back Button */}
-      <div>
+    <div className="flex min-h-screen flex-col">
+      <div className="space-y-3 px-6 py-4">
+        {/* Header with Back Button */}
         <button
           onClick={() => {
             if (subPillar?.pillar_id) {
@@ -118,81 +118,75 @@ function YFPWeeklyArticles() {
               });
             }
           }}
-          className="mb-4 flex items-center gap-2 text-sm font-bold text-slate-600 hover:text-slate-900"
+          className="mb-2 flex items-center gap-2 text-sm font-bold text-slate-600 hover:text-slate-900"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to Sub-Pillars
         </button>
 
-        <div className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-          {subPillar?.title}
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-xs font-bold uppercase tracking-wide text-slate-500">
+              {subPillar?.title}
+            </div>
+            <h1 className="text-xl font-bold text-slate-900">{subPillar?.title} - Weekly Content</h1>
+          </div>
+          <div className="text-right">
+            <div className="text-xs font-bold uppercase text-slate-500">Articles</div>
+            <div className="text-2xl font-black text-[#881337]">{articles.length}</div>
+          </div>
         </div>
-        <h1 className="mb-2 font-serif text-3xl font-bold text-slate-900">
-          {subPillar?.title} - Weekly Content
-        </h1>
-        <p className="text-sm text-slate-600">
-          Manage weekly formation articles and reflection questions
-        </p>
-      </div>
 
-      {/* Metrics */}
-      <div className="flex gap-4 text-sm font-bold text-slate-700">
-        <div>
-          <span className="text-xs text-slate-500 uppercase">Active Articles</span>
-          <div className="mt-1 text-2xl font-bold text-[#881337]">{articles.length}</div>
-        </div>
-      </div>
-
-      {/* Action Buttons & Filters */}
-      <div className="space-y-4">
-        <div className="flex flex-wrap gap-2">
+        {/* Action Buttons & Filters */}
+        <div className="flex flex-wrap gap-2 pt-2">
           <button
             onClick={() => setCreateDialogOpen(true)}
             className="inline-flex items-center gap-2 rounded-lg bg-[#881337] px-4 py-2 text-sm font-bold text-white hover:bg-[#991b1b]"
           >
             <Plus className="h-4 w-4" />
-            Add Weekly Article
+            Add Article
           </button>
-          <button className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">
+          <button className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">
             <Download className="h-4 w-4" />
-            Download Syllabus
+            Download
           </button>
-        </div>
 
-        {/* Status Filter */}
-        <div className="flex gap-2">
-          {["all", "Published", "Scheduled", "Draft"].map((status) => (
-            <button
-              key={status}
-              onClick={() => setFilterStatus(status)}
-              className={`rounded-full px-3 py-1 text-xs font-bold transition-colors ${
-                filterStatus === status
-                  ? "bg-[#881337] text-white"
-                  : "border border-slate-200 bg-white text-slate-700 hover:border-slate-300"
-              }`}
-            >
-              {status === "all" ? "All Status" : status}
-            </button>
-          ))}
+          {/* Status Filter */}
+          <div className="ml-auto flex gap-2">
+            {["all", "Published", "Scheduled", "Draft"].map((status) => (
+              <button
+                key={status}
+                onClick={() => setFilterStatus(status)}
+                className={`rounded-full px-3 py-1 text-xs font-bold transition-colors ${
+                  filterStatus === status
+                    ? "bg-[#881337] text-white"
+                    : "border border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+                }`}
+              >
+                {status === "all" ? "All" : status}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
       {/* Articles Table */}
-      <div className="overflow-hidden rounded-xl border border-slate-200/70 bg-white shadow-sm">
+      <div className="flex-1 overflow-y-auto px-6 py-2">
+        <div className="overflow-hidden rounded-xl border border-slate-200/70 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="border-b border-slate-200/70 bg-slate-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-700">
+                <th className="px-4 py-2 text-left text-xs font-bold uppercase tracking-wide text-slate-700">
                   Week & Title
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-700">
+                <th className="px-4 py-2 text-left text-xs font-bold uppercase tracking-wide text-slate-700">
                   Sunday Date
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-700">
+                <th className="px-4 py-2 text-left text-xs font-bold uppercase tracking-wide text-slate-700">
                   Status
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-bold uppercase tracking-wide text-slate-700">
+                <th className="px-4 py-2 text-right text-xs font-bold uppercase tracking-wide text-slate-700">
                   Actions
                 </th>
               </tr>
@@ -200,18 +194,18 @@ function YFPWeeklyArticles() {
             <tbody>
               {filteredArticles.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-6 py-8 text-center text-sm text-slate-600">
+                  <td colSpan={4} className="px-4 py-6 text-center text-sm text-slate-600">
                     No articles found. Create one to get started.
                   </td>
                 </tr>
               ) : (
                 filteredArticles.map((article) => (
                   <tr key={article.id} className="border-b border-slate-200/70 hover:bg-slate-50">
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3">
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
                           <Icon icon="mdi:book" className="h-4 w-4 text-slate-500" />
-                          <span className="font-bold text-slate-900">
+                          <span className="font-semibold text-slate-900">
                             Week {article.week_number}: {article.article_title}
                           </span>
                         </div>
@@ -226,16 +220,16 @@ function YFPWeeklyArticles() {
                           )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-slate-700">
+                    <td className="px-4 py-3 text-sm text-slate-700">
                       {new Date(article.sunday_date).toLocaleDateString("en-US", {
                         month: "short",
                         day: "numeric",
                         year: "numeric",
                       })}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3">
                       <span
-                        className={`inline-block rounded-full px-2.5 py-1 text-xs font-bold ${
+                        className={`inline-block rounded-full px-2 py-1 text-xs font-bold ${
                           article.status === "Published"
                             ? "bg-green-100 text-green-700"
                             : article.status === "Scheduled"
@@ -246,7 +240,7 @@ function YFPWeeklyArticles() {
                         • {article.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-4 py-3 text-right">
                       <div className="relative inline-block">
                         <button
                           onClick={() =>
