@@ -247,15 +247,14 @@ function PillarCard({ pillar, onNavigate, onEdit, onDelete }: any) {
   };
 
   return (
-    <button
-      className="group relative w-full rounded-xl border-2 p-6 transition-all hover:shadow-md hover:-translate-y-1 text-left"
+    <div
+      className="group relative cursor-pointer rounded-xl border-2 p-6 transition-all hover:shadow-md hover:-translate-y-1"
       style={{
         backgroundColor: colorScheme.background_fill,
         borderColor: colorScheme.border_stroke,
       }}
-      onClick={onNavigate}
     >
-      <div className="flex-1">
+      <div onClick={onNavigate} className="flex-1">
         <div className="mb-3 text-4xl">
           <Icon
             icon={`mdi:${pillar.icon || "menu_book"}`}
@@ -277,10 +276,7 @@ function PillarCard({ pillar, onNavigate, onEdit, onDelete }: any) {
         </div>
       </div>
 
-      <div
-        className="absolute top-2 right-2 opacity-0 transition-opacity group-hover:opacity-100"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="absolute top-2 right-2 opacity-0 transition-opacity group-hover:opacity-100">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="rounded-lg border border-border bg-white p-2 hover:bg-bg-2">
@@ -297,6 +293,6 @@ function PillarCard({ pillar, onNavigate, onEdit, onDelete }: any) {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-    </button>
+    </div>
   );
 }
