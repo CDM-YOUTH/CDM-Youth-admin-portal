@@ -493,7 +493,7 @@ export async function listRegistrations(eventId: string) {
  * also sees deanery-wide events in their own deanery (`parish_id IS NULL`), since those
  * cover their parish too.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 function applyEventScopeFilter(
   query: any,
   scopeDeaneryId?: string | null,

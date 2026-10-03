@@ -303,4 +303,3 @@ function PillarCard({ pillar, onNavigate, onEdit, onDelete }: any) {
     </div>
   );
 }
-

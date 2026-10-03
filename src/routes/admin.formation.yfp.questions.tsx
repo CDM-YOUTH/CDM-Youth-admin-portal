@@ -59,26 +59,31 @@ function YFPQuestionsPage() {
 
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter((i) =>
-        i.question_text?.toLowerCase().includes(query) ||
-        i.inquiry_reference?.toLowerCase().includes(query)
+      filtered = filtered.filter(
+        (i) =>
+          i.question_text?.toLowerCase().includes(query) ||
+          i.inquiry_reference?.toLowerCase().includes(query),
       );
     }
 
-    return filtered.sort((a, b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime());
+    return filtered.sort(
+      (a, b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime(),
+    );
   }, [allInquiries, filterStatus, searchQuery]);
 
   const totalPages = Math.max(1, Math.ceil(filteredInquiries.length / itemsPerPage));
   const safePage = Math.min(currentPage, totalPages);
   const paginatedInquiries = filteredInquiries.slice(
     (safePage - 1) * itemsPerPage,
-    safePage * itemsPerPage
+    safePage * itemsPerPage,
   );
 
   const createMut = useMutation({
     mutationFn: async () => {
       return createYouthInquiry({
-        inquiry_reference: `#YFP-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`,
+        inquiry_reference: `#YFP-${new Date().getFullYear()}-${Math.floor(Math.random() * 10000)
+          .toString()
+          .padStart(4, "0")}`,
         submitted_by: { name: "Admin Generated" },
         submitted_at: new Date().toISOString(),
         question_text: newInquiry.question_text || "",
@@ -329,7 +334,8 @@ function YFPQuestionsPage() {
             <div className="mt-4 flex items-center justify-between text-xs">
               <div className="text-slate-600">
                 <span className="font-semibold">
-                  {paginatedInquiries.length > 0 ? (safePage - 1) * itemsPerPage + 1 : 0}-{Math.min(safePage * itemsPerPage, filteredInquiries.length)}
+                  {paginatedInquiries.length > 0 ? (safePage - 1) * itemsPerPage + 1 : 0}-
+                  {Math.min(safePage * itemsPerPage, filteredInquiries.length)}
                 </span>
                 <span> of {filteredInquiries.length} inquiries</span>
               </div>
@@ -405,15 +411,23 @@ function YFPQuestionsPage() {
               {isEditingPanel ? (
                 <>
                   <div>
-                    <label className="text-xs font-bold uppercase text-slate-600 block mb-2">Question</label>
-                    <p className="text-sm text-slate-900 bg-slate-100 rounded p-2">{selectedInquiry.question_text}</p>
+                    <label className="text-xs font-bold uppercase text-slate-600 block mb-2">
+                      Question
+                    </label>
+                    <p className="text-sm text-slate-900 bg-slate-100 rounded p-2">
+                      {selectedInquiry.question_text}
+                    </p>
                   </div>
 
                   <div>
-                    <label className="text-xs font-bold uppercase text-slate-600 block mb-2">Status</label>
+                    <label className="text-xs font-bold uppercase text-slate-600 block mb-2">
+                      Status
+                    </label>
                     <select
                       value={editingValues.status}
-                      onChange={(e) => setEditingValues({ ...editingValues, status: e.target.value })}
+                      onChange={(e) =>
+                        setEditingValues({ ...editingValues, status: e.target.value })
+                      }
                       className="w-full rounded-lg border border-slate-200 px-3 py-2 text-xs focus:border-gold-3 focus:text-black outline-none"
                     >
                       <option value="Needs_Answer">Needs Answer</option>
@@ -424,7 +438,9 @@ function YFPQuestionsPage() {
                   </div>
 
                   <div>
-                    <label className="text-xs font-bold uppercase text-slate-600 block mb-2">Pastoral Response</label>
+                    <label className="text-xs font-bold uppercase text-slate-600 block mb-2">
+                      Pastoral Response
+                    </label>
                     <textarea
                       value={editingValues.pastoral_response}
                       onChange={(e) =>
@@ -444,7 +460,9 @@ function YFPQuestionsPage() {
 
                   {selectedInquiry.submitted_by && (
                     <div className="bg-white rounded p-4">
-                      <h3 className="text-xs font-bold uppercase text-slate-700 mb-2">Submitted By</h3>
+                      <h3 className="text-xs font-bold uppercase text-slate-700 mb-2">
+                        Submitted By
+                      </h3>
                       <p className="text-sm text-slate-900">{selectedInquiry.submitted_by.name}</p>
                     </div>
                   )}
@@ -468,10 +486,16 @@ function YFPQuestionsPage() {
 
                   {selectedInquiry.pastoral_response?.response && (
                     <div className="bg-blue-50 rounded p-4 border border-blue-200">
-                      <h3 className="text-xs font-bold uppercase text-blue-700 mb-2">Pastoral Response</h3>
-                      <p className="text-sm text-slate-900">{selectedInquiry.pastoral_response.response}</p>
+                      <h3 className="text-xs font-bold uppercase text-blue-700 mb-2">
+                        Pastoral Response
+                      </h3>
+                      <p className="text-sm text-slate-900">
+                        {selectedInquiry.pastoral_response.response}
+                      </p>
                       {selectedInquiry.pastoral_response.respondent && (
-                        <p className="text-xs text-slate-600 mt-2">By: {selectedInquiry.pastoral_response.respondent}</p>
+                        <p className="text-xs text-slate-600 mt-2">
+                          By: {selectedInquiry.pastoral_response.respondent}
+                        </p>
                       )}
                     </div>
                   )}
@@ -490,7 +514,9 @@ function YFPQuestionsPage() {
           <AlertDialogTitle>Create New Question</AlertDialogTitle>
           <div className="space-y-4 py-4">
             <div>
-              <label className="text-xs font-bold uppercase text-slate-600 block mb-2">Question</label>
+              <label className="text-xs font-bold uppercase text-slate-600 block mb-2">
+                Question
+              </label>
               <textarea
                 value={newInquiry.question_text || ""}
                 onChange={(e) => setNewInquiry({ ...newInquiry, question_text: e.target.value })}

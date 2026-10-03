@@ -144,7 +144,6 @@ export type YouthsBreakdownRow = {
 
 // ── Helper ──────────────────────────────────────────────────────────────────
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function n(v: unknown): number {
   return Number(v ?? 0);
 }

@@ -20,6 +20,7 @@ import {
   PanelLeftOpen,
   Crown,
   ChevronDown,
+  Banknote,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useSidebar } from "./sidebar-context";
@@ -98,6 +99,12 @@ const GROUPS: NavGroup[] = [
         badge: { text: "5", tone: "danger" },
       },
       { to: "/admin/uniforms", label: "Uniforms", icon: Shirt, module: "uniforms" },
+    ],
+  },
+  {
+    label: "Finance",
+    items: [
+      { to: "/admin/finances", label: "Ledger & Payments", icon: Banknote, module: "finances" },
     ],
   },
   {
