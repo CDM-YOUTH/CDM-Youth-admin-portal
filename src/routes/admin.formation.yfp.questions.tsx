@@ -63,7 +63,7 @@ function YFPQuestionsPage() {
   const [sortBy, setSortBy] = useState<"recent" | "upvotes">("recent");
   const [dateRange, setDateRange] = useState<DateRange>({ from: undefined, to: undefined });
   const [confirmAction, setConfirmAction] = useState<{ type: "approve" | "delete"; inquiryId: string } | null>(null);
-  const itemsPerPage = 10;
+  const [itemsPerPage, setItemsPerPage] = useState(5);
 
   const createMut = useMutation({
     mutationFn: async () => {
@@ -273,10 +273,24 @@ function YFPQuestionsPage() {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as "recent" | "upvotes")}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold ml-auto"
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold"
             >
               <option value="recent">Recent</option>
               <option value="upvotes">Upvotes</option>
+            </select>
+
+            <select
+              value={itemsPerPage}
+              onChange={(e) => {
+                setItemsPerPage(parseInt(e.target.value));
+                setCurrentPage(1);
+              }}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold"
+            >
+              <option value={5}>5 per page</option>
+              <option value={10}>10 per page</option>
+              <option value={20}>20 per page</option>
+              <option value={50}>50 per page</option>
             </select>
 
             <button

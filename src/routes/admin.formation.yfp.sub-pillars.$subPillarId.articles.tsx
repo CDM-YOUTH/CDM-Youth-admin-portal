@@ -125,7 +125,7 @@ function YFPWeeklyArticles() {
   const [previewFile, setPreviewFile] = useState<{ url: string; type: "image" | "pdf"; name: string } | null>(null);
   const [articleMaterials, setArticleMaterials] = useState<Array<{ url: string; name: string; type: "image" | "pdf"; uploadedAt: string }>>([]);
   const [uploadingMaterial, setUploadingMaterial] = useState(false);
-  const itemsPerPage = 10;
+  const [itemsPerPage, setItemsPerPage] = useState(5);
 
   const handleMaterialUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -399,6 +399,20 @@ function YFPWeeklyArticles() {
                 setCurrentPage(1);
               }}
             />
+
+            <select
+              value={itemsPerPage}
+              onChange={(e) => {
+                setItemsPerPage(parseInt(e.target.value));
+                setCurrentPage(1);
+              }}
+              className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold ml-auto"
+            >
+              <option value={5}>5 per page</option>
+              <option value={10}>10 per page</option>
+              <option value={20}>20 per page</option>
+              <option value={50}>50 per page</option>
+            </select>
           </div>
 
           <div className="flex-1 overflow-y-auto p-6">
