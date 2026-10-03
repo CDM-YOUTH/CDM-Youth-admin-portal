@@ -1,7 +1,7 @@
 ﻿import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Plus, MoreVertical, BarChart3, Pencil, Trash2 } from "lucide-react";
+import { Plus, MoreVertical, BarChart3, HelpCircle, Pencil, Trash2 } from "lucide-react";
 import {
   fetchPillars,
   createPillar,
@@ -136,6 +136,13 @@ function YFPPage() {
         description="Manage youth formation curriculum across pillars, sub-pillars, and weekly content"
         action={
           <div className="flex gap-2">
+            <button
+              onClick={() => navigate({ to: "/admin/formation/yfp/questions" })}
+              className="inline-flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-bold text-text-2 hover:bg-bg-2"
+            >
+              <HelpCircle className="h-4 w-4" />
+              Questions
+            </button>
             <button
               onClick={() => navigate({ to: "/admin/formation/yfp/analytics" })}
               className="inline-flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2 text-sm font-bold text-text-2 hover:bg-bg-2"
