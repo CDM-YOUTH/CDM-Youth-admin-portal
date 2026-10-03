@@ -180,144 +180,271 @@ function YFPQuestionsPage() {
         }
       />
 
-      <div className="flex-1 overflow-y-auto px-5 py-4">
-        <Card>
-          <TableToolbar
-            searchValue={searchQuery}
-            onSearchChange={(value) => {
-              setSearchQuery(value);
-              pagination.reset();
-            }}
-            searchPlaceholder="Search question or reference…"
-          />
+      <div className="flex flex-1 overflow-hidden gap-0">
+        {/* Left: Table - 50% */}
+        <div className="w-1/2 flex flex-col border-r border-border overflow-hidden">
+          <div className="px-5 py-4 flex-1 overflow-y-auto">
+            <Card>
+              <TableToolbar
+                searchValue={searchQuery}
+                onSearchChange={(value) => {
+                  setSearchQuery(value);
+                  pagination.reset();
+                }}
+                searchPlaceholder="Search question or reference…"
+              />
 
-          <CardBody className="p-0">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
-                    <ColumnHeader
-                      label="Reference"
-                      filter={
-                        <ColumnFilter
-                          label="Status"
-                          mode="select"
-                          options={[
-                            { value: "Needs_Answer", label: "Needs Answer" },
-                            { value: "Drafted", label: "Drafted" },
-                            { value: "Approved_For_Bulletin", label: "Approved" },
-                            { value: "Confidential_Pastoral", label: "Confidential" },
-                          ]}
-                          value={
-                            filterStatus ? { operator: "equals", value: filterStatus } : undefined
+              <CardBody className="p-0">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border">
+                      <th className="label-eyebrow px-3.5 py-2.5 text-left">
+                        <ColumnHeader
+                          label="Reference"
+                          filter={
+                            <ColumnFilter
+                              label="Status"
+                              mode="select"
+                              options={[
+                                { value: "Needs_Answer", label: "Needs Answer" },
+                                { value: "Drafted", label: "Drafted" },
+                                { value: "Approved_For_Bulletin", label: "Approved" },
+                                { value: "Confidential_Pastoral", label: "Confidential" },
+                              ]}
+                              value={
+                                filterStatus ? { operator: "equals", value: filterStatus } : undefined
+                              }
+                              onChange={(v) => {
+                                setFilterStatus(v?.value);
+                                pagination.reset();
+                              }}
+                            />
                           }
-                          onChange={(v) => {
-                            setFilterStatus(v?.value);
-                            pagination.reset();
-                          }}
                         />
-                      }
-                    />
-                  </th>
-                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
-                    <ColumnHeader label="Question" />
-                  </th>
-                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
-                    <ColumnHeader label="Submitted" />
-                  </th>
-                  <th className="label-eyebrow px-3.5 py-2.5 text-center">
-                    <ColumnHeader label="Upvotes" />
-                  </th>
-                  <th className="label-eyebrow px-3.5 py-2.5 text-left">
-                    <ColumnHeader label="Status" />
-                  </th>
-                  <th className="label-eyebrow px-3.5 py-2.5 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedInquiries.map((inquiry) => (
-                  <tr key={inquiry.id} className="border-b border-border/30 last:border-0 hover:bg-bg-3">
-                    <td className="px-3.5 py-2.5 font-mono text-[10px] font-bold text-gold">
-                      {inquiry.inquiry_reference}
-                    </td>
-                    <td className="px-3.5 py-2.5 text-[11px] text-text-1 max-w-sm truncate">
-                      {inquiry.question_text}
-                    </td>
-                    <td className="px-3.5 py-2.5 text-[11px] text-text-2">
-                      {new Date(inquiry.submitted_at).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                      })}
-                    </td>
-                    <td className="px-3.5 py-2.5 text-center text-[11px] font-bold text-red-600">
-                      {inquiry.upvotes_count || 0}
-                    </td>
-                    <td className="px-3.5 py-2.5">
-                      <Pill
-                        tone={
-                          inquiry.status === "Approved_For_Bulletin"
-                            ? "success"
-                            : inquiry.status === "Confidential_Pastoral"
-                              ? "neutral"
-                              : inquiry.status === "Drafted"
-                                ? "warning"
-                                : "danger"
-                        }
+                      </th>
+                      <th className="label-eyebrow px-3.5 py-2.5 text-left">
+                        <ColumnHeader label="Question" />
+                      </th>
+                      <th className="label-eyebrow px-3.5 py-2.5 text-left">
+                        <ColumnHeader label="Submitted" />
+                      </th>
+                      <th className="label-eyebrow px-3.5 py-2.5 text-center">
+                        <ColumnHeader label="Upvotes" />
+                      </th>
+                      <th className="label-eyebrow px-3.5 py-2.5 text-left">
+                        <ColumnHeader label="Status" />
+                      </th>
+                      <th className="label-eyebrow px-3.5 py-2.5 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedInquiries.map((inquiry) => (
+                      <tr
+                        key={inquiry.id}
+                        onClick={() => {
+                          setSelectedInquiry(inquiry);
+                          setIsEditingPanel(false);
+                        }}
+                        className={`border-b border-border/30 last:border-0 cursor-pointer ${
+                          selectedInquiry?.id === inquiry.id ? "bg-primary/10" : "hover:bg-bg-3"
+                        }`}
                       >
-                        {inquiry.status?.replace(/_/g, " ")}
-                      </Pill>
-                    </td>
-                    <td className="px-3.5 py-2.5 text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button
-                            type="button"
-                            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-bg-2 text-text-2 hover:border-gold-3 hover:text-gold"
+                        <td className="px-3.5 py-2.5 font-mono text-[10px] font-bold text-gold">
+                          {inquiry.inquiry_reference}
+                        </td>
+                        <td className="px-3.5 py-2.5 text-[11px] text-text-1 max-w-sm truncate">
+                          {inquiry.question_text}
+                        </td>
+                        <td className="px-3.5 py-2.5 text-[11px] text-text-2">
+                          {new Date(inquiry.submitted_at).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                          })}
+                        </td>
+                        <td className="px-3.5 py-2.5 text-center text-[11px] font-bold text-red-600">
+                          {inquiry.upvotes_count || 0}
+                        </td>
+                        <td className="px-3.5 py-2.5">
+                          <Pill
+                            tone={
+                              inquiry.status === "Approved_For_Bulletin"
+                                ? "success"
+                                : inquiry.status === "Confidential_Pastoral"
+                                  ? "neutral"
+                                  : inquiry.status === "Drafted"
+                                    ? "warning"
+                                    : "danger"
+                            }
                           >
-                            <MoreVertical className="h-3.5 w-3.5" />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-40">
-                          <DropdownMenuItem
-                            onClick={() => {
-                              setSelectedInquiry(inquiry);
-                              handleEditStart();
-                            }}
-                          >
-                            <Edit2 className="mr-2 h-3.5 w-3.5" /> Edit Response
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="text-danger focus:text-danger"
-                            onClick={() => setConfirmDelete(inquiry.id)}
-                          >
-                            <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </td>
-                  </tr>
-                ))}
-                {paginatedInquiries.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="px-3.5 py-6 text-center text-[12px] text-text-2">
-                      No inquiries found
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </CardBody>
+                            {inquiry.status?.replace(/_/g, " ")}
+                          </Pill>
+                        </td>
+                        <td className="px-3.5 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button
+                                type="button"
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-bg-2 text-text-2 hover:border-gold-3 hover:text-gold"
+                              >
+                                <MoreVertical className="h-3.5 w-3.5" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-40">
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setSelectedInquiry(inquiry);
+                                  handleEditStart();
+                                }}
+                              >
+                                <Edit2 className="mr-2 h-3.5 w-3.5" /> Edit Response
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-danger focus:text-danger"
+                                onClick={() => setConfirmDelete(inquiry.id)}
+                              >
+                                <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </td>
+                      </tr>
+                    ))}
+                    {paginatedInquiries.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="px-3.5 py-6 text-center text-[12px] text-text-2">
+                          No inquiries found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </CardBody>
 
-          <TablePagination
-            page={safePage}
-            pageSize={pagination.pageSize}
-            total={filteredInquiries.length}
-            totalPages={totalPages}
-            onPageChange={pagination.setPage}
-            onPageSizeChange={pagination.setPageSize}
-          />
-        </Card>
+              <TablePagination
+                page={safePage}
+                pageSize={pagination.pageSize}
+                total={filteredInquiries.length}
+                totalPages={totalPages}
+                onPageChange={pagination.setPage}
+                onPageSizeChange={pagination.setPageSize}
+              />
+            </Card>
+          </div>
+        </div>
+
+        {/* Right: Detail Panel - 50% */}
+        {selectedInquiry && (
+          <div className="w-1/2 flex flex-col border-l border-border bg-bg-2 overflow-hidden">
+            <div className="border-b border-border bg-white px-5 py-3 flex items-start justify-between flex-shrink-0">
+              <div>
+                <div className="text-[10px] font-bold uppercase text-text-3">
+                  {new Date(selectedInquiry.submitted_at).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  })}
+                </div>
+                <h2 className="text-[13px] font-bold text-text-1 mt-1">
+                  {selectedInquiry.inquiry_reference}
+                </h2>
+              </div>
+              {isEditingPanel ? (
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSaveEdit}
+                    className="inline-flex items-center gap-1.5 rounded-md bg-primary px-2.5 py-1.5 text-[11px] font-bold text-white hover:opacity-90"
+                  >
+                    <Icon icon="mdi:check" className="h-3.5 w-3.5" />
+                    Save
+                  </button>
+                  <button
+                    onClick={() => setIsEditingPanel(false)}
+                    className="rounded-md border border-border px-2.5 py-1.5 text-[11px] font-bold text-text-1 hover:bg-bg-3"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={handleEditStart}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-primary px-2.5 py-1.5 text-[11px] font-bold text-white hover:opacity-90"
+                >
+                  <Edit2 className="h-3.5 w-3.5" />
+                  Edit
+                </button>
+              )}
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+              {isEditingPanel ? (
+                <>
+                  <div>
+                    <label className="text-[10px] font-bold uppercase text-text-2 block mb-1">Question</label>
+                    <p className="text-[11px] text-text-1 bg-bg-3 rounded p-2">{selectedInquiry.question_text}</p>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold uppercase text-text-2 block mb-1">Status</label>
+                    <select
+                      value={editingValues.status}
+                      onChange={(e) => setEditingValues({ ...editingValues, status: e.target.value })}
+                      className="w-full rounded border border-border bg-bg-3 px-2 py-1 text-[11px]"
+                    >
+                      <option value="Needs_Answer">Needs Answer</option>
+                      <option value="Drafted">Drafted</option>
+                      <option value="Approved_For_Bulletin">Approved for Bulletin</option>
+                      <option value="Confidential_Pastoral">Confidential Pastoral</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold uppercase text-text-2 block mb-1">Pastoral Response</label>
+                    <textarea
+                      value={editingValues.pastoral_response}
+                      onChange={(e) =>
+                        setEditingValues({ ...editingValues, pastoral_response: e.target.value })
+                      }
+                      className="w-full rounded border border-border bg-bg-3 px-2 py-1 text-[11px] resize-none min-h-20"
+                      placeholder="Enter pastoral response…"
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <h3 className="text-[10px] font-bold uppercase text-text-2 mb-2">Question</h3>
+                    <p className="text-[11px] text-text-1">{selectedInquiry.question_text}</p>
+                  </div>
+
+                  {selectedInquiry.submitted_by && (
+                    <div>
+                      <h3 className="text-[10px] font-bold uppercase text-text-2 mb-1">Submitted By</h3>
+                      <p className="text-[11px] text-text-1">{selectedInquiry.submitted_by.name}</p>
+                    </div>
+                  )}
+
+                  <div>
+                    <h3 className="text-[10px] font-bold uppercase text-text-2 mb-1">Status</h3>
+                    <Pill tone={selectedInquiry.status === "Approved_For_Bulletin" ? "success" : "warning"}>
+                      {selectedInquiry.status?.replace(/_/g, " ")}
+                    </Pill>
+                  </div>
+
+                  {selectedInquiry.pastoral_response?.response && (
+                    <div className="bg-white rounded p-3 border border-border">
+                      <h3 className="text-[10px] font-bold uppercase text-text-2 mb-2">Pastoral Response</h3>
+                      <p className="text-[11px] text-text-1">{selectedInquiry.pastoral_response.response}</p>
+                      {selectedInquiry.pastoral_response.respondent && (
+                        <p className="text-[10px] text-text-3 mt-2">By: {selectedInquiry.pastoral_response.respondent}</p>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Edit Inquiry Dialog */}
