@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Icon } from "@iconify/react";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/admin/formation/yfp/sub-pillars/$subPillarId/articles")({
   component: YFPWeeklyArticles,
@@ -123,7 +124,54 @@ function YFPWeeklyArticles() {
   const [confirmAction, setConfirmAction] = useState<{ type: "publish" | "schedule" | "delete"; articleId: string } | null>(null);
   const [previewFile, setPreviewFile] = useState<{ url: string; type: "image" | "pdf"; name: string } | null>(null);
   const [articleMaterials, setArticleMaterials] = useState<Array<{ url: string; name: string; type: "image" | "pdf"; uploadedAt: string }>>([]);
+  const [uploadingMaterial, setUploadingMaterial] = useState(false);
   const itemsPerPage = 10;
+
+  const handleMaterialUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+
+    const file = files[0];
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error("File must be under 20 MB");
+      return;
+    }
+
+    setUploadingMaterial(true);
+    try {
+      const ext = file.name.split(".").pop() || "bin";
+      const path = `${crypto.randomUUID()}.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("formation")
+        .upload(path, file, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: file.type,
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage.from("formation").getPublicUrl(path);
+      const publicUrl = data.publicUrl;
+
+      const isImage = file.type.startsWith("image/");
+      const fileType: "image" | "pdf" = isImage ? "image" : "pdf";
+
+      const newMaterial = {
+        url: publicUrl,
+        name: file.name,
+        type: fileType,
+        uploadedAt: new Date().toISOString(),
+      };
+
+      setArticleMaterials([...articleMaterials, newMaterial]);
+      toast.success(`${file.name} uploaded successfully`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to upload file");
+    } finally {
+      setUploadingMaterial(false);
+    }
+  };
 
   const createMut = useMutation({
     mutationFn: async (values: Record<string, string>) => {
@@ -587,16 +635,24 @@ function YFPWeeklyArticles() {
                           className="w-full rounded-lg border border-slate-200 px-2 py-1 text-xs mt-1"
                         />
                       ) : field.type === "file" ? (
-                        <input
-                          type="file"
-                          accept={field.accept}
-                          onChange={(e) => {
-                            if (e.target.files?.[0]) {
-                              setEditingValues({ ...editingValues, [field.key]: e.target.files[0].name });
-                            }
-                          }}
-                          className="w-full rounded-lg border border-slate-200 px-2 py-1 text-xs mt-1"
-                        />
+                        <div className="space-y-2">
+                          <label className="inline-flex w-fit cursor-pointer items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-50">
+                            <Icon icon={uploadingMaterial ? "mdi:loading" : "mdi:upload"} className={uploadingMaterial ? "h-4 w-4 animate-spin" : "h-4 w-4"} />
+                            {uploadingMaterial ? "Uploading…" : "Choose file"}
+                            <input
+                              type="file"
+                              accept={field.accept}
+                              onChange={(e) => handleMaterialUpload(e.target.files)}
+                              disabled={uploadingMaterial}
+                              className="hidden"
+                            />
+                          </label>
+                          {articleMaterials.length > 0 && (
+                            <p className="text-xs text-slate-600">
+                              {articleMaterials.length} file{articleMaterials.length !== 1 ? "s" : ""} uploaded
+                            </p>
+                          )}
+                        </div>
                       ) : (
                         <input
                           type="text"
