@@ -107,7 +107,14 @@ export async function guardRequest(
       .eq("id", auth.userId)
       .maybeSingle(),
   ]);
-  const role = (roleResult.data as { role?: string } | null)?.role ?? "user";
+
+  // Staff only: an account with no assigned role (e.g. a public sign-up) is refused.
+  // Fails closed if the role lookup errors.
+  const role = (roleResult.data as { role?: string } | null)?.role;
+  if (roleResult.error || !role) {
+    return { error: jsonError("Forbidden", 403) };
+  }
+
   const profileData = profileResult.data as {
     deanery_id?: string | null;
     parish_id?: string | null;
