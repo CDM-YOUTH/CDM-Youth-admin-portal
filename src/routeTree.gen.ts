@@ -21,6 +21,7 @@ import { Route as AdminDashboardRouteImport } from './routes/admin.dashboard'
 import { Route as AdminEnrollmentRouteImport } from './routes/admin.enrollment'
 import { Route as AdminEventsRouteImport } from './routes/admin.events'
 import { Route as AdminFinancesRouteImport } from './routes/admin.finances'
+import { Route as AdminFinancesConfigRouteImport } from './routes/admin.finances-config'
 import { Route as AdminFormationRouteImport } from './routes/admin.formation'
 import { Route as AdminLeadersRouteImport } from './routes/admin.leaders'
 import { Route as AdminMissionRouteImport } from './routes/admin.mission'
@@ -49,6 +50,10 @@ import { Route as AdminEventEventIdRouteImport } from './routes/admin.event.$eve
 import { Route as AdminFormationBulletinRouteImport } from './routes/admin.formation.bulletin'
 import { Route as AdminFormationYfpRouteImport } from './routes/admin.formation.yfp'
 import { Route as ApiAdminInviteUserRouteImport } from './routes/api/admin/invite-user'
+import { Route as ApiFinancesEnrollmentSummaryRouteImport } from './routes/api/finances/enrollment-summary'
+import { Route as ApiFinancesEventsSummaryRouteImport } from './routes/api/finances/events-summary'
+import { Route as ApiFinancesProjectsSummaryRouteImport } from './routes/api/finances/projects-summary'
+import { Route as ApiFinancesSummaryRouteImport } from './routes/api/finances/summary'
 import { Route as ApiSheetsErrorsRouteImport } from './routes/api/sheets/errors'
 import { Route as ApiSheetsLeadershipRouteImport } from './routes/api/sheets/leadership'
 import { Route as ApiUniformsOrdersRouteImport } from './routes/api/uniforms/orders'
@@ -118,6 +123,11 @@ const AdminEventsRoute = AdminEventsRouteImport.update({
 const AdminFinancesRoute = AdminFinancesRouteImport.update({
   id: '/finances',
   path: '/finances',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminFinancesConfigRoute = AdminFinancesConfigRouteImport.update({
+  id: '/finances-config',
+  path: '/finances-config',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminFormationRoute = AdminFormationRouteImport.update({
@@ -261,6 +271,29 @@ const ApiAdminInviteUserRoute = ApiAdminInviteUserRouteImport.update({
   path: '/api/admin/invite-user',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiFinancesEnrollmentSummaryRoute =
+  ApiFinancesEnrollmentSummaryRouteImport.update({
+    id: '/api/finances/enrollment-summary',
+    path: '/api/finances/enrollment-summary',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiFinancesEventsSummaryRoute =
+  ApiFinancesEventsSummaryRouteImport.update({
+    id: '/api/finances/events-summary',
+    path: '/api/finances/events-summary',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiFinancesProjectsSummaryRoute =
+  ApiFinancesProjectsSummaryRouteImport.update({
+    id: '/api/finances/projects-summary',
+    path: '/api/finances/projects-summary',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiFinancesSummaryRoute = ApiFinancesSummaryRouteImport.update({
+  id: '/api/finances/summary',
+  path: '/api/finances/summary',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSheetsErrorsRoute = ApiSheetsErrorsRouteImport.update({
   id: '/api/sheets/errors',
   path: '/api/sheets/errors',
@@ -328,6 +361,7 @@ export interface FileRoutesByFullPath {
   '/admin/enrollment': typeof AdminEnrollmentRoute
   '/admin/events': typeof AdminEventsRoute
   '/admin/finances': typeof AdminFinancesRoute
+  '/admin/finances-config': typeof AdminFinancesConfigRoute
   '/admin/formation': typeof AdminFormationRouteWithChildren
   '/admin/leaders': typeof AdminLeadersRoute
   '/admin/mission': typeof AdminMissionRoute
@@ -357,6 +391,10 @@ export interface FileRoutesByFullPath {
   '/admin/formation/bulletin': typeof AdminFormationBulletinRoute
   '/admin/formation/yfp': typeof AdminFormationYfpRouteWithChildren
   '/api/admin/invite-user': typeof ApiAdminInviteUserRoute
+  '/api/finances/enrollment-summary': typeof ApiFinancesEnrollmentSummaryRoute
+  '/api/finances/events-summary': typeof ApiFinancesEventsSummaryRoute
+  '/api/finances/projects-summary': typeof ApiFinancesProjectsSummaryRoute
+  '/api/finances/summary': typeof ApiFinancesSummaryRoute
   '/api/sheets/errors': typeof ApiSheetsErrorsRoute
   '/api/sheets/leadership': typeof ApiSheetsLeadershipRoute
   '/api/uniforms/orders': typeof ApiUniformsOrdersRoute
@@ -378,6 +416,7 @@ export interface FileRoutesByTo {
   '/admin/enrollment': typeof AdminEnrollmentRoute
   '/admin/events': typeof AdminEventsRoute
   '/admin/finances': typeof AdminFinancesRoute
+  '/admin/finances-config': typeof AdminFinancesConfigRoute
   '/admin/formation': typeof AdminFormationRouteWithChildren
   '/admin/leaders': typeof AdminLeadersRoute
   '/admin/mission': typeof AdminMissionRoute
@@ -406,6 +445,10 @@ export interface FileRoutesByTo {
   '/admin/event/$eventId': typeof AdminEventEventIdRoute
   '/admin/formation/bulletin': typeof AdminFormationBulletinRoute
   '/api/admin/invite-user': typeof ApiAdminInviteUserRoute
+  '/api/finances/enrollment-summary': typeof ApiFinancesEnrollmentSummaryRoute
+  '/api/finances/events-summary': typeof ApiFinancesEventsSummaryRoute
+  '/api/finances/projects-summary': typeof ApiFinancesProjectsSummaryRoute
+  '/api/finances/summary': typeof ApiFinancesSummaryRoute
   '/api/sheets/errors': typeof ApiSheetsErrorsRoute
   '/api/sheets/leadership': typeof ApiSheetsLeadershipRoute
   '/api/uniforms/orders': typeof ApiUniformsOrdersRoute
@@ -430,6 +473,7 @@ export interface FileRoutesById {
   '/admin/enrollment': typeof AdminEnrollmentRoute
   '/admin/events': typeof AdminEventsRoute
   '/admin/finances': typeof AdminFinancesRoute
+  '/admin/finances-config': typeof AdminFinancesConfigRoute
   '/admin/formation': typeof AdminFormationRouteWithChildren
   '/admin/leaders': typeof AdminLeadersRoute
   '/admin/mission': typeof AdminMissionRoute
@@ -459,6 +503,10 @@ export interface FileRoutesById {
   '/admin/formation/bulletin': typeof AdminFormationBulletinRoute
   '/admin/formation/yfp': typeof AdminFormationYfpRouteWithChildren
   '/api/admin/invite-user': typeof ApiAdminInviteUserRoute
+  '/api/finances/enrollment-summary': typeof ApiFinancesEnrollmentSummaryRoute
+  '/api/finances/events-summary': typeof ApiFinancesEventsSummaryRoute
+  '/api/finances/projects-summary': typeof ApiFinancesProjectsSummaryRoute
+  '/api/finances/summary': typeof ApiFinancesSummaryRoute
   '/api/sheets/errors': typeof ApiSheetsErrorsRoute
   '/api/sheets/leadership': typeof ApiSheetsLeadershipRoute
   '/api/uniforms/orders': typeof ApiUniformsOrdersRoute
@@ -484,6 +532,7 @@ export interface FileRouteTypes {
     | '/admin/enrollment'
     | '/admin/events'
     | '/admin/finances'
+    | '/admin/finances-config'
     | '/admin/formation'
     | '/admin/leaders'
     | '/admin/mission'
@@ -513,6 +562,10 @@ export interface FileRouteTypes {
     | '/admin/formation/bulletin'
     | '/admin/formation/yfp'
     | '/api/admin/invite-user'
+    | '/api/finances/enrollment-summary'
+    | '/api/finances/events-summary'
+    | '/api/finances/projects-summary'
+    | '/api/finances/summary'
     | '/api/sheets/errors'
     | '/api/sheets/leadership'
     | '/api/uniforms/orders'
@@ -534,6 +587,7 @@ export interface FileRouteTypes {
     | '/admin/enrollment'
     | '/admin/events'
     | '/admin/finances'
+    | '/admin/finances-config'
     | '/admin/formation'
     | '/admin/leaders'
     | '/admin/mission'
@@ -562,6 +616,10 @@ export interface FileRouteTypes {
     | '/admin/event/$eventId'
     | '/admin/formation/bulletin'
     | '/api/admin/invite-user'
+    | '/api/finances/enrollment-summary'
+    | '/api/finances/events-summary'
+    | '/api/finances/projects-summary'
+    | '/api/finances/summary'
     | '/api/sheets/errors'
     | '/api/sheets/leadership'
     | '/api/uniforms/orders'
@@ -585,6 +643,7 @@ export interface FileRouteTypes {
     | '/admin/enrollment'
     | '/admin/events'
     | '/admin/finances'
+    | '/admin/finances-config'
     | '/admin/formation'
     | '/admin/leaders'
     | '/admin/mission'
@@ -614,6 +673,10 @@ export interface FileRouteTypes {
     | '/admin/formation/bulletin'
     | '/admin/formation/yfp'
     | '/api/admin/invite-user'
+    | '/api/finances/enrollment-summary'
+    | '/api/finances/events-summary'
+    | '/api/finances/projects-summary'
+    | '/api/finances/summary'
     | '/api/sheets/errors'
     | '/api/sheets/leadership'
     | '/api/uniforms/orders'
@@ -640,6 +703,10 @@ export interface RootRouteChildren {
   ApiYouthsRoute: typeof ApiYouthsRoute
   CheckinEventIdRoute: typeof CheckinEventIdRoute
   ApiAdminInviteUserRoute: typeof ApiAdminInviteUserRoute
+  ApiFinancesEnrollmentSummaryRoute: typeof ApiFinancesEnrollmentSummaryRoute
+  ApiFinancesEventsSummaryRoute: typeof ApiFinancesEventsSummaryRoute
+  ApiFinancesProjectsSummaryRoute: typeof ApiFinancesProjectsSummaryRoute
+  ApiFinancesSummaryRoute: typeof ApiFinancesSummaryRoute
   ApiSheetsErrorsRoute: typeof ApiSheetsErrorsRoute
   ApiSheetsLeadershipRoute: typeof ApiSheetsLeadershipRoute
   ApiUniformsOrdersRoute: typeof ApiUniformsOrdersRoute
@@ -730,6 +797,13 @@ declare module '@tanstack/react-router' {
       path: '/finances'
       fullPath: '/admin/finances'
       preLoaderRoute: typeof AdminFinancesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/finances-config': {
+      id: '/admin/finances-config'
+      path: '/finances-config'
+      fullPath: '/admin/finances-config'
+      preLoaderRoute: typeof AdminFinancesConfigRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/formation': {
@@ -928,6 +1002,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAdminInviteUserRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/finances/enrollment-summary': {
+      id: '/api/finances/enrollment-summary'
+      path: '/api/finances/enrollment-summary'
+      fullPath: '/api/finances/enrollment-summary'
+      preLoaderRoute: typeof ApiFinancesEnrollmentSummaryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/finances/events-summary': {
+      id: '/api/finances/events-summary'
+      path: '/api/finances/events-summary'
+      fullPath: '/api/finances/events-summary'
+      preLoaderRoute: typeof ApiFinancesEventsSummaryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/finances/projects-summary': {
+      id: '/api/finances/projects-summary'
+      path: '/api/finances/projects-summary'
+      fullPath: '/api/finances/projects-summary'
+      preLoaderRoute: typeof ApiFinancesProjectsSummaryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/finances/summary': {
+      id: '/api/finances/summary'
+      path: '/api/finances/summary'
+      fullPath: '/api/finances/summary'
+      preLoaderRoute: typeof ApiFinancesSummaryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/sheets/errors': {
       id: '/api/sheets/errors'
       path: '/api/sheets/errors'
@@ -1043,6 +1145,7 @@ interface AdminRouteChildren {
   AdminEnrollmentRoute: typeof AdminEnrollmentRoute
   AdminEventsRoute: typeof AdminEventsRoute
   AdminFinancesRoute: typeof AdminFinancesRoute
+  AdminFinancesConfigRoute: typeof AdminFinancesConfigRoute
   AdminFormationRoute: typeof AdminFormationRouteWithChildren
   AdminLeadersRoute: typeof AdminLeadersRoute
   AdminMissionRoute: typeof AdminMissionRoute
@@ -1065,6 +1168,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminEnrollmentRoute: AdminEnrollmentRoute,
   AdminEventsRoute: AdminEventsRoute,
   AdminFinancesRoute: AdminFinancesRoute,
+  AdminFinancesConfigRoute: AdminFinancesConfigRoute,
   AdminFormationRoute: AdminFormationRouteWithChildren,
   AdminLeadersRoute: AdminLeadersRoute,
   AdminMissionRoute: AdminMissionRoute,
@@ -1129,6 +1233,10 @@ const rootRouteChildren: RootRouteChildren = {
   ApiYouthsRoute: ApiYouthsRoute,
   CheckinEventIdRoute: CheckinEventIdRoute,
   ApiAdminInviteUserRoute: ApiAdminInviteUserRoute,
+  ApiFinancesEnrollmentSummaryRoute: ApiFinancesEnrollmentSummaryRoute,
+  ApiFinancesEventsSummaryRoute: ApiFinancesEventsSummaryRoute,
+  ApiFinancesProjectsSummaryRoute: ApiFinancesProjectsSummaryRoute,
+  ApiFinancesSummaryRoute: ApiFinancesSummaryRoute,
   ApiSheetsErrorsRoute: ApiSheetsErrorsRoute,
   ApiSheetsLeadershipRoute: ApiSheetsLeadershipRoute,
   ApiUniformsOrdersRoute: ApiUniformsOrdersRoute,

@@ -220,6 +220,22 @@ function DeanerySummaryTab({
   deaneryId: string;
   categories: import("@/lib/db/finances").FinancialCategory[];
 }) {
+  const { data: summaryData } = useQuery({
+    queryKey: ["finance-summary", CURRENT_YEAR, deaneryId],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        year: CURRENT_YEAR.toString(),
+      });
+      if (deaneryId) params.append("deaneryId", deaneryId);
+
+      const resp = await fetch(`/api/finances/summary?${params}`);
+      if (!resp.ok) throw new Error("Failed to fetch summary");
+      return resp.json();
+    },
+  });
+
+  const summaries = summaryData?.summaries ?? [];
+
   return (
     <table className="w-full">
       <thead>
@@ -234,40 +250,38 @@ function DeanerySummaryTab({
       <tbody>
         {deaneryId
           ? // Show parishes for selected deanery
-            (org?.parishes ?? [])
-              .filter((p) => p.deanery_id === deaneryId)
-              .map((parish) => (
-                <tr key={parish.id} className="border-b border-border/30 hover:bg-bg-3">
-                  <td className="px-3.5 py-2.5 text-[11px] font-semibold text-foreground">
-                    {parish.name}
-                  </td>
-                  <td className="px-3.5 py-2.5 text-right text-[11px] text-danger font-semibold">
-                    KES 0
-                  </td>
-                  <td className="px-3.5 py-2.5 text-right text-[11px] text-foreground">KES 0</td>
-                  <td className="px-3.5 py-2.5 text-right text-[11px] text-danger font-semibold">
-                    KES 0
-                  </td>
-                  <td className="px-3.5 py-2.5 text-right text-[11px] font-semibold text-success">
-                    KES 0
-                  </td>
-                </tr>
-              ))
-          : // Show deaneries
-            (org?.deaneries ?? []).map((deanery) => (
-              <tr key={deanery.id} className="border-b border-border/30 hover:bg-bg-3">
-                <td className="px-3.5 py-2.5 text-[11px] font-bold text-foreground">
-                  {deanery.name}
+            summaries[0]?.parishes?.map((parish: any) => (
+              <tr key={parish.id} className="border-b border-border/30 hover:bg-bg-3">
+                <td className="px-3.5 py-2.5 text-[11px] font-semibold text-foreground">
+                  {parish.name}
                 </td>
                 <td className="px-3.5 py-2.5 text-right text-[11px] text-danger font-semibold">
-                  KES 0
+                  KES {(parish.currentArrears ?? 0).toLocaleString()}
                 </td>
                 <td className="px-3.5 py-2.5 text-right text-[11px] text-foreground">KES 0</td>
                 <td className="px-3.5 py-2.5 text-right text-[11px] text-danger font-semibold">
                   KES 0
                 </td>
                 <td className="px-3.5 py-2.5 text-right text-[11px] font-semibold text-success">
+                  KES {(parish.totalBalance ?? 0).toLocaleString()}
+                </td>
+              </tr>
+            ))
+          : // Show deaneries
+            summaries.map((deanery: any) => (
+              <tr key={deanery.id} className="border-b border-border/30 hover:bg-bg-3">
+                <td className="px-3.5 py-2.5 text-[11px] font-bold text-foreground">
+                  {deanery.name}
+                </td>
+                <td className="px-3.5 py-2.5 text-right text-[11px] text-danger font-semibold">
+                  KES {(deanery.currentArrears ?? 0).toLocaleString()}
+                </td>
+                <td className="px-3.5 py-2.5 text-right text-[11px] text-foreground">KES 0</td>
+                <td className="px-3.5 py-2.5 text-right text-[11px] text-danger font-semibold">
                   KES 0
+                </td>
+                <td className="px-3.5 py-2.5 text-right text-[11px] font-semibold text-success">
+                  KES {(deanery.totalBalance ?? 0).toLocaleString()}
                 </td>
               </tr>
             ))}
@@ -287,41 +301,48 @@ function EventsTab({
   fiscalYear: number;
   categories: import("@/lib/db/finances").FinancialCategory[];
 }) {
-  const eventCategories = categories.filter((c) => c.type === "event");
+  // Load aggregated events summary in ONE query
+  const { data: summaryData } = useQuery({
+    queryKey: ["finance-events-summary", fiscalYear, deaneryId],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        year: fiscalYear.toString(),
+      });
+      if (deaneryId) params.append("deaneryId", deaneryId);
 
-  // Fixed unit rates per specification
-  const eventRates: Record<string, number> = {
-    "Bishop's Visit": 1500,
-    "Patronage Day": 5000,
-    "Youth Day": 3000,
-    "CUSA Mass": 3000,
-    "Ball Games": 1000,
-  };
+      const resp = await fetch(`/api/finances/events-summary?${params}`);
+      if (!resp.ok) throw new Error("Failed to fetch events summary");
+      return resp.json();
+    },
+  });
+
+  const summaries = summaryData?.summaries ?? [];
+
+  // Get unique event categories from all summaries
+  const eventMap = new Map<string, any>();
+  summaries.forEach((summary: any) => {
+    summary.events?.forEach((event: any) => {
+      if (!eventMap.has(event.id)) {
+        eventMap.set(event.id, event);
+      }
+    });
+  });
+  const eventCategories = Array.from(eventMap.values());
 
   return (
     <div className="overflow-x-auto">
-      {/* Event rates header */}
-      <div className="px-3.5 py-2.5 border-b border-border bg-bg-2 text-[10px] font-bold text-text-3 flex flex-wrap gap-4">
-        <span>Event Rates (KES):</span>
-        {eventCategories.map((cat) => (
-          <span key={cat.id}>
-            {cat.name}: {(eventRates[cat.name] ?? 0).toLocaleString()}
-          </span>
-        ))}
-      </div>
-
       <table className="w-full">
         <thead>
           <tr className="border-b border-border">
             <th className="label-eyebrow px-3.5 py-2.5 text-left">Deanery / Parish</th>
-            {eventCategories.map((cat) => (
+            {eventCategories.map((event: any) => (
               <th
-                key={cat.id}
+                key={event.id}
                 className="label-eyebrow px-3.5 py-2.5 text-right whitespace-nowrap text-[10px]"
               >
-                <div className="font-bold">{cat.name}</div>
+                <div className="font-bold">{event.name}</div>
                 <div className="text-[9px] font-semibold text-text-3">
-                  ({(eventRates[cat.name] ?? 0).toLocaleString()})
+                  ({event.amountDue.toLocaleString()})
                 </div>
               </th>
             ))}
@@ -333,50 +354,52 @@ function EventsTab({
         <tbody>
           {deaneryId
             ? // Show parishes for selected deanery
-              (org?.parishes ?? [])
-                .filter((p) => p.deanery_id === deaneryId)
-                .map((parish) => (
-                  <tr key={parish.id} className="border-b border-border/30 hover:bg-bg-3">
-                    <td className="px-3.5 py-2.5 text-[11px] font-semibold text-foreground">
-                      {parish.name}
+              summaries[0]?.parishes?.map((parish: any) => (
+                <tr key={parish.id} className="border-b border-border/30 hover:bg-bg-3">
+                  <td className="px-3.5 py-2.5 text-[11px] font-semibold text-foreground">
+                    {parish.name}
+                  </td>
+                  {parish.events?.map((event: any) => (
+                    <td
+                      key={event.id}
+                      className="px-3.5 py-2.5 text-right text-[11px] font-semibold text-foreground"
+                    >
+                      KES {event.amountDue.toLocaleString()}
                     </td>
-                    {eventCategories.map((cat) => (
-                      <td
-                        key={cat.id}
-                        className="px-3.5 py-2.5 text-right text-[11px] font-semibold text-foreground"
-                      >
-                        KES 0
-                      </td>
-                    ))}
-                    <td className="px-3.5 py-2.5 text-right text-[11px] text-danger font-semibold">
-                      KES 0
-                    </td>
-                    <td className="px-3.5 py-2.5 text-right text-[11px] text-text-3">KES 0</td>
-                    <td className="px-3.5 py-2.5 text-right text-[11px] font-semibold text-success">
-                      KES 0
-                    </td>
-                  </tr>
-                ))
+                  ))}
+                  <td className="px-3.5 py-2.5 text-right text-[11px] text-danger font-semibold">
+                    KES {(parish.currentArrears ?? 0).toLocaleString()}
+                  </td>
+                  <td className="px-3.5 py-2.5 text-right text-[11px] text-text-3">
+                    KES {(parish.previousArrears ?? 0).toLocaleString()}
+                  </td>
+                  <td className="px-3.5 py-2.5 text-right text-[11px] font-semibold text-success">
+                    KES {(parish.totalBalance ?? 0).toLocaleString()}
+                  </td>
+                </tr>
+              ))
             : // Show deaneries
-              (org?.deaneries ?? []).map((deanery) => (
+              summaries.map((deanery: any) => (
                 <tr key={deanery.id} className="border-b border-border/30 hover:bg-bg-3">
                   <td className="px-3.5 py-2.5 text-[11px] font-bold text-foreground">
                     {deanery.name}
                   </td>
-                  {eventCategories.map((cat) => (
+                  {deanery.events?.map((event: any) => (
                     <td
-                      key={cat.id}
+                      key={event.id}
                       className="px-3.5 py-2.5 text-right text-[11px] font-semibold text-foreground"
                     >
-                      KES 0
+                      KES {event.amountDue.toLocaleString()}
                     </td>
                   ))}
                   <td className="px-3.5 py-2.5 text-right text-[11px] text-danger font-semibold">
-                    KES 0
+                    KES {(deanery.currentArrears ?? 0).toLocaleString()}
                   </td>
-                  <td className="px-3.5 py-2.5 text-right text-[11px] text-text-3">KES 0</td>
+                  <td className="px-3.5 py-2.5 text-right text-[11px] text-text-3">
+                    KES {(deanery.previousArrears ?? 0).toLocaleString()}
+                  </td>
                   <td className="px-3.5 py-2.5 text-right text-[11px] font-semibold text-success">
-                    KES 0
+                    KES {(deanery.totalBalance ?? 0).toLocaleString()}
                   </td>
                 </tr>
               ))}
@@ -534,3 +557,4 @@ function EnrollmentTab({
     </table>
   );
 }
+

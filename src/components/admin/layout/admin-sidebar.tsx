@@ -105,6 +105,12 @@ const GROUPS: NavGroup[] = [
     label: "Finance",
     items: [
       { to: "/admin/finances", label: "Ledger & Payments", icon: Banknote, module: "finances" },
+      {
+        to: "/admin/finances-config",
+        label: "Configuration",
+        icon: Banknote,
+        module: "finances-config",
+      },
     ],
   },
   {

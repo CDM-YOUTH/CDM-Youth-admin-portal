@@ -334,3 +334,568 @@ export async function deletePaymentAllocation(id: string) {
 
   if (error) throw new Error(`Failed to delete allocation: ${error.message}`);
 }
+
+// ============ ARREARS AGGREGATIONS ============
+
+export type ArrearsAggregation = {
+  currentArrears: number; // Current fiscal year obligations - payments
+  previousArrears: number; // Sum of all prior year arrears
+  totalBalance: number; // currentArrears + previousArrears
+};
+
+export async function getParishArrears(
+  parishId: string,
+  currentFiscalYear: number,
+): Promise<ArrearsAggregation> {
+  // Get current year assessments
+  const { data: currentAssessments = [] } = await supabase
+    .from("parish_assessments")
+    .select("id, amount_due")
+    .eq("parish_id", parishId)
+    .eq("fiscal_year", currentFiscalYear);
+
+  const currentDue = currentAssessments.reduce((sum, a: any) => sum + parseInt(a.amount_due || 0), 0);
+
+  // Get payments for current year assessments
+  const { data: currentPayments = [] } = await supabase
+    .from("payment_allocations")
+    .select("allocated_amount")
+    .in(
+      "assessment_id",
+      currentAssessments.map((a: any) => a.id),
+    );
+
+  const currentPaid = currentPayments.reduce((sum, p: any) => sum + parseInt(p.allocated_amount || 0), 0);
+  const currentArrears = Math.max(0, currentDue - currentPaid);
+
+  // Get all prior year assessments
+  const { data: priorAssessments = [] } = await supabase
+    .from("parish_assessments")
+    .select("id, amount_due")
+    .eq("parish_id", parishId)
+    .lt("fiscal_year", currentFiscalYear);
+
+  const priorDue = priorAssessments.reduce((sum, a: any) => sum + parseInt(a.amount_due || 0), 0);
+
+  // Get payments for prior year assessments
+  const { data: priorPayments = [] } = await supabase
+    .from("payment_allocations")
+    .select("allocated_amount")
+    .in(
+      "assessment_id",
+      priorAssessments.map((a: any) => a.id),
+    );
+
+  const priorPaid = priorPayments.reduce((sum, p: any) => sum + parseInt(p.allocated_amount || 0), 0);
+  const previousArrears = Math.max(0, priorDue - priorPaid);
+
+  return {
+    currentArrears,
+    previousArrears,
+    totalBalance: currentArrears + previousArrears,
+  };
+}
+
+// ============ SUMMARY ENDPOINTS ============
+
+export type EventDetail = {
+  id: string;
+  name: string;
+  amountDue: number;
+  amountPaid: number;
+  arrears: number;
+};
+
+export type ParishEventSummary = {
+  id: string;
+  name: string;
+  events: EventDetail[];
+  currentArrears: number;
+  previousArrears: number;
+  totalBalance: number;
+};
+
+export type DeaneryEventSummary = {
+  id: string;
+  name: string;
+  events: EventDetail[];
+  currentArrears: number;
+  previousArrears: number;
+  totalBalance: number;
+  parishes: ParishEventSummary[];
+};
+
+export async function getEventsSummary(params: {
+  year: number;
+  deaneryId?: string | null;
+  parishId?: string | null;
+}) {
+  const { year, deaneryId, parishId } = params;
+
+  // ONE QUERY: Fetch all event assessments with related data
+  let assessmentQuery = supabase
+    .from("parish_assessments")
+    .select(
+      `
+      id, parish_id, deanery_id, amount_due, amount_paid,
+      category:financial_categories(id, name),
+      parish:parishes(id, name, deanery_id, deanery:deaneries(id, name))
+    `,
+    )
+    .eq("fiscal_year", year)
+    .eq("category_type", "event");
+
+  // Apply filter
+  if (parishId) {
+    assessmentQuery = assessmentQuery.eq("parish_id", parishId);
+  } else if (deaneryId) {
+    assessmentQuery = assessmentQuery.eq("deanery_id", deaneryId);
+  }
+
+  const { data: assessments = [] } = await assessmentQuery;
+
+  if (!assessments.length) {
+    return { summaries: [] };
+  }
+
+  // Build response - aggregate IN MEMORY, not with more queries
+  if (parishId) {
+    // Single parish
+    const parish = assessments[0]?.parish;
+    const events: EventDetail[] = assessments.map((a: any) => ({
+      id: a.category.id,
+      name: a.category.name,
+      amountDue: parseInt(a.amount_due || 0),
+      amountPaid: parseInt(a.amount_paid || 0),
+      arrears: Math.max(0, parseInt(a.amount_due || 0) - parseInt(a.amount_paid || 0)),
+    }));
+
+    const currentArrears = events.reduce((sum, e) => sum + e.arrears, 0);
+
+    return {
+      summaries: [
+        {
+          id: parish?.id,
+          name: parish?.name,
+          events,
+          currentArrears,
+          previousArrears: 0,
+          totalBalance: currentArrears,
+        },
+      ],
+    };
+  }
+
+  // Group by deanery & parish in memory
+  const deaneryMap = new Map<string, any>();
+
+  assessments.forEach((a: any) => {
+    const deanery = a.parish?.deanery;
+    const parish = a.parish;
+    const deaneryKey = a.deanery_id;  // Use direct column, not nested relationship
+
+    if (!deaneryMap.has(deaneryKey)) {
+      deaneryMap.set(deaneryKey, {
+        id: deaneryKey,  // Use direct column value
+        name: deanery?.name,  // Use nested relationship for name
+        parishes: new Map(),
+        eventMap: new Map(),
+      });
+    }
+
+    const deaneryData = deaneryMap.get(deaneryKey);
+
+    // Add to parish
+    if (!deaneryData.parishes.has(parish.id)) {
+      deaneryData.parishes.set(parish.id, {
+        id: parish.id,
+        name: parish.name,
+        events: new Map(),
+      });
+    }
+
+    const parishData = deaneryData.parishes.get(parish.id);
+
+    // Aggregate event
+    const eventKey = a.category.id;
+    const eventAmount = {
+      id: a.category.id,
+      name: a.category.name,
+      amountDue: parseInt(a.amount_due || 0),
+      amountPaid: parseInt(a.amount_paid || 0),
+    };
+
+    if (parishData.events.has(eventKey)) {
+      const existing = parishData.events.get(eventKey);
+      existing.amountDue += eventAmount.amountDue;
+      existing.amountPaid += eventAmount.amountPaid;
+    } else {
+      parishData.events.set(eventKey, eventAmount);
+    }
+
+    // Aggregate for deanery
+    if (deaneryData.eventMap.has(eventKey)) {
+      const existing = deaneryData.eventMap.get(eventKey);
+      existing.amountDue += eventAmount.amountDue;
+      existing.amountPaid += eventAmount.amountPaid;
+    } else {
+      deaneryData.eventMap.set(eventKey, { ...eventAmount });
+    }
+  });
+
+  // Format response
+  const summaries: DeaneryEventSummary[] = Array.from(deaneryMap.values()).map(
+    (deaneryData) => {
+      const parishSummaries: ParishEventSummary[] = Array.from(
+        deaneryData.parishes.values(),
+      ).map((parishData) => {
+        const events = Array.from(parishData.events.values()).map((e: any) => ({
+          ...e,
+          arrears: Math.max(0, e.amountDue - e.amountPaid),
+        }));
+        const currentArrears = events.reduce((sum, e) => sum + e.arrears, 0);
+
+        return {
+          id: parishData.id,
+          name: parishData.name,
+          events,
+          currentArrears,
+          previousArrears: 0,
+          totalBalance: currentArrears,
+        };
+      });
+
+      const deaneryEvents = Array.from(deaneryData.eventMap.values()).map((e: any) => ({
+        ...e,
+        arrears: Math.max(0, e.amountDue - e.amountPaid),
+      }));
+
+      const deaneryCurrentArrears = parishSummaries.reduce(
+        (sum, p) => sum + p.currentArrears,
+        0,
+      );
+
+      return {
+        id: deaneryData.id,
+        name: deaneryData.name,
+        events: deaneryEvents,
+        currentArrears: deaneryCurrentArrears,
+        previousArrears: 0,
+        totalBalance: deaneryCurrentArrears,
+        parishes: parishSummaries,
+      };
+    },
+  );
+
+  return { summaries: deaneryId ? summaries : summaries };
+}
+
+export async function getProjectsSummary(params: {
+  year: number;
+  deaneryId?: string | null;
+  parishId?: string | null;
+}) {
+  const { year, deaneryId, parishId } = params;
+
+  // ONE QUERY: Fetch all project assessments
+  let assessmentQuery = supabase
+    .from("parish_assessments")
+    .select(
+      `
+      id, parish_id, deanery_id, amount_due, amount_paid,
+      category:financial_categories(id, name),
+      parish:parishes(id, name, deanery_id, deanery:deaneries(id, name))
+    `,
+    )
+    .eq("fiscal_year", year)
+    .eq("category_type", "project");
+
+  if (parishId) {
+    assessmentQuery = assessmentQuery.eq("parish_id", parishId);
+  } else if (deaneryId) {
+    assessmentQuery = assessmentQuery.eq("deanery_id", deaneryId);
+  }
+
+  const { data: assessments = [] } = await assessmentQuery;
+
+  if (!assessments.length) {
+    return { summaries: [] };
+  }
+
+  if (parishId) {
+    const parish = assessments[0]?.parish;
+    const projects: EventDetail[] = assessments.map((a: any) => ({
+      id: a.category.id,
+      name: a.category.name,
+      amountDue: parseInt(a.amount_due || 0),
+      amountPaid: parseInt(a.amount_paid || 0),
+      arrears: Math.max(0, parseInt(a.amount_due || 0) - parseInt(a.amount_paid || 0)),
+    }));
+
+    const currentBalance = projects.reduce((sum, p) => sum + p.arrears, 0);
+
+    return {
+      summaries: [
+        {
+          id: parish?.id,
+          name: parish?.name,
+          projects,
+          currentBalance,
+          previousBalance: 0,
+          totalBalance: currentBalance,
+        },
+      ],
+    };
+  }
+
+  // Group in memory
+  const deaneryMap = new Map<string, any>();
+
+  assessments.forEach((a: any) => {
+    const deanery = a.parish?.deanery;
+    const parish = a.parish;
+    const deaneryKey = a.deanery_id;  // Use direct column, not nested relationship
+
+    if (!deaneryMap.has(deaneryKey)) {
+      deaneryMap.set(deaneryKey, {
+        id: deaneryKey,  // Use direct column value
+        name: deanery?.name,  // Use nested relationship for name
+        parishes: new Map(),
+        projectMap: new Map(),
+      });
+    }
+
+    const deaneryData = deaneryMap.get(deaneryKey);
+
+    if (!deaneryData.parishes.has(parish.id)) {
+      deaneryData.parishes.set(parish.id, {
+        id: parish.id,
+        name: parish.name,
+        projects: new Map(),
+      });
+    }
+
+    const parishData = deaneryData.parishes.get(parish.id);
+    const projectKey = a.category.id;
+    const projectAmount = {
+      id: a.category.id,
+      name: a.category.name,
+      amountDue: parseInt(a.amount_due || 0),
+      amountPaid: parseInt(a.amount_paid || 0),
+    };
+
+    if (parishData.projects.has(projectKey)) {
+      const existing = parishData.projects.get(projectKey);
+      existing.amountDue += projectAmount.amountDue;
+      existing.amountPaid += projectAmount.amountPaid;
+    } else {
+      parishData.projects.set(projectKey, projectAmount);
+    }
+
+    if (deaneryData.projectMap.has(projectKey)) {
+      const existing = deaneryData.projectMap.get(projectKey);
+      existing.amountDue += projectAmount.amountDue;
+      existing.amountPaid += projectAmount.amountPaid;
+    } else {
+      deaneryData.projectMap.set(projectKey, { ...projectAmount });
+    }
+  });
+
+  const summaries = Array.from(deaneryMap.values()).map((deaneryData) => {
+    const parishSummaries = Array.from(deaneryData.parishes.values()).map((parishData) => {
+      const projects = Array.from(parishData.projects.values()).map((p: any) => ({
+        ...p,
+        arrears: Math.max(0, p.amountDue - p.amountPaid),
+      }));
+      const currentBalance = projects.reduce((sum, p) => sum + p.arrears, 0);
+
+      return {
+        id: parishData.id,
+        name: parishData.name,
+        projects,
+        currentBalance,
+        previousBalance: 0,
+        totalBalance: currentBalance,
+      };
+    });
+
+    const deaneryProjects = Array.from(deaneryData.projectMap.values()).map((p: any) => ({
+      ...p,
+      arrears: Math.max(0, p.amountDue - p.amountPaid),
+    }));
+
+    const deaneryCurrentBalance = parishSummaries.reduce(
+      (sum, p) => sum + p.currentBalance,
+      0,
+    );
+
+    return {
+      id: deaneryData.id,
+      name: deaneryData.name,
+      projects: deaneryProjects,
+      currentBalance: deaneryCurrentBalance,
+      previousBalance: 0,
+      totalBalance: deaneryCurrentBalance,
+      parishes: parishSummaries,
+    };
+  });
+
+  return { summaries };
+}
+
+export async function getEnrollmentSummary(params: {
+  year: number;
+  deaneryId?: string | null;
+  parishId?: string | null;
+}) {
+  const { year, deaneryId, parishId } = params;
+
+  // ONE QUERY: Fetch all enrollment assessments
+  let assessmentQuery = supabase
+    .from("parish_assessments")
+    .select(
+      `
+      id, parish_id, deanery_id, amount_due, amount_paid, headcount,
+      category:financial_categories(id, name),
+      parish:parishes(id, name, deanery_id, deanery:deaneries(id, name))
+    `,
+    )
+    .eq("fiscal_year", year)
+    .eq("category_type", "enrollment");
+
+  if (parishId) {
+    assessmentQuery = assessmentQuery.eq("parish_id", parishId);
+  } else if (deaneryId) {
+    assessmentQuery = assessmentQuery.eq("deanery_id", deaneryId);
+  }
+
+  const { data: assessments = [] } = await assessmentQuery;
+
+  if (!assessments.length) {
+    return { summaries: [] };
+  }
+
+  if (parishId) {
+    const parish = assessments[0]?.parish;
+    const totalEnrolled = assessments.reduce((sum, a) => sum + (a.headcount || 0), 0);
+    const totalDue = assessments.reduce((sum, a) => sum + parseInt(a.amount_due || 0), 0);
+    const totalPaid = assessments.reduce((sum, a) => sum + parseInt(a.amount_paid || 0), 0);
+    const arrears = Math.max(0, totalDue - totalPaid);
+
+    return {
+      summaries: [
+        {
+          id: parish?.id,
+          name: parish?.name,
+          enrolled: totalEnrolled,
+          totalDue,
+          totalPaid,
+          currentArrears: arrears,
+          previousArrears: 0,
+          totalBalance: arrears,
+        },
+      ],
+    };
+  }
+
+  // Group in memory
+  const deaneryMap = new Map<string, any>();
+
+  assessments.forEach((a: any) => {
+    const deanery = a.parish?.deanery;
+    const parish = a.parish;
+    const deaneryKey = a.deanery_id;  // Use direct column, not nested relationship
+
+    if (!deaneryMap.has(deaneryKey)) {
+      deaneryMap.set(deaneryKey, {
+        id: deaneryKey,  // Use direct column value
+        name: deanery?.name,  // Use nested relationship for name
+        parishes: new Map(),
+        totalEnrolled: 0,
+        totalDue: 0,
+        totalPaid: 0,
+      });
+    }
+
+    const deaneryData = deaneryMap.get(deaneryKey);
+
+    if (!deaneryData.parishes.has(parish.id)) {
+      deaneryData.parishes.set(parish.id, {
+        id: parish.id,
+        name: parish.name,
+        enrolled: 0,
+        totalDue: 0,
+        totalPaid: 0,
+      });
+    }
+
+    const parishData = deaneryData.parishes.get(parish.id);
+    const headcount = a.headcount || 0;
+    const due = parseInt(a.amount_due || 0);
+    const paid = parseInt(a.amount_paid || 0);
+
+    parishData.enrolled += headcount;
+    parishData.totalDue += due;
+    parishData.totalPaid += paid;
+
+    deaneryData.totalEnrolled += headcount;
+    deaneryData.totalDue += due;
+    deaneryData.totalPaid += paid;
+  });
+
+  const summaries = Array.from(deaneryMap.values()).map((deaneryData) => {
+    const parishSummaries = Array.from(deaneryData.parishes.values()).map((parishData) => {
+      const arrears = Math.max(0, parishData.totalDue - parishData.totalPaid);
+      return {
+        id: parishData.id,
+        name: parishData.name,
+        enrolled: parishData.enrolled,
+        totalDue: parishData.totalDue,
+        totalPaid: parishData.totalPaid,
+        currentArrears: arrears,
+        previousArrears: 0,
+        totalBalance: arrears,
+      };
+    });
+
+    const deaneryArrears = Math.max(0, deaneryData.totalDue - deaneryData.totalPaid);
+
+    return {
+      id: deaneryData.id,
+      name: deaneryData.name,
+      enrolled: deaneryData.totalEnrolled,
+      totalDue: deaneryData.totalDue,
+      totalPaid: deaneryData.totalPaid,
+      currentArrears: deaneryArrears,
+      previousArrears: 0,
+      totalBalance: deaneryArrears,
+      parishes: parishSummaries,
+    };
+  });
+
+  return { summaries };
+}
+
+export async function getGeneralSummary(params: {
+  year: number;
+  deaneryId?: string | null;
+  parishId?: string | null;
+}) {
+  const { year, deaneryId, parishId } = params;
+
+  // Fetch all three summaries in parallel
+  const [events, projects, enrollment] = await Promise.all([
+    getEventsSummary({ year, deaneryId, parishId }),
+    getProjectsSummary({ year, deaneryId, parishId }),
+    getEnrollmentSummary({ year, deaneryId, parishId }),
+  ]);
+
+  return {
+    year,
+    deaneryId: deaneryId || null,
+    parishId: parishId || null,
+    events,
+    projects,
+    enrollment,
+  };
+}
